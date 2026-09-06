@@ -100,10 +100,26 @@
     },
     {
       "id": "winpkfilter",
-      "version": "3.6.2+",
+      "version": "3.6.2.1",
       "acquisition": "officialDownload",
       "licenseNotice": "Windows Packet Filter is maintained by NT Kernel Resources and is required by ProxiFyre.",
-      "officialUri": "https://github.com/wiresock/ndisapi/releases/tag/v3.6.2"
+      "officialUri": "https://github.com/wiresock/ndisapi/releases/tag/v3.6.2",
+      "sha256": "9c388c0b7f189f7fa98720bae2caecf7d64f30910838b80b438ecf8956b8502c"
+    },
+    {
+      "id": "vcredist-x64",
+      "version": "14.44.35211.0",
+      "acquisition": "officialDownload",
+      "licenseNotice": "The Microsoft Visual C++ 2015–2022 x64 runtime is downloaded from Microsoft only when requested by the user.",
+      "officialUri": "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist",
+      "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b"
+    },
+    {
+      "id": "dotnet-framework",
+      "version": "4.7.2+",
+      "acquisition": "officialDownload",
+      "licenseNotice": ".NET Framework is installed separately from its official Microsoft download page when it is not already part of Windows.",
+      "officialUri": "https://dotnet.microsoft.com/en-us/download/dotnet-framework/net472"
     }
   ]
 }

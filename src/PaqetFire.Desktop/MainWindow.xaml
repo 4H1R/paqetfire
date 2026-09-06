@@ -389,6 +389,80 @@
             </Grid>
 
             <Border Padding="22" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="16">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="Required software" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="PaqetFire checks these system components for you. Downloads happen only when you choose Install and are removed afterward."
+                             Opacity="0.68" TextWrapping="Wrap" />
+                </StackPanel>
+                <InfoBar x:Name="PrerequisitesInfoBar" IsOpen="False" IsClosable="True" />
+
+                <Grid ColumnSpacing="16" RowSpacing="16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+
+                  <Border Padding="16" CornerRadius="14" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid RowSpacing="8">
+                      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                      <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="Npcap" FontWeight="SemiBold" />
+                        <TextBlock x:Name="NpcapPrerequisiteStatusText" Grid.Column="1" Text="Checking…" Opacity="0.7" />
+                      </Grid>
+                      <TextBlock x:Name="NpcapPrerequisiteDetailText" Grid.Row="1" Text="Packet capture driver used by Paqet." FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                      <Button x:Name="NpcapPrerequisiteButton" Grid.Row="2" Tag="npcap" Content="Open official download" HorizontalAlignment="Left"
+                              IsEnabled="False" Click="PrerequisiteActionButton_Click" />
+                    </Grid>
+                  </Border>
+
+                  <Border Grid.Column="1" Padding="16" CornerRadius="14" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid RowSpacing="8">
+                      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                      <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="Windows Packet Filter" FontWeight="SemiBold" />
+                        <TextBlock x:Name="WinpkFilterPrerequisiteStatusText" Grid.Column="1" Text="Checking…" Opacity="0.7" />
+                      </Grid>
+                      <TextBlock x:Name="WinpkFilterPrerequisiteDetailText" Grid.Row="1" Text="Network redirect driver used by ProxiFyre." FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                      <Button x:Name="WinpkFilterPrerequisiteButton" Grid.Row="2" Tag="winpkfilter" Content="Download and install" HorizontalAlignment="Left"
+                              IsEnabled="False" Click="PrerequisiteActionButton_Click" />
+                    </Grid>
+                  </Border>
+
+                  <Border Grid.Row="1" Padding="16" CornerRadius="14" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid RowSpacing="8">
+                      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                      <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="Visual C++ runtime" FontWeight="SemiBold" />
+                        <TextBlock x:Name="VisualCppPrerequisiteStatusText" Grid.Column="1" Text="Checking…" Opacity="0.7" />
+                      </Grid>
+                      <TextBlock x:Name="VisualCppPrerequisiteDetailText" Grid.Row="1" Text="Microsoft x64 runtime used by ProxiFyre." FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                      <Button x:Name="VisualCppPrerequisiteButton" Grid.Row="2" Tag="vcredist-x64" Content="Download and install" HorizontalAlignment="Left"
+                              IsEnabled="False" Click="PrerequisiteActionButton_Click" />
+                    </Grid>
+                  </Border>
+
+                  <Border Grid.Row="1" Grid.Column="1" Padding="16" CornerRadius="14" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid RowSpacing="8">
+                      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                      <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text=".NET Framework" FontWeight="SemiBold" />
+                        <TextBlock x:Name="DotNetPrerequisiteStatusText" Grid.Column="1" Text="Checking…" Opacity="0.7" />
+                      </Grid>
+                      <TextBlock x:Name="DotNetPrerequisiteDetailText" Grid.Row="1" Text=".NET Framework 4.7.2 or newer, used by ProxiFyre." FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                      <Button x:Name="DotNetPrerequisiteButton" Grid.Row="2" Tag="dotnet-framework" Content="Open Microsoft download" HorizontalAlignment="Left"
+                              IsEnabled="False" Click="PrerequisiteActionButton_Click" />
+                    </Grid>
+                  </Border>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="22" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="12">
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

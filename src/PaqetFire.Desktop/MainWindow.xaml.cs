@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Microsoft.UI.Windowing;
@@ -6,9 +7,11 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PaqetFire.Core.Configuration;
+using PaqetFire.Core.Deployment;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Routing;
 using PaqetFire.Desktop.Ipc;
+using PaqetFire.Desktop.Services;
 using PaqetFire.Desktop.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
@@ -24,9 +27,15 @@ public sealed partial class MainWindow : Window
     private bool hasSavedLanSocksPassword;
     private DesktopPreferences preferences = new();
     private readonly HashSet<string> brokerLogLines = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PrerequisiteStatus> prerequisites = new(StringComparer.OrdinalIgnoreCase);
+    private readonly PrerequisiteInstallerService prerequisiteInstaller = new();
     private System.Windows.Forms.NotifyIcon? trayIcon;
+    private System.Windows.Forms.ToolStripMenuItem? trayStatusMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem? trayConnectMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem? trayDisconnectMenuItem;
     private bool exitRequested;
     private bool trayNoticeShown;
+    private bool prerequisiteActionInProgress;
 
     public ConnectionViewModel ViewModel { get; }
 
@@ -39,6 +48,7 @@ public sealed partial class MainWindow : Window
         ViewModel = new ConnectionViewModel(new NamedPipeBrokerClient(), dispatcherQueue);
         ViewModel.ActivityOccurred += OnActivityOccurred;
         ViewModel.SnapshotReceived += OnSnapshotReceived;
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         InitializeComponent();
 
@@ -91,6 +101,81 @@ public sealed partial class MainWindow : Window
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) =>
         await ViewModel.RefreshAsync();
+
+    private async void PrerequisiteActionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (prerequisiteActionInProgress || sender is not Button button || button.Tag is not string id)
+        {
+            return;
+        }
+
+        if (!prerequisites.TryGetValue(id, out var prerequisite) || prerequisite.IsInstalled)
+        {
+            return;
+        }
+
+        if (!PrerequisiteInstallerService.CanInstallAutomatically(id))
+        {
+            if (prerequisite.HelpUri is null)
+            {
+                ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Warning, "Download unavailable", "No official download page was reported for this component.");
+                return;
+            }
+
+            try
+            {
+                PrerequisiteInstallerService.OpenOfficialPage(prerequisite.HelpUri);
+                ShowInfo(
+                    PrerequisitesInfoBar,
+                    InfoBarSeverity.Informational,
+                    $"Install {prerequisite.DisplayName}",
+                    id == "npcap"
+                        ? "The official Npcap page is open. Install Npcap with WinPcap API-compatible mode enabled, then return here and run checks."
+                        : "The official Microsoft download page is open. Finish the installer, then return here and run checks.");
+                AddActivity($"Opened the official {prerequisite.DisplayName} download page.");
+            }
+            catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+            {
+                ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Error, "Could not open the download page", exception.Message);
+            }
+
+            return;
+        }
+
+        prerequisiteActionInProgress = true;
+        UpdatePrerequisiteCards();
+        try
+        {
+            var progress = new Progress<string>(message =>
+                ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Informational, "Installing required software", message));
+            var result = await prerequisiteInstaller.InstallAsync(id, progress);
+            ShowInfo(
+                PrerequisitesInfoBar,
+                result.RestartRequired ? InfoBarSeverity.Warning : InfoBarSeverity.Success,
+                result.RestartRequired ? "Installation complete — restart required" : "Installation complete",
+                result.RestartRequired
+                    ? "Restart Windows before connecting with PaqetFire."
+                    : "PaqetFire is checking the component again now.");
+            AddActivity($"Installed {prerequisite.DisplayName}.");
+            await ViewModel.RefreshAsync();
+        }
+        catch (OperationCanceledException exception)
+        {
+            ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Warning, "Installation cancelled", exception.Message);
+            AddActivity($"Installation cancelled for {prerequisite.DisplayName}.");
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Error, "Installation failed", exception.Message);
+            AddActivity($"Could not install {prerequisite.DisplayName}.", "ERROR");
+        }
+        finally
+        {
+            prerequisiteActionInProgress = false;
+            UpdatePrerequisiteCards();
+        }
+    }
 
     private void NavigationView_SelectionChanged(
         NavigationView sender,
@@ -629,14 +714,23 @@ public sealed partial class MainWindow : Window
 
         if (snapshot.Prerequisites is { Count: > 0 } prerequisites)
         {
+            this.prerequisites.Clear();
+            foreach (var prerequisite in prerequisites)
+            {
+                this.prerequisites[prerequisite.Id] = prerequisite;
+            }
+
             var missing = prerequisites.Where(item => !item.IsInstalled).ToArray();
             PrerequisiteSummaryText.Text = missing.Length == 0
                 ? "Prerequisites · Ready"
                 : $"Prerequisites · {missing.Length} missing";
+            UpdatePrerequisiteCards();
         }
         else
         {
+            this.prerequisites.Clear();
             PrerequisiteSummaryText.Text = "Prerequisites · No report";
+            UpdatePrerequisiteCards();
         }
 
         foreach (var line in snapshot.RecentLogs ?? [])
@@ -649,6 +743,54 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnActivityOccurred(string message) => AddActivity(message);
+
+    private void UpdatePrerequisiteCards()
+    {
+        UpdatePrerequisiteCard(
+            "npcap",
+            NpcapPrerequisiteStatusText,
+            NpcapPrerequisiteDetailText,
+            NpcapPrerequisiteButton,
+            "Open official download");
+        UpdatePrerequisiteCard(
+            "winpkfilter",
+            WinpkFilterPrerequisiteStatusText,
+            WinpkFilterPrerequisiteDetailText,
+            WinpkFilterPrerequisiteButton,
+            "Download and install");
+        UpdatePrerequisiteCard(
+            "vcredist-x64",
+            VisualCppPrerequisiteStatusText,
+            VisualCppPrerequisiteDetailText,
+            VisualCppPrerequisiteButton,
+            "Download and install");
+        UpdatePrerequisiteCard(
+            "dotnet-framework",
+            DotNetPrerequisiteStatusText,
+            DotNetPrerequisiteDetailText,
+            DotNetPrerequisiteButton,
+            "Open Microsoft download");
+    }
+
+    private void UpdatePrerequisiteCard(
+        string id,
+        TextBlock statusText,
+        TextBlock detailText,
+        Button actionButton,
+        string actionLabel)
+    {
+        if (!prerequisites.TryGetValue(id, out var prerequisite))
+        {
+            statusText.Text = "Not checked";
+            actionButton.IsEnabled = false;
+            return;
+        }
+
+        statusText.Text = prerequisite.IsInstalled ? "Installed" : "Missing";
+        detailText.Text = prerequisite.Detail;
+        actionButton.Content = prerequisite.IsInstalled ? "Installed" : actionLabel;
+        actionButton.IsEnabled = !prerequisite.IsInstalled && !prerequisiteActionInProgress;
+    }
 
     private void AddActivity(string message, string level = "INFO")
     {
@@ -718,9 +860,21 @@ public sealed partial class MainWindow : Window
     private void InitializeTrayIcon(string iconPath)
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
+        trayStatusMenuItem = new System.Windows.Forms.ToolStripMenuItem("Status: Checking…")
+        {
+            Enabled = false,
+        };
+        trayConnectMenuItem = new System.Windows.Forms.ToolStripMenuItem("Connect", null, (_, _) => ConnectFromTray());
+        trayDisconnectMenuItem = new System.Windows.Forms.ToolStripMenuItem("Disconnect", null, (_, _) => DisconnectFromTray());
+        menu.Items.Add(trayStatusMenuItem);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        menu.Items.Add(trayConnectMenuItem);
+        menu.Items.Add(trayDisconnectMenuItem);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Open PaqetFire", null, (_, _) => RestoreFromTray());
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Exit PaqetFire", null, (_, _) => ExitFromTray());
+        menu.Opening += (_, _) => UpdateTrayState();
 
         trayIcon = new System.Windows.Forms.NotifyIcon
         {
@@ -729,9 +883,62 @@ public sealed partial class MainWindow : Window
             ContextMenuStrip = menu,
             Visible = true,
             BalloonTipTitle = "PaqetFire is still running",
-            BalloonTipText = "Use the notification-area icon to reopen or exit PaqetFire.",
+            BalloonTipText = "Right-click the icon to connect, disconnect, reopen, or exit PaqetFire.",
         };
         trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+        UpdateTrayState();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName is nameof(ConnectionViewModel.ConnectionState) or
+            nameof(ConnectionViewModel.CanConnect) or
+            nameof(ConnectionViewModel.CanDisconnect) or
+            nameof(ConnectionViewModel.IsBusy))
+        {
+            UpdateTrayState();
+        }
+    }
+
+    private void UpdateTrayState()
+    {
+        if (trayIcon is null || trayStatusMenuItem is null || trayConnectMenuItem is null || trayDisconnectMenuItem is null)
+        {
+            return;
+        }
+
+        var stateText = ViewModel.ConnectionState switch
+        {
+            BrokerConnectionState.Connected => "Connected",
+            BrokerConnectionState.Connecting => "Connecting…",
+            BrokerConnectionState.Disconnecting => "Disconnecting…",
+            BrokerConnectionState.NotReady => "Setup required",
+            BrokerConnectionState.Degraded => "Connection degraded",
+            BrokerConnectionState.Faulted => "Connection fault",
+            _ => "Disconnected",
+        };
+        trayStatusMenuItem.Text = $"Status: {stateText}";
+        trayConnectMenuItem.Enabled = ViewModel.CanConnect;
+        trayDisconnectMenuItem.Enabled = ViewModel.CanDisconnect;
+        trayIcon.Text = $"PaqetFire — {stateText}";
+    }
+
+    private void ConnectFromTray()
+    {
+        _ = DispatcherQueue.TryEnqueue(async () =>
+        {
+            await ViewModel.ConnectAsync();
+            UpdateTrayState();
+        });
+    }
+
+    private void DisconnectFromTray()
+    {
+        _ = DispatcherQueue.TryEnqueue(async () =>
+        {
+            await ViewModel.DisconnectAsync();
+            UpdateTrayState();
+        });
     }
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
@@ -792,6 +999,8 @@ public sealed partial class MainWindow : Window
 
         ViewModel.ActivityOccurred -= OnActivityOccurred;
         ViewModel.SnapshotReceived -= OnSnapshotReceived;
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        prerequisiteInstaller.Dispose();
         _ = ViewModel.DisposeAsync().AsTask();
     }
 }

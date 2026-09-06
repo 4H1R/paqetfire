@@ -84,17 +84,23 @@ Xray regional and blocking policy applies.
 - Administrator approval for installation and the broker service.
 - A compatible Paqet server endpoint and transport key.
 - [Npcap](https://npcap.com/#download) for Paqet packet capture.
-- [Windows Packet Filter](https://github.com/wiresock/ndisapi) for ProxiFyre.
+- [Windows Packet Filter 3.6.x](https://github.com/wiresock/ndisapi/releases/tag/v3.6.2),
+  [.NET Framework 4.7.2+](https://dotnet.microsoft.com/download/dotnet-framework/net472),
+  and the [Microsoft Visual C++ 2015–2022 x64 runtime](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)
+  for ProxiFyre.
 
-Paqet, Xray, and ProxiFyre are bundled in release installers. Packet-driver
-installers are not stored in this repository because they have separate
-redistribution terms; PaqetFire detects their installation status.
+Paqet, Xray, and ProxiFyre are bundled in release installers. The Diagnostics
+page detects every prerequisite and offers verified, on-demand installation
+where redistribution allows it. Prerequisite installers are not bundled with
+PaqetFire, so this helper does not increase the app's installed size. Npcap is
+opened from its official download page because Npcap Free may not be redistributed.
 
 ## Install and connect
 
-1. Install Npcap and Windows Packet Filter from their official sources.
-2. Install the latest PaqetFire x64 MSI from the project's Releases page when a
+1. Install the latest PaqetFire x64 MSI from the project's Releases page when a
    release is available.
+2. Open PaqetFire, then use **Diagnostics → Required software** to resolve
+   anything missing. Npcap must be installed with WinPcap-compatible mode enabled.
 3. Open **Paqet connection**, enter the server endpoint and transport key, then
    detect the active adapter.
 4. Open **Routing** and review application mode, destination policy, protocol
