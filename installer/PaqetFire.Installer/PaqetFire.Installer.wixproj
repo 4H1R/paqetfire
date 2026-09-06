@@ -4,7 +4,7 @@
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>PaqetFire-0.6.9-x64</OutputName>
+    <OutputName>PaqetFire-0.6.10-x64</OutputName>
     <OutputPath>..\..\artifacts\installer\</OutputPath>
     <!-- .NET 10 native runtime files expose non-MSI language metadata. -->
     <SuppressIces>ICE03</SuppressIces>

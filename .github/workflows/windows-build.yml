@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-build-${{ github.ref }}
@@ -68,6 +70,17 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $installers[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($installers[0].Name)" | Set-Content -LiteralPath "$($installers[0].FullName).sha256" -Encoding ascii
 
+      - name: Validate release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $expectedName = "PaqetFire-$version-x64.msi"
+          $installers = @(Get-ChildItem artifacts/installer/PaqetFire-*-x64.msi)
+          if ($installers.Count -ne 1 -or $installers[0].Name -ne $expectedName) {
+            throw "Release tag $env:GITHUB_REF_NAME does not match installer $($installers.Name)."
+          }
+
       - name: Upload downloadable installer
         uses: actions/upload-artifact@v7
         with:
@@ -77,3 +90,17 @@ jobs:
             artifacts/installer/PaqetFire-*-x64.msi.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = Get-ChildItem artifacts/installer/PaqetFire-*-x64.msi | Select-Object -First 1
+          gh release create $env:GITHUB_REF_NAME `
+            $installer.FullName `
+            "$($installer.FullName).sha256" `
+            --verify-tag `
+            --generate-notes `
+            --title "PaqetFire $env:GITHUB_REF_NAME"

@@ -4,7 +4,7 @@
   <Package
       Name="PaqetFire"
       Manufacturer="PaqetFire"
-      Version="0.6.9"
+      Version="0.6.10"
       Language="1033"
       UpgradeCode="4DA85CF0-9972-421B-99D1-A4631694C72F"
       Scope="perMachine"
