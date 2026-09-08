@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.17-FF6B42">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.18-FF6B42">
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-F59E0B">
   <a href="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml"><img alt="Windows build" src="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml/badge.svg?branch=main"></a>
 </p>
@@ -44,6 +44,8 @@ chain in a safe order.
 ## Highlights
 
 - Route every supported application or only selected executables.
+- Find installed and running applications with a searchable executable picker.
+- Keep multiple protected profiles, rename/switch/duplicate them, and import/export redacted profile catalogs.
 - Independently enable TCP, UDP, IPv4, and IPv6 routing.
 - Lock Paqet, Xray, ProxiFyre, and the broker out of catch-all rules to prevent
   recursive proxy loops.
@@ -56,8 +58,14 @@ chain in a safe order.
 - Share an authenticated Xray SOCKS5 port with trusted devices on the local
   subnet.
 - Detect the active adapter, IPv4 address, gateway, and gateway MAC address.
+- Verify engine health, the local SOCKS route, routed TCP/public IPv4, routed
+  UDP/DNS, and IPv6 on demand; ProxiFyre process state is reported separately
+  and is not presented as proof of capture or leak prevention.
+- Apply trusted/untrusted network rules with resume/network-change recovery and bounded reconnect backoff.
 - Store secrets with Windows DPAPI and restrict generated engine configuration
   to `SYSTEM` and Administrators.
+- Rotate sharing credentials, test listener reachability, copy URI/QR payloads,
+  and copy redacted client setup bundles.
 - Minimize to the notification area and optionally connect on launch.
 - Install the desktop app, broker, Paqet, Xray, and ProxiFyre as one product.
 
@@ -234,7 +242,7 @@ packages are intentionally excluded from Git.
 
 ## Project status
 
-Version 0.6.17 is a usable development preview. The current source includes the
+Version 0.6.18 is a usable development preview. The current source includes the
 native desktop UI, broker service, engine adapters, regional routing, protocol
 selection, kill switch, LAN SOCKS5 sharing, tray behavior, diagnostics, and the
 WiX installer.

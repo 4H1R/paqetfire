@@ -2,6 +2,7 @@ using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
 using PaqetFire.Core.Ipc;
+using PaqetFire.Core.Profiles;
 
 namespace PaqetFire.Broker.Ipc;
 
@@ -25,6 +26,30 @@ public sealed class ConnectionBrokerRequestHandler(
                     return BrokerResponse.Succeeded(
                         request.RequestId,
                         await runtime.DisconnectAsync(cancellationToken).ConfigureAwait(false));
+
+                case BrokerCommand.VerifyConnection:
+                    return BrokerResponse.Succeeded(
+                        request.RequestId,
+                        await runtime.VerifyConnectionAsync(cancellationToken).ConfigureAwait(false));
+
+                case BrokerCommand.ManageProfiles:
+                    if (request.ProfileAction is null)
+                    {
+                        return BrokerResponse.Failed(
+                            request.RequestId,
+                            BrokerErrorCode.InvalidRequest,
+                            "A profile action is required.");
+                    }
+                    return BrokerResponse.Succeeded(
+                        request.RequestId,
+                        await runtime.ManageProfilesAsync(request.ProfileAction, cancellationToken).ConfigureAwait(false));
+
+                case BrokerCommand.ExportProfiles:
+                    return new BrokerResponse(
+                        request.RequestId,
+                        IpcProtocol.Version,
+                        true,
+                        ExportedProfiles: await runtime.ExportProfilesAsync(cancellationToken).ConfigureAwait(false));
 
                 case BrokerCommand.SaveSettings:
                     if (request.Settings is null)
@@ -59,6 +84,20 @@ public sealed class ConnectionBrokerRequestHandler(
                 request.RequestId,
                 BrokerErrorCode.ConfigurationInvalid,
                 string.Join(Environment.NewLine, exception.Errors));
+        }
+        catch (ProfileCatalogException exception)
+        {
+            return BrokerResponse.Failed(
+                request.RequestId,
+                BrokerErrorCode.ConfigurationInvalid,
+                exception.Message);
+        }
+        catch (InvalidDataException exception)
+        {
+            return BrokerResponse.Failed(
+                request.RequestId,
+                BrokerErrorCode.ConfigurationInvalid,
+                exception.Message);
         }
         catch (MissingPrerequisiteException exception)
         {

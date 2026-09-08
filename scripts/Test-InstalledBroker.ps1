@@ -3,8 +3,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$pipeName = 'PaqetFire.Broker.v8'
-$protocolVersion = 8
+$pipeName = 'PaqetFire.Broker.v9'
+$protocolVersion = 9
 $requestId = [guid]::NewGuid()
 $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
 

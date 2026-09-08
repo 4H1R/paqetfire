@@ -2,12 +2,14 @@ using PaqetFire.Broker;
 using System.Net;
 using PaqetFire.Broker.Configuration;
 using PaqetFire.Broker.Deployment;
+using PaqetFire.Broker.Diagnostics;
 using PaqetFire.Broker.Engines;
 using PaqetFire.Broker.Ipc;
 using PaqetFire.Broker.Network;
 using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
+using PaqetFire.Core.Profiles;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -40,11 +42,18 @@ builder.Services.AddSingleton<PayloadIntegrityInspector>();
 builder.Services.AddSingleton<PrerequisiteInspector>();
 builder.Services.AddSingleton<NetworkEnvironmentDetector>();
 builder.Services.AddSingleton<HotspotNetworkDetector>();
+builder.Services.AddSingleton<IRouteProbe, SocketRouteProbe>();
+builder.Services.AddSingleton<IConnectionVerifier, ConnectionVerifier>();
 builder.Services.AddSingleton<IPaqetConfigurationWriter, PaqetYamlConfigurationWriter>();
 builder.Services.AddSingleton<IXrayConfigurationWriter, XrayJsonConfigurationWriter>();
 builder.Services.AddSingleton<IProxiFyreConfigurationWriter, ProxiFyreJsonConfigurationWriter>();
 builder.Services.AddSingleton<IMachineSettingsStore>(_ =>
     new MachineSettingsStore(paths.MachineSettingsPath));
+builder.Services.AddSingleton<IProfileSecretProtector, DpapiProfileSecretProtector>();
+builder.Services.AddSingleton<IMachineProfileCatalogStore>(services =>
+    new MachineProfileCatalogStore(
+        Path.Combine(Path.GetDirectoryName(paths.MachineSettingsPath)!, "profiles.json"),
+        services.GetRequiredService<IProfileSecretProtector>()));
 builder.Services.AddSingleton<IAtomicConfigurationStore>(_ =>
     new AtomicConfigurationStore(
         paths.PayloadRoot,

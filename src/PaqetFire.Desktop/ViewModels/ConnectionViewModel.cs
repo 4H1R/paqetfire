@@ -3,7 +3,9 @@ using System.Runtime.CompilerServices;
 using PaqetFire.Core.Engines;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Configuration;
+using PaqetFire.Core.Diagnostics;
 using PaqetFire.Core.Routing;
+using PaqetFire.Core.Profiles;
 using PaqetFire.Desktop.Ipc;
 using PaqetFire.Desktop.Presentation;
 using CoreConnectionState = PaqetFire.Core.Connections.ConnectionState;
@@ -473,6 +475,114 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         }
         finally
         {
+            operationLock.Release();
+        }
+    }
+
+    public async Task<ConnectionVerificationReport?> VerifyConnectionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (disposed || !await operationLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        try
+        {
+            await UpdateUiAsync(() =>
+            {
+                IsBusy = true;
+                ErrorMessage = null;
+                ActivityOccurred?.Invoke("Connection verification started.");
+            }).ConfigureAwait(false);
+            await brokerClient.OpenAsync(ConnectTimeout, cancellationToken).ConfigureAwait(false);
+            var snapshot = await brokerClient.VerifyConnectionAsync(LifecycleRequestTimeout, cancellationToken)
+                .ConfigureAwait(false);
+            await UpdateUiAsync(() =>
+            {
+                ApplySnapshot(snapshot);
+                ActivityOccurred?.Invoke(snapshot.Verification?.Summary ?? "Connection verification completed.");
+            }).ConfigureAwait(false);
+            return snapshot.Verification;
+        }
+        catch (Exception exception)
+        {
+            await UpdateUiAsync(() => ApplyTransportFailure(exception)).ConfigureAwait(false);
+            return null;
+        }
+        finally
+        {
+            await TryUpdateUiAsync(() => IsBusy = false).ConfigureAwait(false);
+            operationLock.Release();
+        }
+    }
+
+    public async Task<bool> ManageProfileAsync(
+        ProfileAction action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (disposed || !await operationLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        try
+        {
+            await UpdateUiAsync(() =>
+            {
+                IsBusy = true;
+                ErrorMessage = null;
+            }).ConfigureAwait(false);
+            await brokerClient.OpenAsync(ConnectTimeout, cancellationToken).ConfigureAwait(false);
+            var snapshot = await brokerClient.ManageProfilesAsync(
+                    action,
+                    LifecycleRequestTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await UpdateUiAsync(() => ApplySnapshot(snapshot)).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            await UpdateUiAsync(() => ApplyTransportFailure(exception)).ConfigureAwait(false);
+            return false;
+        }
+        finally
+        {
+            await TryUpdateUiAsync(() => IsBusy = false).ConfigureAwait(false);
+            operationLock.Release();
+        }
+    }
+
+    public async Task<string?> ExportProfilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (disposed || !await operationLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        try
+        {
+            await UpdateUiAsync(() =>
+            {
+                IsBusy = true;
+                ErrorMessage = null;
+            }).ConfigureAwait(false);
+            await brokerClient.OpenAsync(ConnectTimeout, cancellationToken).ConfigureAwait(false);
+            return await brokerClient.ExportProfilesAsync(
+                    LifecycleRequestTimeout,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            await UpdateUiAsync(() => ApplyTransportFailure(exception)).ConfigureAwait(false);
+            return null;
+        }
+        finally
+        {
+            await TryUpdateUiAsync(() => IsBusy = false).ConfigureAwait(false);
             operationLock.Release();
         }
     }

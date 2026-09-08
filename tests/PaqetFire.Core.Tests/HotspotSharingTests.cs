@@ -4,11 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PaqetFire.Broker.Configuration;
 using PaqetFire.Broker.Deployment;
+using PaqetFire.Broker.Diagnostics;
 using PaqetFire.Broker.Engines;
 using PaqetFire.Broker.Network;
 using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
+using PaqetFire.Core.Profiles;
 using Xunit;
 
 namespace PaqetFire.Core.Tests;
@@ -183,10 +185,16 @@ public sealed class HotspotSharingTests
         services.AddSingleton<PrerequisiteInspector>();
         services.AddSingleton<NetworkEnvironmentDetector>();
         services.AddSingleton<HotspotNetworkDetector>();
+        services.AddSingleton<IRouteProbe, SocketRouteProbe>();
+        services.AddSingleton<IConnectionVerifier, ConnectionVerifier>();
         services.AddSingleton<IPaqetConfigurationWriter, PaqetYamlConfigurationWriter>();
         services.AddSingleton<IXrayConfigurationWriter, XrayJsonConfigurationWriter>();
         services.AddSingleton<IProxiFyreConfigurationWriter, ProxiFyreJsonConfigurationWriter>();
         services.AddSingleton<IMachineSettingsStore>(_ => new MachineSettingsStore(paths.MachineSettingsPath));
+        services.AddSingleton<IProfileSecretProtector, DpapiProfileSecretProtector>();
+        services.AddSingleton<IMachineProfileCatalogStore>(serviceProvider => new MachineProfileCatalogStore(
+            Path.Combine(tempDir, "profiles.json"),
+            serviceProvider.GetRequiredService<IProfileSecretProtector>()));
         services.AddSingleton<IAtomicConfigurationStore>(_ => new AtomicConfigurationStore(paths.PayloadRoot, [paths.PaqetConfigurationPath]));
         services.AddSingleton(_ => new PaqetProcessAdapter(new PaqetProcessOptions
         {
@@ -255,12 +263,18 @@ public sealed class HotspotSharingTests
         services.AddSingleton(paths);
         services.AddSingleton<PayloadIntegrityInspector>();
         services.AddSingleton<PrerequisiteInspector>();
+        services.AddSingleton<IRouteProbe, SocketRouteProbe>();
+        services.AddSingleton<IConnectionVerifier, ConnectionVerifier>();
         services.AddSingleton<NetworkEnvironmentDetector>();
         // Intentionally omit HotspotNetworkDetector to verify fail-fast behavior
         services.AddSingleton<IPaqetConfigurationWriter, PaqetYamlConfigurationWriter>();
         services.AddSingleton<IXrayConfigurationWriter, XrayJsonConfigurationWriter>();
         services.AddSingleton<IProxiFyreConfigurationWriter, ProxiFyreJsonConfigurationWriter>();
         services.AddSingleton<IMachineSettingsStore>(_ => new MachineSettingsStore(paths.MachineSettingsPath));
+        services.AddSingleton<IProfileSecretProtector, DpapiProfileSecretProtector>();
+        services.AddSingleton<IMachineProfileCatalogStore>(serviceProvider => new MachineProfileCatalogStore(
+            Path.Combine(tempDir, "profiles.json"),
+            serviceProvider.GetRequiredService<IProfileSecretProtector>()));
         services.AddSingleton<IAtomicConfigurationStore>(_ => new AtomicConfigurationStore(paths.PayloadRoot, [paths.PaqetConfigurationPath]));
         services.AddSingleton(_ => new PaqetProcessAdapter(new PaqetProcessOptions
         {

@@ -2,6 +2,8 @@ using PaqetFire.Core.Engines;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
 using PaqetFire.Core.Deployment;
+using PaqetFire.Core.Diagnostics;
+using PaqetFire.Core.Profiles;
 
 namespace PaqetFire.Core.Ipc;
 
@@ -11,6 +13,9 @@ public enum BrokerCommand
     SaveSettings,
     Connect,
     Disconnect,
+    VerifyConnection,
+    ManageProfiles,
+    ExportProfiles,
 }
 
 public enum BrokerMessageType
@@ -42,14 +47,16 @@ public sealed record BrokerRequest(
     int ProtocolVersion,
     BrokerCommand Command,
     PaqetFireSettings? Settings = null,
-    bool ConnectAfterSave = false);
+    bool ConnectAfterSave = false,
+    ProfileAction? ProfileAction = null);
 
 public sealed record BrokerResponse(
     Guid RequestId,
     int ProtocolVersion,
     bool Success,
     BrokerSnapshot? Snapshot = null,
-    BrokerError? Error = null)
+    BrokerError? Error = null,
+    string? ExportedProfiles = null)
 {
     public static BrokerResponse Succeeded(Guid requestId, BrokerSnapshot? snapshot = null) =>
         new(requestId, IpcProtocol.Version, true, snapshot);
@@ -92,6 +99,8 @@ public sealed record BrokerSnapshot(
     IReadOnlyList<string>? RecentLogs = null,
     string? StatusMessage = null,
     ConnectionState ConnectionState = ConnectionState.Disconnected,
-    string? OperationWarning = null);
+    string? OperationWarning = null,
+    ConnectionVerificationReport? Verification = null,
+    ProfileCatalogView? ProfileCatalog = null);
 
 public sealed record BrokerError(BrokerErrorCode Code, string Message);

@@ -1,5 +1,6 @@
 using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Configuration;
+using PaqetFire.Core.Profiles;
 
 namespace PaqetFire.Desktop.Ipc;
 
@@ -25,4 +26,15 @@ public interface IBrokerClient
         bool connected,
         TimeSpan timeout,
         CancellationToken cancellationToken);
+
+    ValueTask<BrokerSnapshot> VerifyConnectionAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
+
+    ValueTask<BrokerSnapshot> ManageProfilesAsync(
+        ProfileAction action,
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
+
+    ValueTask<string> ExportProfilesAsync(TimeSpan timeout, CancellationToken cancellationToken);
 }

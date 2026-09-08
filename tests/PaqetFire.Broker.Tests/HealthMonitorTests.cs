@@ -4,6 +4,7 @@ using PaqetFire.Broker;
 using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Ipc;
+using PaqetFire.Core.Profiles;
 using Xunit;
 
 namespace PaqetFire.Broker.Tests;
@@ -44,6 +45,9 @@ public sealed class HealthMonitorTests
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
         public ValueTask<BrokerSnapshot> ConnectAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public ValueTask<BrokerSnapshot> DisconnectAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> VerifyConnectionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> ManageProfilesAsync(ProfileAction action, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<string> ExportProfilesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public ValueTask<BrokerSnapshot> SaveSettingsAsync(PaqetFireSettings settings, bool connectAfterSave,
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }

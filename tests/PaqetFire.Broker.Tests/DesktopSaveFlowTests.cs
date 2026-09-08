@@ -2,6 +2,7 @@ using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Desktop.Ipc;
 using PaqetFire.Desktop.ViewModels;
+using PaqetFire.Core.Profiles;
 using Xunit;
 
 namespace PaqetFire.Broker.Tests;
@@ -73,6 +74,9 @@ public sealed class DesktopSaveFlowTests
         public Task CloseAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public ValueTask<BrokerSnapshot> GetSnapshotAsync(TimeSpan timeout, CancellationToken cancellationToken) => new(Snapshot());
         public ValueTask<BrokerSnapshot> SetConnectionStateAsync(bool connected, TimeSpan timeout, CancellationToken cancellationToken) => new(Snapshot());
+        public ValueTask<BrokerSnapshot> VerifyConnectionAsync(TimeSpan timeout, CancellationToken cancellationToken) => new(Snapshot());
+        public ValueTask<BrokerSnapshot> ManageProfilesAsync(ProfileAction action, TimeSpan timeout, CancellationToken cancellationToken) => new(Snapshot());
+        public ValueTask<string> ExportProfilesAsync(TimeSpan timeout, CancellationToken cancellationToken) => new("{}");
         public ValueTask<BrokerSnapshot> SaveSettingsAsync(PaqetFireSettings settings, bool connectAfterSave, TimeSpan timeout, CancellationToken cancellationToken)
         {
             SaveCount++;

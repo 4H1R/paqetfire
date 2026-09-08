@@ -18,7 +18,7 @@
         <Border x:Name="VersionBadge" Height="22" MinWidth="44" Padding="8,0"
                 CornerRadius="7" VerticalAlignment="Center"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-          <TextBlock Text="v0.6.17" FontSize="10" FontWeight="SemiBold" Opacity="0.78"
+          <TextBlock Text="v0.6.18" FontSize="10" FontWeight="SemiBold" Opacity="0.78"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
       </StackPanel>
@@ -176,6 +176,26 @@
             <TextBlock x:Name="ConnectionPendingText" Text="No pending changes." TextWrapping="Wrap" />
             <TextBlock Text="Either Save button applies the connection profile and routing policy together, including edits on the other page. Applying changes restarts an active connection." FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
 
+            <Border Padding="20" CornerRadius="18" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Saved profiles" FontSize="18" FontWeight="SemiBold" />
+                <ComboBox x:Name="ProfilePicker" Header="Active profile"
+                          ItemsSource="{x:Bind ProfileEntries}" DisplayMemberPath="DisplayName"
+                          SelectionChanged="ProfilePicker_SelectionChanged" HorizontalAlignment="Stretch" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Rename" Click="RenameProfileButton_Click" />
+                  <Button Content="Duplicate" Click="DuplicateProfileButton_Click" />
+                  <Button Content="Make default" Click="MakeDefaultProfileButton_Click" />
+                  <Button Content="Delete" Click="DeleteProfileButton_Click" />
+                  <Button Content="Export" Click="ExportProfilesButton_Click" />
+                  <Button Content="Import" Click="ImportProfilesButton_Click" />
+                </StackPanel>
+                <TextBlock Text="Exports never include transport keys or sharing passwords. Imported profiles require those secrets to be entered again."
+                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="16">
@@ -308,7 +328,37 @@
                 <TextBox x:Name="SelectedApplicationsBox" Header="Executable names or full paths"
                          PlaceholderText="chrome.exe&#x0a;C:\Apps\Game\game.exe"
                          AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="112" />
-                <TextBlock Text="Enter one executable per line. Rules match in the order shown." FontSize="12" Opacity="0.62" />
+                <Expander Header="Choose installed or running applications"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Expanding="ApplicationPicker_Expanding">
+                  <StackPanel Spacing="10" Padding="0,10,0,0">
+                    <Grid ColumnSpacing="8">
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <TextBox x:Name="ApplicationSearchBox" PlaceholderText="Search applications or paths"
+                               TextChanged="ApplicationSearchBox_TextChanged" />
+                      <Button Grid.Column="1" Content="Refresh" Click="RefreshApplicationsButton_Click" />
+                      <Button Grid.Column="2" Content="Browse…" Click="BrowseApplicationButton_Click" />
+                    </Grid>
+                    <ProgressRing x:Name="ApplicationDiscoveryProgress" IsActive="False" Width="22" Height="22" HorizontalAlignment="Left" />
+                    <ListView ItemsSource="{x:Bind ApplicationEntries}" SelectionMode="None" MaxHeight="310">
+                      <ListView.ItemTemplate>
+                        <DataTemplate>
+                          <Grid Padding="3,7" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      Checked="ApplicationPickerCheckBox_Changed" Unchecked="ApplicationPickerCheckBox_Changed" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                              <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                              <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Opacity="0.62" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding StateText}" Opacity="0.68" VerticalAlignment="Center" />
+                          </Grid>
+                        </DataTemplate>
+                      </ListView.ItemTemplate>
+                    </ListView>
+                  </StackPanel>
+                </Expander>
+                <TextBlock Text="Choose from discovered apps or keep manually entered executable names. Full paths avoid ambiguity." FontSize="12" Opacity="0.62" />
               </StackPanel>
             </Border>
 
@@ -354,6 +404,10 @@
                              ValueChanged="LanSharePortBox_ValueChanged" HorizontalAlignment="Left" Width="200" />
                   <TextBlock x:Name="LanShareEndpointText" Text="SOCKS5 endpoint appears after the active adapter is detected."
                              FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Test listener" Tag="lan" Click="TestShareListenerButton_Click" />
+                    <Button Content="Copy redacted setup" Tag="lan" Click="CopyShareSetupButton_Click" />
+                  </StackPanel>
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -374,6 +428,7 @@
                                PasswordRevealMode="Peek" PlaceholderText="At least 8 characters"
                                PasswordChanged="SharePasswordBox_PasswordChanged" />
                 </Grid>
+                <Button Content="Generate strong password" Click="RotateSharingPasswordButton_Click" HorizontalAlignment="Left" />
                 <Border Padding="12" CornerRadius="10" Background="#18FFB020">
                   <TextBlock Text="SOCKS5 does not encrypt traffic between local devices and this computer. Use this only on a trusted local network and keep the password private."
                              FontSize="12" TextWrapping="Wrap" />
@@ -408,8 +463,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="HotspotUriBox" Header="SOCKS URI for v2rayNG / HAPP (Hiddify)" IsReadOnly="True" PlaceholderText="Detect hotspot and re-enter your proxy password to copy a URI" />
-                    <Button Grid.Column="1" Content="Copy" Click="CopyHotspotUriButton_Click" VerticalAlignment="Bottom" />
+                    <Button Grid.Column="1" Content="Copy URI / QR payload" Click="CopyHotspotUriButton_Click" VerticalAlignment="Bottom" />
                   </Grid>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Test listener" Tag="hotspot" Click="TestShareListenerButton_Click" />
+                    <Button Content="Copy redacted setup" Tag="hotspot" Click="CopyShareSetupButton_Click" />
+                  </StackPanel>
                   <TextBlock Text="Client setup guides" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0" Opacity="0.85" />
                   <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
@@ -515,7 +574,11 @@
                 <TextBlock Text="Use this page to check the broker, engines, local endpoint, and recent actions."
                            FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
               </StackPanel>
-              <Button Grid.Column="1" Content="Run checks" Click="RefreshButton_Click" VerticalAlignment="Bottom" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                <Button Content="Refresh status" Click="RefreshButton_Click" />
+                <Button Content="Verify route" Style="{StaticResource AccentButtonStyle}"
+                        Click="VerifyConnectionButton_Click" />
+              </StackPanel>
             </Grid>
 
             <Grid ColumnSpacing="14" HorizontalAlignment="Stretch">
@@ -533,6 +596,41 @@
                 <StackPanel Spacing="5"><TextBlock Text="ProxiFyre" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.RoutingStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
               </Border>
             </Grid>
+
+            <Border Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="14">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="Connection verification" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock x:Name="VerificationSummaryText"
+                             Text="Connect, then verify the local proxy route over TCP, routed UDP/DNS, IPv4, and IPv6."
+                             Opacity="0.68" TextWrapping="Wrap" />
+                  <TextBlock Text="Only when you click Verify route, public-address checks contact api4.ipify.org and api6.ipify.org through Xray; returned addresses remain local. UDP/DNS uses a routed query for example.com through 1.1.1.1. This does not prove that every application is captured or detect system DNS/WebRTC leaks."
+                             FontSize="12" Opacity="0.58" TextWrapping="Wrap" />
+                </StackPanel>
+                <InfoBar x:Name="VerificationInfoBar" IsOpen="False" IsClosable="True" />
+                <ListView ItemsSource="{x:Bind VerificationEntries}" SelectionMode="None" MaxHeight="420">
+                  <ListView.ItemTemplate>
+                    <DataTemplate>
+                      <Grid Padding="4,8" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="30" />
+                          <ColumnDefinition Width="180" />
+                          <ColumnDefinition Width="90" />
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="70" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Glyph}" FontSize="16" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Grid.Column="2" Text="{Binding Status}" Foreground="{StaticResource PaqetFireAccentBrush}" />
+                        <TextBlock Grid.Column="3" Text="{Binding Detail}" Opacity="0.72" TextWrapping="Wrap" />
+                        <TextBlock Grid.Column="4" Text="{Binding Duration}" Opacity="0.55" HorizontalAlignment="Right" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListView.ItemTemplate>
+                </ListView>
+              </StackPanel>
+            </Border>
 
             <Border Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
@@ -661,9 +759,30 @@
             </Border>
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="14">
+                <TextBlock Text="Network-aware connection" FontSize="18" FontWeight="SemiBold" />
+                <ToggleSwitch x:Name="NetworkAutomationSwitch"
+                              Header="Automatically connect on unknown and untrusted networks"
+                              OnContent="Enabled" OffContent="Disabled" />
+                <ToggleSwitch x:Name="ConnectOnTrustedNetworksSwitch"
+                              Header="Also connect on trusted networks"
+                              OnContent="Route required" OffContent="May stay direct" />
+                <TextBlock x:Name="CurrentNetworkText" Text="Current network has not been detected yet."
+                           Opacity="0.68" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Trust current network" Click="TrustCurrentNetworkButton_Click" />
+                  <Button Content="Require route here" Click="RequireRouteCurrentNetworkButton_Click" />
+                  <Button Content="Pause for 15 minutes" Click="PauseNetworkAutomationButton_Click" />
+                </StackPanel>
+                <TextBlock Text="Network changes and resume events use a short settle delay and bounded reconnect backoff. Captive portals pause automatic connection; an active kill switch remains fail-closed until you change it deliberately."
+                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="12">
                 <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="PaqetFire 0.6.17" FontWeight="SemiBold" />
+                <TextBlock Text="PaqetFire 0.6.18" FontWeight="SemiBold" />
                 <TextBlock Text="A single Windows control surface for Paqet, Xray, and ProxiFyre. Core engines and their licenses are included with the installer."
                            Opacity="0.68" TextWrapping="Wrap" />
                 <TextBlock Text="Routing always excludes Paqet, Xray, ProxiFyre, the broker, and packet-capture services to avoid a proxy loop."

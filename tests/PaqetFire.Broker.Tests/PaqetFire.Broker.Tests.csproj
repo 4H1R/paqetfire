@@ -14,6 +14,7 @@
     <ProjectReference Include="../../src/PaqetFire.Broker/PaqetFire.Broker.csproj" />
     <Compile Include="../../src/PaqetFire.Desktop/Ipc/*.cs" Link="Desktop/Ipc/%(Filename)%(Extension)" />
     <Compile Include="../../src/PaqetFire.Desktop/Presentation/*.cs" Link="Desktop/Presentation/%(Filename)%(Extension)" />
+    <Compile Include="../../src/PaqetFire.Desktop/Services/ApplicationDiscovery/*.cs" Link="Desktop/Services/ApplicationDiscovery/%(Filename)%(Extension)" />
     <Compile Include="../../src/PaqetFire.Desktop/ViewModels/*.cs" Link="Desktop/ViewModels/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

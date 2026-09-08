@@ -1,5 +1,22 @@
 # Development progress
 
+## Implemented for the next feature release
+
+- Added an on-demand connection verification report for the engine chain, local
+  Xray SOCKS handshake, routed TCP/public IPv4, SOCKS5 UDP-associate DNS, and
+  IPv6. ProxiFyre process/policy state is an explicit warning because it cannot
+  prove application capture or the absence of system DNS/WebRTC leaks.
+- Added trusted/untrusted network automation policy with stable network IDs,
+  profile targeting, captive-portal and hotspot interlocks, sleep/network-change
+  settling, temporary pause, and bounded reconnect backoff.
+- Added a protected multi-profile catalog with active/default selection,
+  renaming, duplication, deletion, legacy migration, machine-scoped DPAPI secrets, and
+  strict redacted import/export.
+- Added searchable installed/running application discovery, missing-path warnings,
+  and a routing picker.
+- Added cryptographic sharing-password rotation, escaped URI/QR payloads,
+  redacted setup bundles, and LAN/hotspot listener reachability checks.
+
 ## Completed 0.6.8 patch
 
 - Removed the unsupported `bittorrent` Xray sniffing override while retaining

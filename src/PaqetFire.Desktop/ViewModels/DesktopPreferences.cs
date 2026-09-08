@@ -72,6 +72,23 @@ public sealed class DesktopPreferences
     public bool MinimizeToTray { get; set; } = true;
 
     public bool ShowNotifications { get; set; } = true;
+
+    public bool EnableNetworkAutomation { get; set; }
+
+    public bool ConnectOnTrustedNetworks { get; set; }
+
+    public List<NetworkRulePreference> NetworkRules { get; set; } = [];
+}
+
+public sealed class NetworkRulePreference
+{
+    public string NetworkId { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public bool IsTrusted { get; set; }
+
+    public Guid? ProfileId { get; set; }
 }
 
 public sealed class DesktopPreferencesStore

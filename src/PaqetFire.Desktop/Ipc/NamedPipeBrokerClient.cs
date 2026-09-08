@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Configuration;
+using PaqetFire.Core.Profiles;
 
 namespace PaqetFire.Desktop.Ipc;
 
@@ -126,12 +127,68 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
             .ConfigureAwait(false);
     }
 
+    public async ValueTask<BrokerSnapshot> VerifyConnectionAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        return await SendAsync(BrokerCommand.VerifyConnection, timeout, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask<BrokerSnapshot> ManageProfilesAsync(
+        ProfileAction action,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return await SendAsync(
+                BrokerCommand.ManageProfiles,
+                timeout,
+                cancellationToken,
+                profileAction: action)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask<string> ExportProfilesAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var response = await SendResponseAsync(
+                BrokerCommand.ExportProfiles,
+                timeout,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return response.ExportedProfiles ??
+            throw new InvalidDataException("The broker profile export was empty.");
+    }
+
     private async ValueTask<BrokerSnapshot> SendAsync(
         BrokerCommand command,
         TimeSpan timeout,
         CancellationToken cancellationToken,
         PaqetFireSettings? settings = null,
-        bool connectAfterSave = false)
+        bool connectAfterSave = false,
+        ProfileAction? profileAction = null)
+    {
+        var response = await SendResponseAsync(
+                command,
+                timeout,
+                cancellationToken,
+                settings,
+                connectAfterSave,
+                profileAction)
+            .ConfigureAwait(false);
+        return response.Snapshot ??
+            throw new InvalidDataException("The broker snapshot response was empty.");
+    }
+
+    private async ValueTask<BrokerResponse> SendResponseAsync(
+        BrokerCommand command,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        PaqetFireSettings? settings = null,
+        bool connectAfterSave = false,
+        ProfileAction? profileAction = null)
     {
         ValidateTimeout(timeout);
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -147,7 +204,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
             IpcProtocol.Version,
             command,
             settings,
-            connectAfterSave);
+            connectAfterSave,
+            profileAction);
         var completion = new TaskCompletionSource<BrokerResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         if (!pendingRequests.TryAdd(request.RequestId, completion))
@@ -183,8 +241,7 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
                         "The broker rejected the request without an error."));
             }
 
-            return response.Snapshot ??
-                throw new InvalidDataException("The broker snapshot response was empty.");
+            return response;
         }
         finally
         {
@@ -364,9 +421,9 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
         var valid = message.MessageType switch
         {
             BrokerMessageType.Response => message.Response is
-                { ProtocolVersion: IpcProtocol.Version } && message.Event is null,
+            { ProtocolVersion: IpcProtocol.Version } && message.Event is null,
             BrokerMessageType.Event => message.Event is
-                { ProtocolVersion: IpcProtocol.Version } && message.Response is null,
+            { ProtocolVersion: IpcProtocol.Version } && message.Response is null,
             _ => false,
         };
 
