@@ -3,6 +3,8 @@
 The x64 MSI installs the self-contained WinUI desktop application under
 `Program Files\PaqetFire`, registers and starts the `PaqetFire Broker` Windows
 service, adds a Start Menu shortcut, and supports repair, upgrade, and uninstall.
+The setup wizard shows an explicit completion screen and installs both Start Menu
+and Desktop shortcuts so users can immediately tell that installation succeeded.
 It also installs the pinned Paqet alpha.21 payload, Xray 26.3.27, ProxiFyre 2.6.0, registers
 `ProxiFyreService` for on-demand routing, and creates its program-scoped Windows
 Firewall exceptions.
@@ -30,4 +32,10 @@ Build inputs are created with:
 dotnet publish src\PaqetFire.Desktop\PaqetFire.Desktop.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained true -o artifacts\publish\win-x64\desktop -p:DebugType=None -p:DebugSymbols=false
 dotnet publish src\PaqetFire.Broker\PaqetFire.Broker.csproj -c Release -r win-x64 --self-contained true -o artifacts\publish\win-x64\broker -p:DebugType=None -p:DebugSymbols=false
 dotnet build installer\PaqetFire.Installer\PaqetFire.Installer.wixproj -c Release
+```
+
+The installer UX regression check can be run independently with:
+
+```powershell
+.\installer\Test-InstallerConfiguration.ps1
 ```

@@ -18,7 +18,7 @@
         <Border x:Name="VersionBadge" Height="22" MinWidth="44" Padding="8,0"
                 CornerRadius="7" VerticalAlignment="Center"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-          <TextBlock Text="v0.6.15" FontSize="10" FontWeight="SemiBold" Opacity="0.78"
+          <TextBlock Text="v0.6.16" FontSize="10" FontWeight="SemiBold" Opacity="0.78"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
       </StackPanel>
@@ -657,7 +657,7 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="12">
                 <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="PaqetFire 0.6.15" FontWeight="SemiBold" />
+                <TextBlock Text="PaqetFire 0.6.16" FontWeight="SemiBold" />
                 <TextBlock Text="A single Windows control surface for Paqet, Xray, and ProxiFyre. Core engines and their licenses are included with the installer."
                            Opacity="0.68" TextWrapping="Wrap" />
                 <TextBlock Text="Routing always excludes Paqet, Xray, ProxiFyre, the broker, and packet-capture services to avoid a proxy loop."

@@ -48,6 +48,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
+      - name: Validate installer UX contract
+        shell: pwsh
+        run: ./installer/Test-InstallerConfiguration.ps1
+
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v5
         with:
