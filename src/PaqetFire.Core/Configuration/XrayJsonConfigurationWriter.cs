@@ -20,6 +20,8 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             throw new ConfigurationValidationException(["The Xray domain strategy is invalid."]);
         }
 
+        var directDestinations = ParseDirectDestinations(policy.DirectRouteDestinations);
+
         if (policy.LanShare is not null && policy.HotspotShare is not null &&
             policy.LanShare.Port == policy.HotspotShare.Port)
         {
@@ -132,6 +134,25 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             writer.WriteStartObject("routing");
             writer.WriteString("domainStrategy", policy.DomainStrategy.ToString());
             writer.WriteStartArray("rules");
+            var directDomains = directDestinations
+                .Where(destination => destination.Kind == DirectRouteDestinationKind.Domain)
+                .Select(destination => destination.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var directIps = directDestinations
+                .Where(destination => destination.Kind == DirectRouteDestinationKind.Ip)
+                .Select(destination => destination.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (directDomains.Length > 0)
+            {
+                WriteRule(writer, "domain", directDomains, "direct");
+            }
+            if (directIps.Length > 0)
+            {
+                WriteRule(writer, "ip", directIps, "direct");
+            }
+
             if (policy.BlockAds)
             {
                 WriteRule(writer, "domain", ["geosite:category-ads-all"], "block");
@@ -170,6 +191,29 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
         }
 
         return Encoding.UTF8.GetString(stream.ToArray()) + "\n";
+    }
+
+    private static IReadOnlyList<DirectRouteDestination> ParseDirectDestinations(
+        IReadOnlyList<string>? values)
+    {
+        if (values is null)
+        {
+            return [];
+        }
+
+        var destinations = new List<DirectRouteDestination>(values.Count);
+        foreach (var value in values)
+        {
+            if (!DirectRouteDestination.TryParse(value, out var destination))
+            {
+                throw new ConfigurationValidationException(
+                    ["Every direct-route destination must be a domain, *.domain wildcard, IP address, or CIDR range."]);
+            }
+
+            destinations.Add(destination);
+        }
+
+        return destinations;
     }
 
     private static void ValidateLanShare(LanSocksShare share)

@@ -118,9 +118,21 @@ public static class PaqetFireSettingsValidator
 
         ValidateEntries(settings.SelectedApplications, "selected application", errors);
         ValidateEntries(settings.UserExclusions, "exclusion", errors);
+        ValidateDirectRouteDestinations(settings.DirectRouteDestinations, errors);
         ValidateFlags(settings.LocalTcpFlags, "local", errors);
         ValidateFlags(settings.RemoteTcpFlags, "remote", errors);
         return errors;
+    }
+
+    private static void ValidateDirectRouteDestinations(
+        IReadOnlyList<string>? entries,
+        ICollection<string> errors)
+    {
+        ValidateEntries(entries, "direct-route destination", errors);
+        if (entries is not null && entries.Any(entry => !DirectRouteDestination.TryParse(entry, out _)))
+        {
+            errors.Add("Every direct-route destination must be a domain, *.domain wildcard, IP address, or CIDR range.");
+        }
     }
 
     private static void ValidateEntries(

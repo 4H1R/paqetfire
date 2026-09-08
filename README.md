@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.16-FF6B42">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.17-FF6B42">
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-F59E0B">
   <a href="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml"><img alt="Windows build" src="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml/badge.svg?branch=main"></a>
 </p>
@@ -48,6 +48,7 @@ chain in a safe order.
 - Lock Paqet, Xray, ProxiFyre, and the broker out of catch-all rules to prevent
   recursive proxy loops.
 - Use the Iran-direct Xray preset or route all destinations through Paqet.
+- Route chosen domains, wildcard subdomains, IP addresses, and CIDR ranges directly.
 - Block advertising domains, block QUIC, or send BitTorrent directly.
 - Keep local routers, printers, and NAS devices reachable with LAN bypass.
 - Optionally fail closed for ProxiFyre-covered applications with the routing
@@ -123,6 +124,7 @@ installation directory.
 - **Iran — Direct** sends Iranian domains and IP ranges directly from the host.
 - **Send BitTorrent directly** exposes the host's normal public IP to peers.
 - **LAN bypass** keeps private destinations outside PaqetFire.
+- **Custom direct destinations** accept one domain, `*.domain`, IP address, or CIDR range per line. A bare domain also includes its subdomains. Custom entries are evaluated before optional blocking and regional rules. Domain matching requires Xray to receive or recover a hostname; add the IP or CIDR for protocols that expose only a resolved address.
 - The **routing kill switch** covers traffic ProxiFyre can attribute to routed
   applications. It is not a machine-wide Windows Firewall kill switch.
 - LAN SOCKS5 authentication controls access but does not encrypt traffic between
@@ -232,7 +234,7 @@ packages are intentionally excluded from Git.
 
 ## Project status
 
-Version 0.6.16 is a usable development preview. The current source includes the
+Version 0.6.17 is a usable development preview. The current source includes the
 native desktop UI, broker service, engine adapters, regional routing, protocol
 selection, kill switch, LAN SOCKS5 sharing, tray behavior, diagnostics, and the
 WiX installer.

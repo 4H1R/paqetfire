@@ -178,6 +178,7 @@ public sealed class BrokerWorker(
                previous.KcpMode == current.KcpMode &&
                previous.SelectedApplications.SequenceEqual(current.SelectedApplications) &&
                previous.UserExclusions.SequenceEqual(current.UserExclusions) &&
+               previous.DirectRouteDestinations.SequenceEqual(current.DirectRouteDestinations) &&
                previous.LocalTcpFlags.SequenceEqual(current.LocalTcpFlags) &&
                previous.RemoteTcpFlags.SequenceEqual(current.RemoteTcpFlags);
     }

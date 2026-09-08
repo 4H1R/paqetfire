@@ -61,12 +61,14 @@ public sealed class ConfigurationTests
             TransportKey = "secret",
             SelectedApplications = Enumerable.Range(0, 129).Select(index => $"app-{index}.exe").ToArray(),
             UserExclusions = Enumerable.Range(0, 9).Select(index => $"{index}-{new string('x', 1022)}").ToArray(),
+            DirectRouteDestinations = Enumerable.Range(0, 129).Select(index => $"host-{index}.example.com").ToArray(),
         };
 
         var errors = PaqetFireSettingsValidator.Validate(settings);
 
         Assert.Contains(errors, error => error.Contains("selected application list is too large", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(errors, error => error.Contains("exclusion list is too large", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, error => error.Contains("direct-route destination list is too large", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -80,6 +82,7 @@ public sealed class ConfigurationTests
             RouteUdp = true,
             RouteIpv4 = true,
             RouteIpv6 = false,
+            DirectRouteDestinations = ["*.example.com", "203.0.113.10"],
         };
 
         var view = PaqetFireSettingsView.FromSettings(settings);
@@ -88,6 +91,7 @@ public sealed class ConfigurationTests
         Assert.True(view.RouteUdp);
         Assert.True(view.RouteIpv4);
         Assert.False(view.RouteIpv6);
+        Assert.Equal(settings.DirectRouteDestinations, view.DirectRouteDestinations);
         Assert.Empty(PaqetFireSettingsValidator.Validate(settings));
 
         var invalid = settings with
@@ -182,6 +186,72 @@ public sealed class ConfigurationTests
         Assert.Equal("443", rules[1].GetProperty("port").GetString());
         Assert.Equal("direct", rules[2].GetProperty("outboundTag").GetString());
         Assert.Equal("paqet", rules[3].GetProperty("outboundTag").GetString());
+    }
+
+    [Fact]
+    public void CustomDirectDestinations_NormalizeDomainsWildcardsIpsAndCidrs()
+    {
+        var json = new XrayJsonConfigurationWriter().Write(new XrayRoutingPolicy(
+            RegionalRoutingPreset.None,
+            XrayDomainStrategy.IPIfNonMatch,
+            BypassLan: false,
+            BlockAds: true,
+            BlockQuic: true,
+            DirectBitTorrent: false,
+            DirectRouteDestinations:
+            [
+                "Example.COM",
+                "*.another-example.com",
+                "203.0.113.10",
+                "2001:db8::/32",
+            ]));
+
+        using var document = JsonDocument.Parse(json);
+        var rules = document.RootElement.GetProperty("routing").GetProperty("rules");
+        var domainRule = rules[0];
+        Assert.Equal("direct", domainRule.GetProperty("outboundTag").GetString());
+        Assert.Equal(
+            ["domain:example.com", "domain:another-example.com"],
+            domainRule.GetProperty("domain").EnumerateArray().Select(value => value.GetString()!).ToArray());
+
+        var ipRule = rules[1];
+        Assert.Equal("direct", ipRule.GetProperty("outboundTag").GetString());
+        Assert.Equal(
+            ["203.0.113.10", "2001:db8::/32"],
+            ipRule.GetProperty("ip").EnumerateArray().Select(value => value.GetString()!).ToArray());
+        Assert.Equal("block", rules[2].GetProperty("outboundTag").GetString());
+        Assert.Equal("paqet", rules[rules.GetArrayLength() - 1].GetProperty("outboundTag").GetString());
+    }
+
+    [Theory]
+    [InlineData("foo.*.example.com")]
+    [InlineData("https://example.com")]
+    [InlineData("10.0.0.0/33")]
+    [InlineData("2001:db8::/129")]
+    [InlineData("*.127.0.0.1")]
+    public void CustomDirectDestinations_RejectInvalidEntries(string entry)
+    {
+        var settings = new PaqetFireSettings
+        {
+            ServerEndpoint = "example.com:8443",
+            TransportKey = "secret",
+            DirectRouteDestinations = [entry],
+        };
+
+        Assert.Contains(
+            PaqetFireSettingsValidator.Validate(settings),
+            error => error.Contains("direct-route destination", StringComparison.OrdinalIgnoreCase));
+
+        var policy = new XrayRoutingPolicy(
+            RegionalRoutingPreset.None,
+            XrayDomainStrategy.IPIfNonMatch,
+            BypassLan: false,
+            BlockAds: false,
+            BlockQuic: false,
+            DirectBitTorrent: false,
+            DirectRouteDestinations: [entry]);
+        Assert.Throws<ConfigurationValidationException>(() =>
+            new XrayJsonConfigurationWriter().Write(policy));
     }
 
     [Fact]

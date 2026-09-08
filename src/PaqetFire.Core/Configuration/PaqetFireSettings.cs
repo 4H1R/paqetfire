@@ -16,6 +16,8 @@ public sealed record PaqetFireSettings
 
     public IReadOnlyList<string> UserExclusions { get; init; } = [];
 
+    public IReadOnlyList<string> DirectRouteDestinations { get; init; } = [];
+
     public bool BypassLan { get; init; }
 
     public bool RouteTcp { get; init; } = true;
@@ -64,6 +66,7 @@ public sealed record PaqetFireSettingsView(
     RoutingMode RoutingMode,
     IReadOnlyList<string> SelectedApplications,
     IReadOnlyList<string> UserExclusions,
+    IReadOnlyList<string> DirectRouteDestinations,
     bool BypassLan,
     bool RouteTcp,
     bool RouteUdp,
@@ -92,6 +95,7 @@ public sealed record PaqetFireSettingsView(
         settings.RoutingMode,
         settings.SelectedApplications,
         settings.UserExclusions,
+        settings.DirectRouteDestinations,
         settings.BypassLan,
         settings.RouteTcp,
         settings.RouteUdp,
@@ -135,7 +139,8 @@ public sealed record XrayRoutingPolicy(
     bool BlockQuic,
     bool DirectBitTorrent,
     LanSocksShare? LanShare = null,
-    LanSocksShare? HotspotShare = null);
+    LanSocksShare? HotspotShare = null,
+    IReadOnlyList<string>? DirectRouteDestinations = null);
 
 public sealed record LanSocksShare(
     string ListenAddress,

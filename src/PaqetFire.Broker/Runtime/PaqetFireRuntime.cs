@@ -272,7 +272,8 @@ public sealed class PaqetFireRuntime(
                     settings.LanSocksUsername,
                     settings.LanSocksPassword)
                 : null,
-            hotspotShare));
+            hotspotShare,
+            settings.DirectRouteDestinations));
         var proxiFyreText = proxiFyreWriter.Write(routePlan, lockedExclusions);
 
         await configurationStore.WriteAsync(paths.PaqetConfigurationPath, paqetText, cancellationToken)
@@ -352,6 +353,7 @@ public sealed class PaqetFireRuntime(
         KcpMode = settings.KcpMode.Trim().ToLowerInvariant(),
         SelectedApplications = NormalizeList(settings.SelectedApplications),
         UserExclusions = NormalizeList(settings.UserExclusions),
+        DirectRouteDestinations = NormalizeList(settings.DirectRouteDestinations),
         LocalTcpFlags = NormalizeFlags(settings.LocalTcpFlags),
         RemoteTcpFlags = NormalizeFlags(settings.RemoteTcpFlags),
     };
@@ -403,6 +405,7 @@ public sealed class PaqetFireRuntime(
         string.Empty,
         false,
         RoutingMode.AllApplications,
+        [],
         [],
         [],
         false,

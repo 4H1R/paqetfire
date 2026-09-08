@@ -514,6 +514,7 @@ public sealed partial class MainWindow : Window
         new Control[] { ProfileNameBox, ServerEndpointBox, TransportKeyBox, KcpModeBox,
             LocalFlagsBox, RemoteFlagsBox, RoutingModeButtons, SelectedApplicationsBox,
             UserExclusionsBox, BypassLanSwitch, RegionalPresetBox, DomainStrategyBox,
+            DirectRouteDestinationsBox,
             BlockAdsSwitch, BlockQuicSwitch, DirectBitTorrentSwitch, KillSwitchToggle,
             ShareWithLanSwitch, LanSharePortBox,
             ShareViaHotspotSwitch, HotspotPortBox,
@@ -584,6 +585,7 @@ public sealed partial class MainWindow : Window
                 var m when m.Contains("SOCKS5 port") => LanSharePortBox,
                 var m when m.Contains("username") => ShareUsernameBox,
                 var m when m.Contains("password") => SharePasswordBox,
+                var m when m.Contains("direct-route destination") => DirectRouteDestinationsBox,
                 var m when m.Contains("exclusion") => UserExclusionsBox,
                 var m when m.Contains("application", StringComparison.OrdinalIgnoreCase) => SelectedApplicationsBox,
                 var m when m.Contains("protocol") => RouteTcpCheckBox,
@@ -783,6 +785,7 @@ public sealed partial class MainWindow : Window
                 : RoutingMode.AllApplications,
             SelectedApplications = SplitLines(SelectedApplicationsBox.Text),
             UserExclusions = SplitLines(UserExclusionsBox.Text),
+            DirectRouteDestinations = SplitLines(DirectRouteDestinationsBox.Text),
             BypassLan = BypassLanSwitch.IsOn,
             RouteTcp = RouteTcpCheckBox.IsChecked == true,
             RouteUdp = RouteUdpCheckBox.IsChecked == true,
@@ -850,6 +853,7 @@ public sealed partial class MainWindow : Window
         RoutingModeButtons.SelectedIndex = source.RouteAllApplications ? 0 : 1;
         SelectedApplicationsBox.Text = source.SelectedApplications;
         UserExclusionsBox.Text = source.UserExclusions;
+        DirectRouteDestinationsBox.Text = source.DirectRouteDestinations;
         isUpdatingHotspotInterlock = true;
         try
         {
@@ -917,6 +921,7 @@ public sealed partial class MainWindow : Window
         preferences.RouteAllApplications = RoutingModeButtons.SelectedIndex != 1;
         preferences.SelectedApplications = SelectedApplicationsBox.Text.Trim();
         preferences.UserExclusions = UserExclusionsBox.Text.Trim();
+        preferences.DirectRouteDestinations = DirectRouteDestinationsBox.Text.Trim();
         preferences.BypassLan = BypassLanSwitch.IsOn;
         preferences.RegionalPreset = RegionalPresetBox.SelectedIndex == 1
             ? RegionalRoutingPreset.None
@@ -1057,6 +1062,7 @@ public sealed partial class MainWindow : Window
             RoutingModeButtons.SelectedIndex = settings.RoutingMode == RoutingMode.SelectedApplications ? 1 : 0;
             SelectedApplicationsBox.Text = string.Join(Environment.NewLine, settings.SelectedApplications);
             UserExclusionsBox.Text = string.Join(Environment.NewLine, settings.UserExclusions);
+            DirectRouteDestinationsBox.Text = string.Join(Environment.NewLine, settings.DirectRouteDestinations);
             isUpdatingHotspotInterlock = true;
             try
             {

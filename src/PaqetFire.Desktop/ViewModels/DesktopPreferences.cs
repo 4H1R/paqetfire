@@ -31,6 +31,8 @@ public sealed class DesktopPreferences
 
     public string UserExclusions { get; set; } = string.Empty;
 
+    public string DirectRouteDestinations { get; set; } = string.Empty;
+
     public bool BypassLan { get; set; } = true;
 
     public RegionalRoutingPreset RegionalPreset { get; set; } = RegionalRoutingPreset.IranDirect;

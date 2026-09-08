@@ -728,7 +728,13 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         var lan = settings.BypassLan ? "LAN bypass on" : "LAN routed";
         var bitTorrent = settings.DirectBitTorrent ? "BitTorrent direct" : "BitTorrent routed";
         var killSwitch = settings.KillSwitchEnabled ? "Kill switch on" : "Kill switch off";
-        return $"{scope} · {destination} · {lan} · {bitTorrent} · {killSwitch}";
+        var customDirect = settings.DirectRouteDestinations.Count switch
+        {
+            0 => "no custom direct destinations",
+            1 => "1 custom direct destination",
+            var count => $"{count} custom direct destinations",
+        };
+        return $"{scope} · {destination} · {lan} · {bitTorrent} · {customDirect} · {killSwitch}";
     }
 
     private async Task SafeCloseTransportAsync()
