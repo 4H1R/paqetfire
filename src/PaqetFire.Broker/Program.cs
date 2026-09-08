@@ -39,6 +39,7 @@ builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton<PayloadIntegrityInspector>();
 builder.Services.AddSingleton<PrerequisiteInspector>();
 builder.Services.AddSingleton<NetworkEnvironmentDetector>();
+builder.Services.AddSingleton<HotspotNetworkDetector>();
 builder.Services.AddSingleton<IPaqetConfigurationWriter, PaqetYamlConfigurationWriter>();
 builder.Services.AddSingleton<IXrayConfigurationWriter, XrayJsonConfigurationWriter>();
 builder.Services.AddSingleton<IProxiFyreConfigurationWriter, ProxiFyreJsonConfigurationWriter>();

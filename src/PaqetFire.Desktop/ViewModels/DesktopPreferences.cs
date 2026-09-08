@@ -51,6 +51,10 @@ public sealed class DesktopPreferences
 
     public string LanSocksUsername { get; set; } = "paqetfire";
 
+    public bool ShareViaHotspot { get; set; }
+
+    public int HotspotSocksPort { get; set; } = 10808;
+
     public bool RouteTcp { get; set; } = true;
 
     public bool RouteUdp { get; set; } = true;

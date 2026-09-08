@@ -41,6 +41,7 @@ public sealed class AtomicConfigurationStore : IAtomicConfigurationStore
         {
             var destination = ValidateContainedDestination(destinationPath);
             _brokerOwnedDestinations.Add(destination);
+            EnsureDestinationParentExists(destination);
             var backup = ValidateSidecarPath(destination + ".bak");
             if (File.Exists(backup))
             {
@@ -206,6 +207,7 @@ public sealed class AtomicConfigurationStore : IAtomicConfigurationStore
                 "The path is not an exact broker-owned configuration destination.");
         }
 
+        EnsureDestinationParentExists(destination);
         return destination;
     }
 
@@ -234,14 +236,23 @@ public sealed class AtomicConfigurationStore : IAtomicConfigurationStore
         }
 
         var parent = Path.GetDirectoryName(destination);
-        if (string.IsNullOrEmpty(parent) || !Directory.Exists(parent))
+        if (string.IsNullOrEmpty(parent))
         {
-            throw new DirectoryNotFoundException(
-                $"The broker-owned configuration directory does not exist: '{parent}'.");
+            throw new ArgumentException(
+                "A broker-owned configuration destination must have a parent directory.",
+                nameof(destinationPath));
         }
 
         EnsureContainedPathHasNoReparsePoints(destination);
         return destination;
+    }
+
+    private void EnsureDestinationParentExists(string destination)
+    {
+        // Validate every existing ancestor before creating anything beneath it.
+        EnsureContainedPathHasNoReparsePoints(destination);
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        EnsureContainedPathHasNoReparsePoints(destination);
     }
 
     private string ValidateSidecarPath(string path)

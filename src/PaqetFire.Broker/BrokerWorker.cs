@@ -173,6 +173,8 @@ public sealed class BrokerWorker(
                previous.LanSocksPort == current.LanSocksPort &&
                previous.LanSocksUsername == current.LanSocksUsername &&
                previous.HasLanSocksPassword == current.HasLanSocksPassword &&
+               previous.ShareViaHotspot == current.ShareViaHotspot &&
+               previous.HotspotSocksPort == current.HotspotSocksPort &&
                previous.KcpMode == current.KcpMode &&
                previous.SelectedApplications.SequenceEqual(current.SelectedApplications) &&
                previous.UserExclusions.SequenceEqual(current.UserExclusions) &&

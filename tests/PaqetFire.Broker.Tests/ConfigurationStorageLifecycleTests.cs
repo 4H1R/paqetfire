@@ -23,6 +23,29 @@ public sealed class BrokerIdentityFactAttribute : FactAttribute
 public sealed class ConfigurationStorageLifecycleTests
 {
     [BrokerIdentityFact]
+    public void ReparseAncestorIsRejectedBeforeCreatingOutsideDirectories()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "PaqetFire-reparse-" + Guid.NewGuid());
+        var root = Path.Combine(directory, "protected");
+        var outside = Path.Combine(directory, "outside");
+        var link = Path.Combine(root, "link");
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(outside);
+        try
+        {
+            Directory.CreateSymbolicLink(link, outside);
+            Assert.Throws<UnauthorizedAccessException>(() => new AtomicConfigurationStore(
+                root, [Path.Combine(link, "missing", "config.yaml")]));
+            Assert.False(Directory.Exists(Path.Combine(outside, "missing")));
+        }
+        finally
+        {
+            if (Directory.Exists(link)) Directory.Delete(link);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [BrokerIdentityFact]
     public async Task ReplaceAndRollbackRetainProtectedSecrets()
     {
         var directory = Path.Combine(Path.GetTempPath(), "PaqetFire-storage-" + Guid.NewGuid());

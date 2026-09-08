@@ -6,7 +6,7 @@
     <RootNamespace>PaqetFire.Desktop</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\PaqetFire.ico</ApplicationIcon>
-    <Platforms>x64;ARM64</Platforms>
+    <Platforms>x64;ARM64;AnyCPU</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
@@ -46,17 +46,17 @@
   -->
   <Target Name="PublishWinUiCompiledResources" AfterTargets="Publish">
     <ItemGroup>
-      <_PaqetFireWinUiResource Include="$(TargetDir)*.xbf" />
+      <_PaqetFireWinUiResource Include="$(TargetDir)**\*.xbf" />
       <_PaqetFireWinUiResource Include="$(TargetDir)$(AssemblyName).pri" />
     </ItemGroup>
 
     <Copy
         SourceFiles="@(_PaqetFireWinUiResource)"
-        DestinationFolder="$(PublishDir)"
+        DestinationFiles="@(_PaqetFireWinUiResource->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
         SkipUnchangedFiles="true" />
 
     <Error
-        Condition="!Exists('$(PublishDir)App.xbf') or !Exists('$(PublishDir)MainWindow.xbf') or !Exists('$(PublishDir)$(AssemblyName).pri')"
+        Condition="!Exists('$(PublishDir)App.xbf') or !Exists('$(PublishDir)MainWindow.xbf') or !Exists('$(PublishDir)Controls\HappGuideControl.xbf') or !Exists('$(PublishDir)Controls\V2rayNgGuideControl.xbf') or !Exists('$(PublishDir)$(AssemblyName).pri')"
         Text="The WinUI PRI/XBF resources were not copied into the publish directory." />
   </Target>
 </Project>

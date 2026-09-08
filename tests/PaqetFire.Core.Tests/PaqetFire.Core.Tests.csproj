@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -16,5 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PaqetFire.Core\PaqetFire.Core.csproj" />
+    <ProjectReference Include="..\..\src\PaqetFire.Broker\PaqetFire.Broker.csproj" />
   </ItemGroup>
 </Project>

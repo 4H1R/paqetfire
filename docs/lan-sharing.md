@@ -4,6 +4,9 @@ PaqetFire 0.6 can expose a separate Xray SOCKS5 listener to devices on the same
 local network. Sharing is disabled by default and requires a username and a
 password of at least eight characters.
 
+See also [Hotspot SOCKS5 sharing](hotspot-sharing.md) for sharing over a
+Windows mobile hotspot.
+
 The broker detects the active adapter and binds Xray to that adapter's specific
 IPv4 address. It does not listen on `0.0.0.0`. The installer creates inbound TCP
 and UDP rules for Xray restricted to Windows Firewall's `localSubnet` scope.

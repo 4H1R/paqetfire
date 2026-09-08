@@ -34,7 +34,7 @@ jobs:
       - name: Test core and Windows boundaries
         run: dotnet test PaqetFire.slnx -c Release -r win-x64 --no-restore
       - name: Build desktop and broker
-        run: dotnet build PaqetFire.slnx -c Release -r win-x64 --no-restore
+        run: dotnet build PaqetFire.slnx -c Release --no-restore
 
   build:
     if: github.event_name != 'pull_request'

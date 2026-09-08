@@ -46,6 +46,10 @@ public sealed record PaqetFireSettings
 
     public string LanSocksPassword { get; init; } = string.Empty;
 
+    public bool ShareViaHotspot { get; init; }
+
+    public int HotspotSocksPort { get; init; } = 10808;
+
     public string KcpMode { get; init; } = "fast";
 
     public IReadOnlyList<string> LocalTcpFlags { get; init; } = ["PA"];
@@ -75,6 +79,8 @@ public sealed record PaqetFireSettingsView(
     int LanSocksPort,
     string LanSocksUsername,
     bool HasLanSocksPassword,
+    bool ShareViaHotspot,
+    int HotspotSocksPort,
     string KcpMode,
     IReadOnlyList<string> LocalTcpFlags,
     IReadOnlyList<string> RemoteTcpFlags)
@@ -101,6 +107,8 @@ public sealed record PaqetFireSettingsView(
         settings.LanSocksPort,
         settings.LanSocksUsername,
         !string.IsNullOrEmpty(settings.LanSocksPassword),
+        settings.ShareViaHotspot,
+        settings.HotspotSocksPort,
         settings.KcpMode,
         settings.LocalTcpFlags,
         settings.RemoteTcpFlags);
@@ -126,7 +134,8 @@ public sealed record XrayRoutingPolicy(
     bool BlockAds,
     bool BlockQuic,
     bool DirectBitTorrent,
-    LanSocksShare? LanShare = null);
+    LanSocksShare? LanShare = null,
+    LanSocksShare? HotspotShare = null);
 
 public sealed record LanSocksShare(
     string ListenAddress,

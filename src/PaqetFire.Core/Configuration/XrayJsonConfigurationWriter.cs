@@ -20,6 +20,12 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             throw new ConfigurationValidationException(["The Xray domain strategy is invalid."]);
         }
 
+        if (policy.LanShare is not null && policy.HotspotShare is not null &&
+            policy.LanShare.Port == policy.HotspotShare.Port)
+        {
+            throw new ConfigurationValidationException(["The hotspot port must differ from the LAN share port."]);
+        }
+
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
@@ -72,6 +78,37 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
                 writer.WriteEndArray();
                 writer.WriteBoolean("udp", true);
                 writer.WriteString("ip", lanShare.ListenAddress);
+                writer.WriteEndObject();
+                writer.WriteStartObject("sniffing");
+                writer.WriteBoolean("enabled", true);
+                writer.WriteStartArray("destOverride");
+                writer.WriteStringValue("http");
+                writer.WriteStringValue("tls");
+                writer.WriteStringValue("quic");
+                writer.WriteEndArray();
+                writer.WriteBoolean("routeOnly", false);
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
+
+            if (policy.HotspotShare is { } hotspotShare)
+            {
+                ValidateLanShare(hotspotShare);
+                writer.WriteStartObject();
+                writer.WriteString("tag", "hotspot-share-in");
+                writer.WriteString("listen", hotspotShare.ListenAddress);
+                writer.WriteNumber("port", hotspotShare.Port);
+                writer.WriteString("protocol", "socks");
+                writer.WriteStartObject("settings");
+                writer.WriteString("auth", "password");
+                writer.WriteStartArray("accounts");
+                writer.WriteStartObject();
+                writer.WriteString("user", hotspotShare.Username);
+                writer.WriteString("pass", hotspotShare.Password);
+                writer.WriteEndObject();
+                writer.WriteEndArray();
+                writer.WriteBoolean("udp", true);
+                writer.WriteString("ip", hotspotShare.ListenAddress);
                 writer.WriteEndObject();
                 writer.WriteStartObject("sniffing");
                 writer.WriteBoolean("enabled", true);

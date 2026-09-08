@@ -23,6 +23,7 @@ public sealed class PaqetFireRuntime(
     IXrayConfigurationWriter xrayWriter,
     IProxiFyreConfigurationWriter proxiFyreWriter,
     NetworkEnvironmentDetector networkDetector,
+    HotspotNetworkDetector hotspotDetector,
     PayloadIntegrityInspector payloadInspector,
     PrerequisiteInspector prerequisiteInspector,
     RuntimePaths paths,
@@ -248,6 +249,14 @@ public sealed class PaqetFireRuntime(
             paths.ProxiFyreExecutablePath,
             [paths.XrayExecutablePath, brokerExecutablePath]);
 
+        LanSocksShare? hotspotShare = null;
+        if (settings.ShareViaHotspot)
+        {
+            var hotspot = hotspotDetector.TryDetect()
+                ?? throw new InvalidOperationException(
+                    "No active Windows hotspot network was found. Turn on Mobile hotspot in Windows Settings, connect this laptop via Ethernet or Wi-Fi first, then re-detect.");
+            hotspotShare = new LanSocksShare(hotspot.Address, settings.HotspotSocksPort, settings.LanSocksUsername, settings.LanSocksPassword);
+        }
         var paqetText = paqetWriter.Write(paqetProfile, settings.TransportKey);
         var xrayText = xrayWriter.Write(new XrayRoutingPolicy(
             settings.RegionalPreset,
@@ -262,7 +271,8 @@ public sealed class PaqetFireRuntime(
                     settings.LanSocksPort,
                     settings.LanSocksUsername,
                     settings.LanSocksPassword)
-                : null));
+                : null,
+            hotspotShare));
         var proxiFyreText = proxiFyreWriter.Write(routePlan, lockedExclusions);
 
         await configurationStore.WriteAsync(paths.PaqetConfigurationPath, paqetText, cancellationToken)
@@ -327,7 +337,7 @@ public sealed class PaqetFireRuntime(
             return await settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (
-            exception is IOException or InvalidDataException or CryptographicException or FormatException)
+            exception is IOException or InvalidDataException or CryptographicException or FormatException or UnauthorizedAccessException)
         {
             logger.LogError(exception, "The saved PaqetFire settings could not be loaded.");
             return null;
@@ -410,6 +420,8 @@ public sealed class PaqetFireRuntime(
         1082,
         "paqetfire",
         false,
+        false,
+        10808,
         "fast",
         ["PA"],
         ["PA"]);
