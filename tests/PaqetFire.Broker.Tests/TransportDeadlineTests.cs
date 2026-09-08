@@ -15,9 +15,11 @@ public sealed class TransportDeadlineTests
         var name = "PaqetFire-test-" + Guid.NewGuid();
         await using var server = CreateServer(name);
         await using var client = new NamedPipeBrokerClient(name);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        // Named-pipe setup can be delayed by cold or contended Windows runners.
+        // Keep infrastructure timing separate from the request cancellation below.
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var connected = server.WaitForConnectionAsync(deadline.Token);
-        await client.OpenAsync(TimeSpan.FromSeconds(2), deadline.Token);
+        await client.OpenAsync(TimeSpan.FromSeconds(10), deadline.Token);
         await connected;
         using var cancellation = new CancellationTokenSource();
         var request = client.SaveSettingsAsync(
@@ -37,7 +39,7 @@ public sealed class TransportDeadlineTests
         var name = "PaqetFire-test-" + Guid.NewGuid();
         await using var server = CreateServer(name);
         await using var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var connected = server.WaitForConnectionAsync(deadline.Token);
         await client.ConnectAsync(deadline.Token);
         await connected;
@@ -62,9 +64,9 @@ public sealed class TransportDeadlineTests
         var name = "PaqetFire-test-" + Guid.NewGuid();
         await using var server = CreateServer(name);
         await using var client = new NamedPipeBrokerClient(name);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var connected = server.WaitForConnectionAsync(deadline.Token);
-        await client.OpenAsync(TimeSpan.FromSeconds(2), deadline.Token);
+        await client.OpenAsync(TimeSpan.FromSeconds(10), deadline.Token);
         await connected;
 
         // Simulate an earlier write holding the serialization gate. This previously
