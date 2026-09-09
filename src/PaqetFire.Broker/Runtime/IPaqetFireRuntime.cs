@@ -19,6 +19,8 @@ public interface IPaqetFireRuntime
 
     ValueTask<BrokerSnapshot> DisconnectAsync(CancellationToken cancellationToken);
 
+    ValueTask StopEnginesAsync(CancellationToken cancellationToken);
+
     ValueTask<BrokerSnapshot> VerifyConnectionAsync(CancellationToken cancellationToken);
 
     ValueTask<BrokerSnapshot> ManageProfilesAsync(ProfileAction action, CancellationToken cancellationToken);

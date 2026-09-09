@@ -12,6 +12,32 @@ namespace PaqetFire.Broker.Tests;
 public sealed class HealthMonitorTests
 {
     [Fact]
+    public async Task ServiceShutdownStopsLonePaqetProcess()
+    {
+        var runtime = new ShutdownRuntime();
+        using var worker = new BrokerWorker(NullLogger<BrokerWorker>.Instance, null!, runtime, null!);
+
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.Equal(1, runtime.StopEnginesCount);
+        Assert.False(runtime.PaqetRunning);
+        Assert.False(runtime.XrayRunning);
+        Assert.False(runtime.ProxiFyreRunning);
+    }
+
+    [Fact]
+    public async Task ServiceShutdownStillStopsLonePaqetWhenHostTokenExpires()
+    {
+        var runtime = new ShutdownRuntime();
+        using var worker = new BrokerWorker(NullLogger<BrokerWorker>.Instance, null!, runtime, null!);
+
+        await worker.StopAsync(new CancellationToken(canceled: true));
+
+        Assert.Equal(1, runtime.StopEnginesCount);
+        Assert.False(runtime.PaqetRunning);
+    }
+
+    [Fact]
     public async Task HealthChecksContinueAndCoalesceWhenPublisherDoesNotConsume()
     {
         var runtime = new ChangingRuntime();
@@ -43,6 +69,35 @@ public sealed class HealthMonitorTests
         }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask<BrokerSnapshot> ConnectAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> DisconnectAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask StopEnginesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> VerifyConnectionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> ManageProfilesAsync(ProfileAction action, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<string> ExportProfilesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> SaveSettingsAsync(PaqetFireSettings settings, bool connectAfterSave,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class ShutdownRuntime : IPaqetFireRuntime
+    {
+        public int StopEnginesCount { get; private set; }
+        public bool PaqetRunning { get; private set; } = true;
+        public bool XrayRunning { get; private set; }
+        public bool ProxiFyreRunning { get; private set; }
+
+        public ValueTask StopEnginesAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            StopEnginesCount++;
+            PaqetRunning = false;
+            XrayRunning = false;
+            ProxiFyreRunning = false;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask<BrokerSnapshot> GetSnapshotAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public ValueTask<BrokerSnapshot> ConnectAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public ValueTask<BrokerSnapshot> DisconnectAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public ValueTask<BrokerSnapshot> VerifyConnectionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

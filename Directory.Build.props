@@ -1,5 +1,7 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)PaqetFire.Version.props" />
   <PropertyGroup>
+    <Version>$(PaqetFireVersion)</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

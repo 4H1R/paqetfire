@@ -47,6 +47,23 @@ public sealed class BrokerWorker(
         logger.LogInformation("PaqetFire Broker stopped.");
     }
 
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            // The engine adapters apply their own bounded shutdown timeouts. Do not
+            // skip child-process cleanup merely because the host stop token expired.
+            await runtime.StopEnginesAsync(CancellationToken.None).ConfigureAwait(false);
+            logger.LogInformation("PaqetFire engines stopped during broker shutdown.");
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "One or more PaqetFire engines could not be stopped during broker shutdown.");
+        }
+    }
+
     internal async Task MonitorAsync(CancellationToken stoppingToken, TimeSpan? interval = null)
     {
         BrokerSnapshot? previousSnapshot = null;

@@ -18,6 +18,7 @@ using PaqetFire.Core.Network;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.Routing;
 using PaqetFire.Core.Sharing;
+using PaqetFire.Core.Updates;
 using PaqetFire.Desktop.Ipc;
 using PaqetFire.Desktop.Services;
 using PaqetFire.Desktop.Services.ApplicationDiscovery;
@@ -62,6 +63,14 @@ public sealed partial class MainWindow : Window
     private readonly ISharedProxyCredentialGenerator sharingCredentialGenerator = new SharedProxyCredentialGenerator();
     private CancellationTokenSource? applicationDiscoveryCancellation;
     private bool updatingApplicationPicker;
+    private readonly HttpClient updateHttpClient;
+    private readonly GitHubUpdateService updateService;
+    private readonly CancellationTokenSource updateCancellation = new();
+    private SoftwareRelease? availableUpdate;
+    private bool updateActionInProgress;
+
+    private static readonly Version CurrentVersion = typeof(MainWindow).Assembly.GetName().Version
+        ?? new Version(0, 0, 0);
 
     public ConnectionViewModel ViewModel { get; }
 
@@ -75,6 +84,11 @@ public sealed partial class MainWindow : Window
 
     public MainWindow()
     {
+        updateHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        updateHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+            $"PaqetFire/{GitHubUpdateService.FormatVersion(CurrentVersion)}");
+        updateService = new GitHubUpdateService(updateHttpClient);
+
         var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()
             ?? throw new InvalidOperationException("The UI dispatcher is unavailable.");
         ViewModel = new ConnectionViewModel(new NamedPipeBrokerClient(), new WinUiDispatcher(dispatcherQueue));
@@ -83,6 +97,10 @@ public sealed partial class MainWindow : Window
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         InitializeComponent();
+        var versionText = GitHubUpdateService.FormatVersion(CurrentVersion);
+        VersionBadgeText.Text = $"v{versionText}";
+        AboutVersionText.Text = $"PaqetFire {versionText}";
+        ToolTipService.SetToolTip(VersionBadge, $"Installed version {versionText}");
         UpdateConnectionVisuals();
 
         Title = "PaqetFire";
@@ -133,6 +151,11 @@ public sealed partial class MainWindow : Window
             AddActivity("Automatic connection requested from settings.");
             await ViewModel.ConnectAsync();
         }
+
+        if (preferences.CheckForUpdatesOnLaunch)
+        {
+            _ = CheckForUpdatesAsync(showCurrentVersionResult: false);
+        }
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e) =>
@@ -143,6 +166,173 @@ public sealed partial class MainWindow : Window
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) =>
         await ViewModel.RefreshAsync();
+
+    private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e) =>
+        await CheckForUpdatesAsync(showCurrentVersionResult: true);
+
+    private async Task CheckForUpdatesAsync(bool showCurrentVersionResult)
+    {
+        if (updateActionInProgress)
+        {
+            return;
+        }
+
+        updateActionInProgress = true;
+        CheckForUpdatesButton.IsEnabled = false;
+        InstallUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = "Checking GitHub Releases…";
+        try
+        {
+            var result = await updateService.CheckAsync(CurrentVersion, updateCancellation.Token);
+            availableUpdate = result.IsUpdateAvailable ? result.LatestRelease : null;
+            if (availableUpdate is not null)
+            {
+                var latestVersion = GitHubUpdateService.FormatVersion(availableUpdate.Version);
+                UpdateStatusText.Text = $"Version {latestVersion} is ready to install.";
+                VersionBadgeText.Text = $"v{GitHubUpdateService.FormatVersion(CurrentVersion)} · update";
+                ToolTipService.SetToolTip(VersionBadge, $"PaqetFire {latestVersion} is available in Settings");
+                InstallUpdateButton.Content = $"Download and install {latestVersion}";
+                InstallUpdateButton.Visibility = Visibility.Visible;
+                ViewReleaseButton.Visibility = Visibility.Visible;
+                ShowInfo(
+                    UpdateInfoBar,
+                    InfoBarSeverity.Informational,
+                    "Update available",
+                    $"PaqetFire {latestVersion} is newer than the installed version. The installer will be verified before it opens.");
+                AddActivity($"PaqetFire update {latestVersion} is available.");
+            }
+            else
+            {
+                var versionText = GitHubUpdateService.FormatVersion(CurrentVersion);
+                UpdateStatusText.Text = $"No release newer than PaqetFire {versionText} was found.";
+                VersionBadgeText.Text = $"v{versionText}";
+                ToolTipService.SetToolTip(VersionBadge, $"Installed version {versionText}");
+                InstallUpdateButton.Visibility = Visibility.Collapsed;
+                ViewReleaseButton.Visibility = Visibility.Collapsed;
+                if (showCurrentVersionResult)
+                {
+                    ShowInfo(
+                        UpdateInfoBar,
+                        InfoBarSeverity.Success,
+                        "You're up to date",
+                        $"No GitHub release newer than the installed version ({versionText}) was found.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (updateCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            UpdateStatusText.Text = "PaqetFire could not check GitHub Releases. You can try again.";
+            if (showCurrentVersionResult)
+            {
+                ShowInfo(UpdateInfoBar, InfoBarSeverity.Warning, "Update check failed", exception.Message);
+            }
+            AddActivity("The update check could not be completed.", "WARN");
+        }
+        finally
+        {
+            updateActionInProgress = false;
+            if (!exitRequested)
+            {
+                CheckForUpdatesButton.IsEnabled = true;
+                InstallUpdateButton.IsEnabled = availableUpdate is not null;
+            }
+        }
+    }
+
+    private async void InstallUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (availableUpdate is null || updateActionInProgress)
+        {
+            return;
+        }
+
+        updateActionInProgress = true;
+        CheckForUpdatesButton.IsEnabled = false;
+        InstallUpdateButton.IsEnabled = false;
+        UpdateProgressBar.Visibility = Visibility.Visible;
+        UpdateProgressBar.IsIndeterminate = true;
+        UpdateStatusText.Text = "Reading the published checksum…";
+
+        try
+        {
+            var progress = new Progress<SoftwareUpdateDownloadProgress>(download =>
+            {
+                if (download.Percentage is double percentage)
+                {
+                    UpdateProgressBar.IsIndeterminate = false;
+                    UpdateProgressBar.Value = percentage;
+                    UpdateStatusText.Text = $"Downloading update… {percentage:0}%";
+                }
+                else
+                {
+                    UpdateStatusText.Text = $"Downloading update… {download.BytesReceived / 1048576d:0.0} MB";
+                }
+            });
+            var installerPath = await updateService.DownloadVerifiedInstallerAsync(
+                availableUpdate,
+                progress,
+                updateCancellation.Token);
+
+            UpdateProgressBar.IsIndeterminate = false;
+            UpdateProgressBar.Value = 100;
+            UpdateStatusText.Text = "Download verified. Opening Windows Installer…";
+            AddActivity("The PaqetFire update was downloaded and checksum-verified.");
+
+            SoftwareUpdateInstaller.Start(installerPath);
+
+            exitRequested = true;
+            if (trayIcon is not null)
+            {
+                trayIcon.Visible = false;
+            }
+            Close();
+        }
+        catch (OperationCanceledException) when (updateCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            UpdateProgressBar.Visibility = Visibility.Collapsed;
+            UpdateStatusText.Text = "The update was not installed. You can try again.";
+            ShowInfo(UpdateInfoBar, InfoBarSeverity.Error, "Update failed", exception.Message);
+            AddActivity("The PaqetFire update could not be installed.", "ERROR");
+        }
+        finally
+        {
+            updateActionInProgress = false;
+            if (!exitRequested)
+            {
+                CheckForUpdatesButton.IsEnabled = true;
+                InstallUpdateButton.IsEnabled = availableUpdate is not null;
+            }
+        }
+    }
+
+    private void ViewReleaseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (availableUpdate is null)
+        {
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                availableUpdate.ReleasePageUri.AbsoluteUri)
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            ShowInfo(UpdateInfoBar, InfoBarSeverity.Warning, "Release page could not be opened", exception.Message);
+        }
+    }
 
     private async void VerifyConnectionButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1373,6 +1563,7 @@ public sealed partial class MainWindow : Window
         StartWithWindowsSwitch.IsOn = source.StartWithWindows;
         ConnectOnLaunchSwitch.IsOn = source.ConnectOnLaunch;
         CloseToTraySwitch.IsOn = source.MinimizeToTray;
+        CheckForUpdatesSwitch.IsOn = source.CheckForUpdatesOnLaunch;
         NetworkAutomationSwitch.IsOn = source.EnableNetworkAutomation;
         ConnectOnTrustedNetworksSwitch.IsOn = source.ConnectOnTrustedNetworks;
         UpdateCurrentNetworkText();
@@ -1426,6 +1617,7 @@ public sealed partial class MainWindow : Window
         preferences.StartWithWindows = StartWithWindowsSwitch.IsOn;
         preferences.ConnectOnLaunch = ConnectOnLaunchSwitch.IsOn;
         preferences.MinimizeToTray = CloseToTraySwitch.IsOn;
+        preferences.CheckForUpdatesOnLaunch = CheckForUpdatesSwitch.IsOn;
         preferences.EnableNetworkAutomation = NetworkAutomationSwitch.IsOn;
         preferences.ConnectOnTrustedNetworks = ConnectOnTrustedNetworksSwitch.IsOn;
     }
@@ -2362,6 +2554,9 @@ public sealed partial class MainWindow : Window
         Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         networkAutomationCancellation?.Cancel();
         networkAutomationCancellation?.Dispose();
+        updateCancellation.Cancel();
+        updateCancellation.Dispose();
+        updateHttpClient.Dispose();
         if (V2rayNgGuideView is not null)
         {
             V2rayNgGuideView.BackRequested -= OnGuideBackRequested;

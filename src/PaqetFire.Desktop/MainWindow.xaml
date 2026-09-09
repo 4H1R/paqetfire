@@ -18,7 +18,7 @@
         <Border x:Name="VersionBadge" Height="22" MinWidth="44" Padding="8,0"
                 CornerRadius="7" VerticalAlignment="Center"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-          <TextBlock Text="v0.6.18" FontSize="10" FontWeight="SemiBold" Opacity="0.78"
+          <TextBlock x:Name="VersionBadgeText" Text="v0.0.0" FontSize="10" FontWeight="SemiBold" Opacity="0.78"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
       </StackPanel>
@@ -755,6 +755,8 @@
                               OnContent="Enabled" OffContent="Disabled" />
                 <ToggleSwitch x:Name="CloseToTraySwitch" Header="Close to notification area"
                               OnContent="Closing hides PaqetFire" OffContent="Closing exits PaqetFire" IsOn="True" />
+                <ToggleSwitch x:Name="CheckForUpdatesSwitch" Header="Check for updates when PaqetFire opens"
+                              OnContent="Enabled" OffContent="Disabled" IsOn="True" />
               </StackPanel>
             </Border>
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
@@ -782,11 +784,22 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="12">
                 <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="PaqetFire 0.6.18" FontWeight="SemiBold" />
+                <TextBlock x:Name="AboutVersionText" Text="PaqetFire" FontWeight="SemiBold" />
                 <TextBlock Text="A single Windows control surface for Paqet, Xray, and ProxiFyre. Core engines and their licenses are included with the installer."
                            Opacity="0.68" TextWrapping="Wrap" />
                 <TextBlock Text="Routing always excludes Paqet, Xray, ProxiFyre, the broker, and packet-capture services to avoid a proxy loop."
                            Opacity="0.68" TextWrapping="Wrap" />
+                <InfoBar x:Name="UpdateInfoBar" IsOpen="False" IsClosable="True" />
+                <TextBlock x:Name="UpdateStatusText" Text="Check GitHub Releases for a newer verified build."
+                           Opacity="0.72" TextWrapping="Wrap" />
+                <ProgressBar x:Name="UpdateProgressBar" Visibility="Collapsed" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="CheckForUpdatesButton" Content="Check for updates" Click="CheckForUpdatesButton_Click" />
+                  <Button x:Name="InstallUpdateButton" Content="Download and install" Visibility="Collapsed"
+                          Style="{StaticResource AccentButtonStyle}" Click="InstallUpdateButton_Click" />
+                  <Button x:Name="ViewReleaseButton" Content="View release notes" Visibility="Collapsed"
+                          Click="ViewReleaseButton_Click" />
+                </StackPanel>
               </StackPanel>
             </Border>
             <Button Content="Save settings" Style="{StaticResource AccentButtonStyle}" Click="SaveSettingsButton_Click" HorizontalAlignment="Left" />

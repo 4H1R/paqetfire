@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:firewall="http://wixtoolset.org/schemas/v4/wxs/firewall">
+     xmlns:firewall="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
       Name="PaqetFire"
       Manufacturer="PaqetFire"
@@ -15,6 +16,28 @@
     <MajorUpgrade
         DowngradeErrorMessage="A newer PaqetFire version is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <util:CloseApplication
+        Id="ClosePaqetFireDesktop"
+        Target="PaqetFire.Desktop.exe"
+        Description="PaqetFire must close while Setup updates the installed files."
+        Condition="WIX_UPGRADE_DETECTED OR REMOVE~=&quot;ALL&quot;"
+        CloseMessage="yes"
+        ElevatedCloseMessage="yes"
+        Timeout="2"
+        RebootPrompt="no"
+        TerminateProcess="0" />
+    <util:RestartResource
+        Id="PaqetEngineRestartResource"
+        Path="[BrokerFolder]payload\engines\paqet\x64\paqet_windows_amd64.exe" />
+    <util:RestartResource
+        Id="XrayEngineRestartResource"
+        Path="[#PaqetFireXrayExe]" />
+    <util:RestartResource
+        Id="ProxiFyreEngineRestartResource"
+        Path="[#PaqetFireProxiFyreExe]" />
+    <Property Id="MSIRMSHUTDOWN" Value="1" />
+    <Property Id="MSIDISABLERMRESTART" Value="1" />
 
     <UI Id="PaqetFireUI">
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />

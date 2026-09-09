@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.18-FF6B42">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.19-FF6B42">
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-F59E0B">
   <a href="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml"><img alt="Windows build" src="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml/badge.svg?branch=main"></a>
 </p>
@@ -122,6 +122,12 @@ opened from its official download page because Npcap Free may not be redistribut
 4. Open **Routing** and review application mode, destination policy, protocol
    families, exclusions, and optional LAN sharing.
 5. Save the profile and connect.
+
+PaqetFire checks GitHub Releases when it opens (this can be disabled in
+**Settings**). The **About** card also supports a manual check. When an update is
+available, PaqetFire downloads the matching x64 MSI, verifies it against the
+SHA-256 checksum published with that release, and opens Windows Installer for an
+in-place upgrade.
 
 PaqetFire never searches for or modifies unrelated Paqet or ProxiFyre
 installations. It only starts version-pinned payloads beneath its own protected
@@ -242,16 +248,16 @@ packages are intentionally excluded from Git.
 
 ## Project status
 
-Version 0.6.18 is a usable development preview. The current source includes the
+Version 0.6.19 is a usable development preview. The current source includes the
 native desktop UI, broker service, engine adapters, regional routing, protocol
-selection, kill switch, LAN SOCKS5 sharing, tray behavior, diagnostics, and the
-WiX installer.
+selection, kill switch, LAN SOCKS5 sharing, tray behavior, diagnostics, verified
+GitHub release updates, and the WiX installer.
 
 Notable work still planned:
 
 - end-to-end SOCKS5 UDP-associate and packet-leak tests;
 - a machine-wide firewall kill-switch mode;
-- code signing and trusted automatic updates;
+- code signing for application and installer binaries;
 - a redistributable driver bootstrapper, subject to upstream licensing;
 
 See the [roadmap](docs/roadmap.md) and

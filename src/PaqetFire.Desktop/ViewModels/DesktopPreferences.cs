@@ -71,6 +71,8 @@ public sealed class DesktopPreferences
 
     public bool MinimizeToTray { get; set; } = true;
 
+    public bool CheckForUpdatesOnLaunch { get; set; } = true;
+
     public bool ShowNotifications { get; set; } = true;
 
     public bool EnableNetworkAutomation { get; set; }

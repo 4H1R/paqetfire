@@ -4,18 +4,19 @@
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
-    <OutputName>PaqetFire-0.6.18-x64</OutputName>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">$(PaqetFireVersion)</ProductVersion>
+    <OutputName>PaqetFire-$(ProductVersion)-x64</OutputName>
     <OutputPath>..\..\artifacts\installer\</OutputPath>
     <!-- .NET 10 native runtime files expose non-MSI language metadata. -->
     <SuppressIces>ICE03</SuppressIces>
     <DesktopPublishDir>$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64\desktop</DesktopPublishDir>
     <BrokerPublishDir>$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64\broker</BrokerPublishDir>
-    <ProductVersion Condition="'$(ProductVersion)' == ''">0.6.18</ProductVersion>
     <DefineConstants>DesktopPublishDir=$(DesktopPublishDir);BrokerPublishDir=$(BrokerPublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="WixToolset.Firewall.wixext" Version="7.0.0" />
     <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
   </ItemGroup>
 </Project>

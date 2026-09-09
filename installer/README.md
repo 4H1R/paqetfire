@@ -3,6 +3,9 @@
 The x64 MSI installs the self-contained WinUI desktop application under
 `Program Files\PaqetFire`, registers and starts the `PaqetFire Broker` Windows
 service, adds a Start Menu shortcut, and supports repair, upgrade, and uninstall.
+During an upgrade or uninstall, setup closes the running desktop application,
+registers the installed engine paths with Windows Restart Manager, and waits for
+the broker to stop its owned engine processes before replacing files.
 The setup wizard shows an explicit completion screen and installs both Start Menu
 and Desktop shortcuts so users can immediately tell that installation succeeded.
 It also installs the pinned Paqet alpha.21 payload, Xray 26.3.27, ProxiFyre 2.6.0, registers

@@ -240,6 +240,20 @@ public sealed class PaqetFireRuntime(
         }
     }
 
+    public async ValueTask StopEnginesAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            latestVerification = null;
+            await connectionController.DisconnectAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async ValueTask<BrokerSnapshot> VerifyConnectionAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
