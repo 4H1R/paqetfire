@@ -81,6 +81,7 @@ public sealed class ProfileCatalogTests
         const string sharingSecret = "sharing-secret-that-must-not-leak";
         var catalog = ProfileCatalog.Create(HomeId, Settings("Home") with
         {
+            NetworkInterfaceGuid = WorkId,
             TransportKey = transportSecret,
             LanSocksPassword = sharingSecret,
         });
@@ -92,6 +93,7 @@ public sealed class ProfileCatalogTests
         Assert.DoesNotContain(sharingSecret, json, StringComparison.Ordinal);
         Assert.Contains("protectedTransportKey", json, StringComparison.Ordinal);
         var loaded = ProfileCatalogJson.ReadProtected(json, protector);
+        Assert.Equal(WorkId, loaded.ActiveProfile.Settings.NetworkInterfaceGuid);
         Assert.Equal(transportSecret, loaded.ActiveProfile.Settings.TransportKey);
         Assert.Equal(sharingSecret, loaded.ActiveProfile.Settings.LanSocksPassword);
     }

@@ -414,7 +414,7 @@ public sealed class PaqetFireRuntime(
         PaqetFireSettings settings,
         CancellationToken cancellationToken)
     {
-        var network = networkDetector.Detect();
+        var network = networkDetector.Detect(settings.NetworkInterfaceGuid);
         var paqetProfile = new PaqetProfile(
             settings.ServerEndpoint,
             "127.0.0.1:1080",

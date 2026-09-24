@@ -11,13 +11,7 @@ public sealed class DesktopPreferences
 
     public string LocalSocksEndpoint { get; set; } = "127.0.0.1:1080";
 
-    public string InterfaceName { get; set; } = string.Empty;
-
-    public string InterfaceGuid { get; set; } = string.Empty;
-
-    public string LocalIpv4Address { get; set; } = string.Empty;
-
-    public string RouterMac { get; set; } = string.Empty;
+    public Guid? NetworkInterfaceGuid { get; set; }
 
     public string LocalTcpFlags { get; set; } = "S";
 

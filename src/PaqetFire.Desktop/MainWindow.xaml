@@ -212,11 +212,15 @@
               </StackPanel>
             </Border>
 
-            <Expander Header="Detected network details" IsExpanded="False"
+            <Expander Header="Network interface" IsExpanded="False"
                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
               <Border Padding="24" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                <StackPanel Spacing="16">
-                <TextBlock Text="PaqetFire detects these values from the active default route when the profile is saved. You can preview the detected adapter here."
+                <TextBlock Text="Choose Automatic or select the interface PaqetFire should use for this profile. Automatic prefers Ethernet, then Wi-Fi. Save the profile to apply your choice."
+                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+                <ComboBox x:Name="NetworkInterfaceBox" Header="Connection interface" HorizontalAlignment="Stretch"
+                          DisplayMemberPath="DisplayName" SelectionChanged="NetworkInterfaceBox_SelectionChanged" />
+                <TextBlock Text="Only active interfaces with an IPv4 address and default gateway are listed."
                            FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -229,7 +233,9 @@
                   <TextBox x:Name="LocalIpv4Box" Header="Local IPv4 address" PlaceholderText="Detected automatically" IsReadOnly="True" />
                   <TextBox x:Name="RouterMacBox" Grid.Column="1" Header="Router MAC address" PlaceholderText="Resolved when the broker saves" IsReadOnly="True" />
                 </Grid>
-                <Button Content="Detect adapter details" Click="DetectAdapterButton_Click" HorizontalAlignment="Left" />
+                <TextBlock Text="The IP and router MAC are detected from this interface and refreshed when you save. If detection fails, reconnect the interface and retry."
+                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+                <Button x:Name="DetectAdapterButton" Content="Detect adapter details" Click="DetectAdapterButton_Click" HorizontalAlignment="Left" />
                </StackPanel>
               </Border>
             </Expander>

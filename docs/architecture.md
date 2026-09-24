@@ -18,6 +18,15 @@ protected engine configuration or manipulate services directly. The broker
 accepts a small, versioned set of typed commands and rejects arbitrary paths,
 arguments, and unvalidated configuration.
 
+Each profile can select a Windows network interface by GUID, or leave it unset
+for automatic selection (Ethernet before Wi-Fi). The desktop preview and broker
+use the same adapter discovery rules. Gateway MAC lookup is scoped to the
+adapter's local IPv4 address. Preview failures clear earlier network details;
+an unavailable selected interface or unresolved MAC prevents the broker from
+applying the connection instead of silently choosing another interface. Use
+**Detect adapter details** to refresh available interfaces, then save the profile
+to apply a selection. Existing profiles default to automatic selection.
+
 ## Product payload
 
 The installed layout is owned by PaqetFire and treated as one product:

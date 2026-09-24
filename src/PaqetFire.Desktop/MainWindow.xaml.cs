@@ -20,6 +20,7 @@ using PaqetFire.Core.Routing;
 using PaqetFire.Core.Sharing;
 using PaqetFire.Core.Updates;
 using PaqetFire.Desktop.Ipc;
+using PaqetFire.Desktop.Presentation;
 using PaqetFire.Desktop.Services;
 using PaqetFire.Desktop.Services.ApplicationDiscovery;
 using PaqetFire.Desktop.ViewModels;
@@ -31,6 +32,8 @@ namespace PaqetFire.Desktop;
 public sealed partial class MainWindow : Window
 {
     private readonly DesktopPreferencesStore preferencesStore = new();
+    private readonly NetworkAdapterPreview networkAdapterPreview = new(new NetworkAdapterDetector());
+    private bool updatingNetworkInterfaceSelection;
     private bool initialized;
     private bool brokerSettingsApplied;
     private bool hasSavedTransportKey;
@@ -730,7 +733,7 @@ public sealed partial class MainWindow : Window
                     box.PasswordChanged += (_, _) => ConfigurationEdited(); break;
                 case NumberBox box:
                     box.ValueChanged += (_, _) => ConfigurationEdited(); break;
-                case ComboBox box:
+                case ComboBox box when box != NetworkInterfaceBox:
                     box.SelectionChanged += (_, _) => ConfigurationEdited(); break;
                 case ListView list:
                     list.SelectionChanged += (_, _) => ConfigurationEdited(); break;
@@ -1081,7 +1084,7 @@ public sealed partial class MainWindow : Window
     }
 
     private IEnumerable<Control> ConfigurationControls() =>
-        new Control[] { ProfileNameBox, ServerEndpointBox, TransportKeyBox, KcpModeBox,
+        new Control[] { ProfileNameBox, ServerEndpointBox, TransportKeyBox, KcpModeBox, NetworkInterfaceBox, DetectAdapterButton,
             LocalFlagsBox, RemoteFlagsBox, RoutingModeButtons, SelectedApplicationsBox,
             UserExclusionsBox, BypassLanSwitch, RegionalPresetBox, DomainStrategyBox,
             DirectRouteDestinationsBox,
@@ -1267,53 +1270,59 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void NetworkInterfaceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (updatingNetworkInterfaceSelection || NetworkInterfaceBox.SelectedItem is not NetworkInterfaceOption option) return;
+        ConfigurationEdited();
+        RefreshNetworkAdapter(option.InterfaceGuid);
+    }
+
     private void DetectAdapterButton_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshNetworkAdapter(networkAdapterPreview.SelectedInterfaceGuid);
+        if (ShareViaHotspotSwitch?.IsOn == true)
+            DetectHotspot(notifyOnSuccess: false, notifyOnFailure: false);
+    }
+
+    private void RefreshNetworkAdapter(Guid? selected, bool resolveRouterMac = true)
     {
         try
         {
-            var adapter = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(candidate => candidate.OperationalStatus == OperationalStatus.Up)
-                .Select(candidate => new
-                {
-                    Adapter = candidate,
-                    Properties = candidate.GetIPProperties(),
-                })
-                .FirstOrDefault(candidate =>
-                    candidate.Adapter.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel &&
-                    candidate.Properties.GatewayAddresses.Count > 0 &&
-                    candidate.Properties.UnicastAddresses.Any(address =>
-                        address.Address.AddressFamily == AddressFamily.InterNetwork));
-
-            if (adapter is null)
+            networkAdapterPreview.Refresh(selected, resolveRouterMac);
+            if (networkAdapterPreview.Detected is { } detected)
             {
-                ShowInfo(ConnectionInfoBar, InfoBarSeverity.Warning, "No active adapter found", "Connect Ethernet or Wi-Fi, then try again.");
-                return;
-            }
-
-            InterfaceNameBox.Text = adapter.Adapter.Name;
-            InterfaceGuidBox.Text = adapter.Adapter.Id.Trim('{', '}');
-            LocalIpv4Box.Text = adapter.Properties.UnicastAddresses
-                .First(address => address.Address.AddressFamily == AddressFamily.InterNetwork)
-                .Address.ToString();
-            UpdateLanShareEndpointText();
-
-            var gateway = adapter.Properties.GatewayAddresses
-                .FirstOrDefault(address => address.Address.AddressFamily == AddressFamily.InterNetwork)?.Address;
-            RouterMacBox.Text = TryResolveMacAddress(gateway) ?? RouterMacBox.Text;
-
-            var message = string.IsNullOrWhiteSpace(RouterMacBox.Text)
-                ? "Adapter details were detected. Save the profile so the broker can resolve the router MAC. If saving fails, check that Ethernet or Wi-Fi has a working default gateway, then retry."
-                : "Adapter and router details were detected.";
-            ShowInfo(ConnectionInfoBar, InfoBarSeverity.Success, "Network detected", message);
-            AddActivity($"Detected active adapter '{adapter.Adapter.Name}'.");
-            if (ShareViaHotspotSwitch?.IsOn == true)
-            {
-                DetectHotspot(notifyOnSuccess: false, notifyOnFailure: false);
+                var hasMac = !string.IsNullOrWhiteSpace(detected.RouterMac);
+                ShowInfo(ConnectionInfoBar, hasMac ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
+                    hasMac ? "Network detected" : "Router MAC not detected",
+                    hasMac ? "Adapter and router details were detected. Save the profile to apply your interface choice."
+                        : "Adapter details were detected, but its router MAC could not be resolved. Check the connection and retry. Saving the profile will retry detection.");
+                AddActivity($"Detected adapter '{detected.Adapter.InterfaceName}'.");
             }
         }
         catch (Exception exception) when (exception is NetworkInformationException or SocketException or InvalidOperationException)
         {
             ShowInfo(ConnectionInfoBar, InfoBarSeverity.Warning, "Detection was incomplete", exception.Message);
+        }
+        finally
+        {
+            updatingNetworkInterfaceSelection = true;
+            try
+            {
+                NetworkInterfaceBox.ItemsSource = networkAdapterPreview.Options;
+                NetworkInterfaceBox.SelectedItem = networkAdapterPreview.Options
+                    .Single(option => option.InterfaceGuid == networkAdapterPreview.SelectedInterfaceGuid);
+            }
+            finally
+            {
+                updatingNetworkInterfaceSelection = false;
+            }
+
+            var detected = networkAdapterPreview.Detected;
+            InterfaceNameBox.Text = detected?.Adapter.InterfaceName ?? string.Empty;
+            InterfaceGuidBox.Text = detected?.Adapter.InterfaceGuid.ToString("D") ?? string.Empty;
+            LocalIpv4Box.Text = detected?.Adapter.LocalAddress.ToString() ?? string.Empty;
+            RouterMacBox.Text = detected?.RouterMac ?? string.Empty;
+            UpdateLanShareEndpointText();
         }
     }
 
@@ -1443,6 +1452,7 @@ public sealed partial class MainWindow : Window
         {
             ProfileName = ProfileNameBox.Text.Trim(),
             ServerEndpoint = ServerEndpointBox.Text.Trim(),
+            NetworkInterfaceGuid = networkAdapterPreview.SelectedInterfaceGuid,
             TransportKey = TransportKeyBox.Password,
             RoutingMode = RoutingModeButtons.SelectedIndex == 1
                 ? RoutingMode.SelectedApplications
@@ -1500,10 +1510,7 @@ public sealed partial class MainWindow : Window
         ProfileNameBox.Text = source.ProfileName;
         ServerEndpointBox.Text = source.ServerEndpoint;
         SocksEndpointBox.Text = source.LocalSocksEndpoint;
-        InterfaceNameBox.Text = source.InterfaceName;
-        InterfaceGuidBox.Text = source.InterfaceGuid;
-        LocalIpv4Box.Text = source.LocalIpv4Address;
-        RouterMacBox.Text = source.RouterMac;
+        RefreshNetworkAdapter(source.NetworkInterfaceGuid, resolveRouterMac: false);
         LocalFlagsBox.Text = source.LocalTcpFlags;
         RemoteFlagsBox.Text = source.RemoteTcpFlags;
         KcpModeBox.SelectedIndex = source.KcpMode.ToLowerInvariant() switch
@@ -1578,10 +1585,7 @@ public sealed partial class MainWindow : Window
         preferences.ProfileName = ProfileNameBox.Text.Trim();
         preferences.ServerEndpoint = ServerEndpointBox.Text.Trim();
         preferences.LocalSocksEndpoint = SocksEndpointBox.Text.Trim();
-        preferences.InterfaceName = InterfaceNameBox.Text.Trim();
-        preferences.InterfaceGuid = InterfaceGuidBox.Text.Trim();
-        preferences.LocalIpv4Address = LocalIpv4Box.Text.Trim();
-        preferences.RouterMac = RouterMacBox.Text.Trim();
+        preferences.NetworkInterfaceGuid = networkAdapterPreview.SelectedInterfaceGuid;
         preferences.LocalTcpFlags = LocalFlagsBox.Text.Trim();
         preferences.RemoteTcpFlags = RemoteFlagsBox.Text.Trim();
         preferences.KcpMode = (KcpModeBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "fast";
@@ -1659,62 +1663,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static string? TryResolveMacAddress(System.Net.IPAddress? gateway)
-    {
-        if (gateway is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            using var ping = new Ping();
-            _ = ping.Send(gateway, 300);
-            var output = new System.Text.StringBuilder(256);
-            var length = output.Capacity;
-            if (GetIpNetTable2Mac(gateway.ToString(), output, ref length) == 0)
-            {
-                return output.ToString();
-            }
-        }
-        catch
-        {
-            // Adapter detection still provides useful values when ARP lookup fails.
-        }
-
-        return null;
-    }
-
-    private static int GetIpNetTable2Mac(string address, System.Text.StringBuilder output, ref int length)
-    {
-        using var process = new System.Diagnostics.Process
-        {
-            StartInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "arp.exe",
-                Arguments = $"-a {address}",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-        };
-        process.Start();
-        var text = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(500);
-        var line = text.Split('\n').FirstOrDefault(candidate => candidate.Contains(address, StringComparison.Ordinal));
-        var candidateMac = line?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .FirstOrDefault(value => value.Count(character => character == '-') == 5);
-        if (candidateMac is null)
-        {
-            return -1;
-        }
-
-        var normalized = candidateMac.Replace('-', ':').ToUpperInvariant();
-        output.Append(normalized);
-        length = normalized.Length;
-        return 0;
-    }
-
     private void OnSnapshotReceived(BrokerSnapshot snapshot)
     {
         if (!DispatcherQueue.HasThreadAccess)
@@ -1737,6 +1685,7 @@ public sealed partial class MainWindow : Window
             hasSavedLanSocksPassword = settings.HasLanSocksPassword;
             ProfileNameBox.Text = settings.ProfileName;
             ServerEndpointBox.Text = settings.ServerEndpoint;
+            RefreshNetworkAdapter(settings.NetworkInterfaceGuid, resolveRouterMac: false);
             RoutingModeButtons.SelectedIndex = settings.RoutingMode == RoutingMode.SelectedApplications ? 1 : 0;
             SelectedApplicationsBox.Text = string.Join(Environment.NewLine, settings.SelectedApplications);
             UserExclusionsBox.Text = string.Join(Environment.NewLine, settings.UserExclusions);
@@ -2297,7 +2246,10 @@ public sealed partial class MainWindow : Window
             .First(address => address.Address.AddressFamily == AddressFamily.InterNetwork).Address;
         var adapterId = adapter.Adapter.Id.Trim('{', '}');
         var windowsProfileName = windowsProfile?.ProfileName?.Trim();
-        var gatewayMac = TryResolveMacAddress(gateway);
+        var localAddress = adapter.Properties.UnicastAddresses
+            .Select(value => value.Address)
+            .FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork);
+        var gatewayMac = localAddress is null ? null : NetworkAdapterDetector.ResolveMacAddress(gateway, localAddress);
         var networkSignature = string.Join('|', new[] { windowsProfileName, gatewayMac }
             .Where(value => !string.IsNullOrWhiteSpace(value)));
         if (networkSignature.Length == 0)

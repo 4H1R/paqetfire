@@ -8,6 +8,8 @@ public sealed record PaqetFireSettings
 
     public string ServerEndpoint { get; init; } = string.Empty;
 
+    public Guid? NetworkInterfaceGuid { get; init; }
+
     public string TransportKey { get; init; } = string.Empty;
 
     public RoutingMode RoutingMode { get; init; } = RoutingMode.AllApplications;
@@ -88,6 +90,8 @@ public sealed record PaqetFireSettingsView(
     IReadOnlyList<string> LocalTcpFlags,
     IReadOnlyList<string> RemoteTcpFlags)
 {
+    public Guid? NetworkInterfaceGuid { get; init; }
+
     public static PaqetFireSettingsView FromSettings(PaqetFireSettings settings) => new(
         settings.ProfileName,
         settings.ServerEndpoint,
@@ -115,7 +119,10 @@ public sealed record PaqetFireSettingsView(
         settings.HotspotSocksPort,
         settings.KcpMode,
         settings.LocalTcpFlags,
-        settings.RemoteTcpFlags);
+        settings.RemoteTcpFlags)
+    {
+        NetworkInterfaceGuid = settings.NetworkInterfaceGuid,
+    };
 }
 
 public enum RegionalRoutingPreset

@@ -57,7 +57,7 @@ The composition root must:
    `ConnectionController` and register it for async disposal.
 5. Register `PaqetYamlConfigurationWriter`, an `AtomicConfigurationStore`
    constrained to `paths.ConfigurationPath`, and `PaqetConfigurationService`.
-6. Use `PaqetNetworkDiscovery.Discover()` to populate the adapter selector and
+6. Use the shared `NetworkAdapterDetector` to populate the adapter selector and
    `PaqetPrerequisiteInspector.Inspect()` to block connection when Npcap is
    absent.
 

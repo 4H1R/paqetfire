@@ -224,6 +224,8 @@ public static class ProfileCatalogJson
 
     private sealed record ProfileSettingsData
     {
+        public Guid? NetworkInterfaceGuid { get; init; }
+
         public string ProfileName { get; init; } = "Default";
 
         public string ServerEndpoint { get; init; } = string.Empty;
@@ -276,6 +278,7 @@ public static class ProfileCatalogJson
 
         public static ProfileSettingsData FromSettings(PaqetFireSettings settings) => new()
         {
+            NetworkInterfaceGuid = settings.NetworkInterfaceGuid,
             ProfileName = settings.ProfileName,
             ServerEndpoint = settings.ServerEndpoint,
             RoutingMode = settings.RoutingMode,
@@ -305,6 +308,7 @@ public static class ProfileCatalogJson
 
         public PaqetFireSettings ToSettings() => new()
         {
+            NetworkInterfaceGuid = NetworkInterfaceGuid,
             ProfileName = ProfileName,
             ServerEndpoint = ServerEndpoint,
             TransportKey = string.Empty,

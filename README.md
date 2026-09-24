@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.19-FF6B42">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.20-FF6B42">
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-F59E0B">
   <a href="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml"><img alt="Windows build" src="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml/badge.svg?branch=main"></a>
 </p>
