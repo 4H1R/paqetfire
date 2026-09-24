@@ -1,5 +1,15 @@
 # Engine release assessment — 2026-09-24
 
+## Correction after installed validation
+
+The original checks below missed the broker's separate hardcoded ProxiFyre
+startup pin. v0.6.21 passed manifest/configuration validation but could not
+connect because that pin still expected the 2.6.0 executable. v0.6.22 corrects
+the pin and adds tests through the production startup check, plus manifest
+consistency tests for all production engine options. See the
+[hotfix notes](releases/v0.6.22.md). The earlier test results alone did not prove
+that the broker could start the updated engine chain.
+
 ## Versions and compatibility
 
 | Engine | Previous pin | Latest stable | Action |

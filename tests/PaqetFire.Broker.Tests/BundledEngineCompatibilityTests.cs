@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using PaqetFire.Broker.Engines;
+using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Deployment;
 using PaqetFire.Core.Engines;
@@ -23,6 +24,45 @@ public sealed class BundledEngineTheoryAttribute : TheoryAttribute
 
 public sealed class BundledEngineCompatibilityTests
 {
+    [BundledEngineTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProductionProxiFyreStartupValidatesBundledExecutable(bool tampered)
+    {
+        var executable = await VerifyEngineAsync(EngineKind.ProxiFyre);
+        var configuration = Path.GetTempFileName();
+        try
+        {
+            var paths = new RuntimePaths("unused", "unused", "unused", "unused", "unused",
+                "unused", "unused", executable, configuration, "unused");
+            var options = BundledEngineOptions.CreateProxiFyre(paths);
+            if (tampered)
+            {
+                // Use the temporary file as a corrupted executable; never alter the payload.
+                await File.WriteAllTextAsync(configuration, "corrupted executable");
+                options = options with { ExecutablePath = configuration };
+            }
+            await using var adapter = new ProxiFyreProcessAdapter(options);
+            if (tampered)
+            {
+                await Assert.ThrowsAsync<System.Security.Cryptography.CryptographicException>(
+                    () => adapter.ValidatePayloadAsync(CancellationToken.None));
+            }
+            else
+            {
+                await adapter.ValidatePayloadAsync(CancellationToken.None);
+            }
+            var root = Environment.GetEnvironmentVariable("PAQETFIRE_TEST_PAYLOAD_ROOT")!;
+            var manifest = ProductPayloadManifest.Load(Path.Combine(root, "payload-manifest.json"));
+            Assert.Equal(manifest.Engines.Single(engine => engine.Engine == EngineKind.ProxiFyre).Version,
+                (await adapter.GetStatusAsync(CancellationToken.None)).Version);
+        }
+        finally
+        {
+            File.Delete(configuration);
+        }
+    }
+
     [BundledEngineTheory]
     [InlineData(XrayDomainStrategy.AsIs, false)]
     [InlineData(XrayDomainStrategy.AsIs, true)]

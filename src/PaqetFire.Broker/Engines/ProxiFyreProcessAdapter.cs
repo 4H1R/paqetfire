@@ -191,7 +191,7 @@ public sealed class ProxiFyreProcessAdapter : IEngineAdapter, IAsyncDisposable
         },
     };
 
-    private async Task ValidatePayloadAsync(CancellationToken cancellationToken)
+    internal async Task ValidatePayloadAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(options.ExecutablePath))
         {
