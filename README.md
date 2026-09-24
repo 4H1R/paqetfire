@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.20-FF6B42">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.21-FF6B42">
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-F59E0B">
   <a href="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml"><img alt="Windows build" src="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml/badge.svg?branch=main"></a>
 </p>
@@ -248,7 +248,7 @@ packages are intentionally excluded from Git.
 
 ## Project status
 
-Version 0.6.19 is a usable development preview. The current source includes the
+Version 0.6.21 is a usable development preview. The current source includes the
 native desktop UI, broker service, engine adapters, regional routing, protocol
 selection, kill switch, LAN SOCKS5 sharing, tray behavior, diagnostics, verified
 GitHub release updates, and the WiX installer.
@@ -271,7 +271,7 @@ PaqetFire distributes independently maintained components as an aggregate:
 | --- | ---: | --- |
 | [Paqet](https://github.com/hanselime/paqet) | `v1.0.0-alpha.21` | MIT |
 | [Xray-core](https://github.com/XTLS/Xray-core) | `26.3.27` | MPL-2.0 |
-| [ProxiFyre](https://github.com/wiresock/proxifyre) | `2.6.0` | AGPL-3.0 |
+| [ProxiFyre](https://github.com/wiresock/proxifyre) | `2.6.1` | AGPL-3.0 |
 
 The repository contains the corresponding notices and upstream license texts.
 See [THIRD_PARTY_NOTICES.md](payload/THIRD_PARTY_NOTICES.md) for exact-source

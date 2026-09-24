@@ -1,17 +1,16 @@
 # ProxiFyre integration contract
 
 This note records the production integration contract for PaqetFire. It was
-validated against the official ProxiFyre documentation and source on 2026-09-06.
+rechecked against ProxiFyre 2.6.1 documentation and source on 2026-09-24.
+See the [engine release assessment](engine-update-2026-09-24.md).
 
 ## Runtime model
 
 PaqetFire must treat ProxiFyre as a separately managed engine process, not load
-`socksify.dll` into the broker. The recommended installed topology is:
+`socksify.dll` into the broker. The installed topology is:
 
-- `ProxiFyreService`, running as `LocalSystem`, manual start, with an SCM
-  dependency on `NDISRD`;
-- PaqetFire Broker, which writes a validated configuration and then controls
-  `ProxiFyreService` through the Service Control Manager;
+- PaqetFire Broker running as `LocalSystem`, checking `NDISRD`, writing validated
+  configuration, and supervising the bundled `ProxiFyre.exe` child process;
 - `app-config.json` beside the installed `ProxiFyre.exe`; and
 - program-scoped inbound TCP and UDP firewall rules for `ProxiFyre.exe`, because
   the redirect listeners use dynamically allocated ports.
@@ -62,8 +61,9 @@ For “route everything,” PaqetFire emits a catch-all rule and locks the follo
 exclusions so the user cannot remove them:
 
 1. the full installed path of `paqet.exe`;
-2. the full installed path of `ProxiFyre.exe`; and
-3. the full installed path of `PaqetFire.Broker.exe`.
+2. the full installed path of `xray.exe`;
+3. the full installed path of `ProxiFyre.exe`; and
+4. the full installed path of `PaqetFire.Broker.exe`.
 
 Full paths are preferred. ProxiFyre's exclusion matcher is deliberately
 permissive: a name-only exclusion is a substring match and can accidentally
@@ -87,10 +87,10 @@ official MSI file set includes `ProxiFyre.exe`, its `.config`,
 and `NLog.config`. The authoritative list is in the
 [upstream MSI contents](https://github.com/wiresock/proxifyre/blob/main/docs/installer.md#msi-contents-and-behavior).
 
-The loose local folder at `C:\Users\Ali\Desktop\Internet\ProxyFyre` is a signed
-ProxiFyre 2.6.0 payload, but it does **not** contain the Windows Packet Filter
-driver installer or the Visual C++ redistributable. It therefore cannot by
-itself satisfy PaqetFire's one-installer requirement.
+The bundled 2.6.1 payload comes from the official x64 ZIP and is verified against
+the published archive checksum and the per-file manifest. The ZIP does not
+include prerequisite installers. Upstream's first-party 2.6.1 binaries are
+unsigned; archive and file digests establish the pinned artifact identity.
 
 For x64, the official ProxiFyre deployment contract currently requires:
 
@@ -131,16 +131,15 @@ The composition root must:
 
 1. verify the closed payload manifest and hashes before activating engines;
 2. construct the routing policy with the installed full paths of Paqet,
-   ProxiFyre, and the broker as locked exclusions;
+   Xray, ProxiFyre, and the broker as locked exclusions;
 3. call `RoutingPolicyCompiler.CreateLockedExclusions(...)`, pass the same list
    to `ProxiFyreJsonConfigurationWriter.Write(...)`, and commit the resulting
    JSON beside `ProxiFyre.exe` through the atomic protected store;
-4. start Paqet and wait for its SOCKS5 listener before starting ProxiFyre;
-5. stop ProxiFyre before Paqet; and
+4. start Paqet, then Xray, waiting for each SOCKS5 listener before starting ProxiFyre;
+5. stop ProxiFyre, then Xray, then Paqet; and
 6. surface missing `NDISRD`, service-start failure, configuration validation,
    and Paqet-listener failure separately.
 
-The service adapter now performs an explicit `NDISRD` registration preflight
-and accepts the bundled engine version for status reporting. Installer wiring
-must still register `ProxiFyreService`, its `NDISRD` dependency, and the two
-program-scoped firewall rules.
+The broker reports the bundled engine version and performs prerequisite checks.
+The installer retains the two program-scoped firewall rules and removes obsolete
+standalone `ProxiFyreService` registration; the broker owns the process lifecycle.

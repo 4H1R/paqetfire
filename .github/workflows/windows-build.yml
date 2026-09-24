@@ -65,6 +65,8 @@ jobs:
         run: dotnet restore PaqetFire.slnx -r win-x64
 
       - name: Run tests
+        env:
+          PAQETFIRE_TEST_PAYLOAD_ROOT: ${{ github.workspace }}/payload
         run: dotnet test PaqetFire.slnx -c Release -r win-x64 --no-restore
 
       - name: Publish desktop app

@@ -9,10 +9,10 @@ an aggregate. Each engine remains under its upstream license.
 - Exact source: https://github.com/hanselime/paqet/tree/v1.0.0-alpha.21
 - License: MIT
 
-## ProxiFyre 2.6.0
+## ProxiFyre 2.6.1
 
 - Project: https://github.com/wiresock/proxifyre
-- Exact source: https://github.com/wiresock/proxifyre/tree/v2.6.0
+- Exact source: https://github.com/wiresock/proxifyre/tree/v2.6.1
 - License: GNU Affero General Public License v3.0
 
 The corresponding source for the bundled ProxiFyre release is available at the

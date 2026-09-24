@@ -1,7 +1,12 @@
 # Xray regional policy routing
 
-PaqetFire 0.4 bundles Xray-core 26.3.27 as a local destination-policy engine.
+PaqetFire bundles Xray-core 26.3.27 as a local destination-policy engine.
 Xray is not a second VPN and does not replace Paqet.
+
+The official latest-stable release and archive digest were rechecked on
+2026-09-24; 26.3.27 remains current. See the
+[engine release assessment](engine-update-2026-09-24.md) for feature opportunities
+and upgrade validation.
 
 ## Data path
 

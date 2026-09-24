@@ -38,7 +38,7 @@
     },
     {
       "engine": "ProxiFyre",
-      "version": "2.6.0",
+      "version": "2.6.1",
       "entryPoint": "engines/proxifyre/x64/ProxiFyre.exe",
       "serviceName": "ProxiFyreService",
       "files": [
@@ -65,12 +65,12 @@
         {
           "path": "engines/proxifyre/x64/ProxiFyre.Configuration.dll",
           "size": 55296,
-          "sha256": "6b477f868233050aaed0c2ddb6d82fda50a6aec38009d61f2099494b046728d3"
+          "sha256": "b07178da3e35e293e66f606745be7280ddab2144b3064d1d008a70bd6371fcd6"
         },
         {
           "path": "engines/proxifyre/x64/ProxiFyre.exe",
           "size": 105984,
-          "sha256": "eaa48f0efc0dfbbab6f4ea6fc2ff6c7b45164dca544921962025b698bd59869f"
+          "sha256": "b317381d7f61af1c5a697c0de32c7743869843fbf52dd1805e9ebd1a5612741e"
         },
         {
           "path": "engines/proxifyre/x64/ProxiFyre.exe.config",
@@ -80,7 +80,7 @@
         {
           "path": "engines/proxifyre/x64/socksify.dll",
           "size": 1831936,
-          "sha256": "60b81a761ce19817063e146dec607243195ba6e27a7bab6b37b53dc1bf3fd505"
+          "sha256": "9c5680a36cc818e4e11a1d05ff621dcc5f917d14fe36f3405185228dbed70598"
         },
         {
           "path": "engines/proxifyre/x64/Topshelf.dll",
