@@ -52,6 +52,10 @@ public sealed class PaqetFireRuntime(
         else if (profileCatalog is not null)
         {
             settings = profileCatalog.ActiveProfile.Settings;
+            // Migrate catalogs with per-profile authentication using the current
+            // application's credentials, so later profile switches cannot rotate them.
+            profileCatalog = profileCatalog.WithSharingCredentials(settings.LanSocksUsername, settings.LanSocksPassword);
+            await profileCatalogStore.SaveAsync(profileCatalog, cancellationToken).ConfigureAwait(false);
             await SaveLegacySettingsMirrorAsync(settings, cancellationToken).ConfigureAwait(false);
         }
         await snapshotMetadata.UpdateSettingsAsync(settings).ConfigureAwait(false);
@@ -114,11 +118,12 @@ public sealed class PaqetFireRuntime(
                 EnsurePrerequisitesAvailable();
             }
 
-            var inspection = await payloadInspector.InspectAsync(cancellationToken)
-                .ConfigureAwait(false);
-            if (inspection.State != PayloadInspectionState.Ready)
+            var applyEngineConfiguration = reconnect || settings.KillSwitchEnabled || current.State != ConnectionState.Disconnected;
+            if (applyEngineConfiguration)
             {
-                throw new InvalidOperationException(inspection.Detail);
+                var inspection = await payloadInspector.InspectAsync(cancellationToken).ConfigureAwait(false);
+                if (inspection.State != PayloadInspectionState.Ready)
+                    throw new InvalidOperationException(inspection.Detail);
             }
 
             var normalized = Normalize(settings);
@@ -128,13 +133,14 @@ public sealed class PaqetFireRuntime(
                 : profileCatalog.Apply(new ProfileCatalogChange.Update(
                     profileCatalog.ActiveProfileId,
                     normalized));
+            catalogToSave = catalogToSave.WithSharingCredentials(normalized.LanSocksUsername, normalized.LanSocksPassword);
             string? interfaceName = null;
             var activationError = await ConfigurationActivation.ApplyAsync(
                 connectionController,
                 async () =>
                 {
-                    interfaceName = await WriteEngineConfigurationsAsync(normalized, cancellationToken)
-                        .ConfigureAwait(false);
+                    if (applyEngineConfiguration)
+                        interfaceName = await WriteEngineConfigurationsAsync(normalized, cancellationToken).ConfigureAwait(false);
                     await profileCatalogStore.SaveAsync(catalogToSave, cancellationToken).ConfigureAwait(false);
                     profileCatalog = catalogToSave;
                     await snapshotMetadata.UpdateSettingsAsync(normalized).ConfigureAwait(false);
@@ -285,6 +291,23 @@ public sealed class PaqetFireRuntime(
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (action.Kind == ProfileActionKind.FactoryReset)
+            {
+                // Reset deliberately releases the route and guard. It must also work
+                // when no connection has been configured yet.
+                await connectionController.DisconnectAsync(cancellationToken).ConfigureAwait(false);
+                var defaults = new PaqetFireSettings();
+                var emptyCatalog = ProfileCatalog.Create(Guid.NewGuid(), defaults);
+                await profileCatalogStore.SaveAsync(emptyCatalog, cancellationToken).ConfigureAwait(false);
+                profileCatalog = emptyCatalog;
+                latestVerification = null;
+                await snapshotMetadata.UpdateSettingsAsync(defaults).ConfigureAwait(false);
+                await settingsStore.SaveAsync(defaults, cancellationToken).ConfigureAwait(false);
+                foreach (var path in new[] { paths.PaqetConfigurationPath, paths.XrayConfigurationPath, paths.ProxiFyreConfigurationPath })
+                    await configurationStore.DeleteAsync(path, cancellationToken).ConfigureAwait(false);
+                return await CreateSnapshotAsync(PaqetFireSettingsView.FromSettings(defaults), cancellationToken).ConfigureAwait(false);
+            }
+
             var catalog = await EnsureProfileCatalogAsync(cancellationToken).ConfigureAwait(false);
             var currentStatus = await connectionController.GetStatusAsync(cancellationToken).ConfigureAwait(false);
             ProfileCatalog updated;
@@ -303,8 +326,11 @@ public sealed class PaqetFireRuntime(
                         MakeActive: true));
                     break;
                 case ProfileActionKind.Delete:
-                    updated = catalog.Apply(new ProfileCatalogChange.Delete(
-                        action.ProfileId ?? throw new InvalidOperationException("Choose a profile to delete.")));
+                    var deletedId = action.ProfileId ?? throw new InvalidOperationException("Choose a profile to delete.");
+                    // Keep the editor usable after deleting the final saved connection.
+                    updated = catalog.Profiles.Count == 1 && deletedId == catalog.ActiveProfileId
+                        ? ProfileCatalog.Create(Guid.NewGuid(), new PaqetFireSettings())
+                        : catalog.Apply(new ProfileCatalogChange.Delete(deletedId));
                     break;
                 case ProfileActionKind.Activate:
                     updated = catalog.Apply(new ProfileCatalogChange.Activate(
@@ -315,19 +341,22 @@ public sealed class PaqetFireRuntime(
                         action.ProfileId ?? throw new InvalidOperationException("Choose a default profile.")));
                     break;
                 case ProfileActionKind.ImportRedacted:
+                case ProfileActionKind.Import:
                     if (currentStatus.State != ConnectionState.Disconnected)
                     {
                         throw new InvalidOperationException("Disconnect the route before replacing profiles from an import.");
                     }
-                    updated = ProfileCatalogJson.ReadRedactedExport(
+                    updated = ProfileCatalogJson.ReadImport(
                         action.Payload ?? throw new InvalidOperationException("The profile import is empty."));
                     break;
                 default:
                     throw new InvalidOperationException("The profile action is not supported.");
             }
 
+            var applicationSettings = catalog.ActiveProfile.Settings;
+            updated = updated.WithSharingCredentials(applicationSettings.LanSocksUsername, applicationSettings.LanSocksPassword);
             var activeChanged = updated.ActiveProfileId != catalog.ActiveProfileId ||
-                                action.Kind == ProfileActionKind.ImportRedacted;
+                                action.Kind is ProfileActionKind.ImportRedacted or ProfileActionKind.Import;
             if (!activeChanged)
             {
                 await profileCatalogStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
@@ -345,17 +374,20 @@ public sealed class PaqetFireRuntime(
             }
 
             var selected = Normalize(updated.ActiveProfile.Settings);
-            if (action.Kind != ProfileActionKind.ImportRedacted)
+            var reconnect = currentStatus.State != ConnectionState.Disconnected;
+            // Selecting a profile for editing is allowed before it can connect.
+            // Validate only when this action would actually restart the route.
+            if (reconnect)
             {
                 var errors = PaqetFireSettingsValidator.Validate(selected);
                 if (errors.Count > 0)
                 {
-                    throw new ConfigurationValidationException(errors);
+                    throw new InvalidOperationException(
+                        "Disconnect the route before selecting or deleting a profile that needs setup.");
                 }
             }
 
             latestVerification = null;
-            var reconnect = currentStatus.State != ConnectionState.Disconnected;
             string? activationError = null;
             if (reconnect)
             {
@@ -402,7 +434,7 @@ public sealed class PaqetFireRuntime(
         try
         {
             var catalog = await EnsureProfileCatalogAsync(cancellationToken).ConfigureAwait(false);
-            return ProfileCatalogJson.WriteRedactedExport(catalog);
+            return ProfileCatalogJson.WritePortableExport(catalog);
         }
         finally
         {
@@ -425,6 +457,7 @@ public sealed class PaqetFireRuntime(
             settings.LocalTcpFlags,
             settings.RemoteTcpFlags,
             settings.KcpMode);
+        paqetProfile = settings.Advanced.ApplyTo(paqetProfile);
 
         var policy = new RoutingPolicy(
             settings.RoutingMode,
@@ -520,7 +553,8 @@ public sealed class PaqetFireRuntime(
             IsKillSwitchEnabled: settings?.KillSwitchEnabled == true &&
                                  status.ProxiFyre.State == EngineState.Running,
             status.ObservedAt ?? DateTimeOffset.UtcNow,
-            IsConfigured: settings is { HasTransportKey: true } &&
+            IsConfigured: settings is not null &&
+                          (settings.HasTransportKey || !PaqetConfigurationValidator.RequiresTransportKey(settings.Advanced.KcpBlock)) &&
                           !string.IsNullOrWhiteSpace(settings.ServerEndpoint),
             Settings: settings ?? CreateDefaultView(),
             Prerequisites: prerequisites,
@@ -582,8 +616,7 @@ public sealed class PaqetFireRuntime(
             return profileCatalog;
         }
 
-        var settings = await TryLoadSettingsAsync(cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Save a connection profile before managing profiles.");
+        var settings = await TryLoadSettingsAsync(cancellationToken).ConfigureAwait(false) ?? new PaqetFireSettings();
         profileCatalog = ProfileCatalog.FromLegacySettings(Guid.NewGuid(), settings);
         await profileCatalogStore.SaveAsync(profileCatalog, cancellationToken).ConfigureAwait(false);
         return profileCatalog;
@@ -611,7 +644,6 @@ public sealed class PaqetFireRuntime(
 
     private static IReadOnlyList<string> NormalizeFlags(IEnumerable<string> values) => values
         .Select(value => value.Trim().ToUpperInvariant())
-        .Distinct(StringComparer.Ordinal)
         .ToArray();
 
     private void EnsurePrerequisitesAvailable()

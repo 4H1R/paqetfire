@@ -7,8 +7,8 @@ namespace PaqetFire.Core.Configuration;
 
 public static partial class PaqetConfigurationValidator
 {
-    private const int MaximumBufferBytes = 1_073_741_824;
-    private static readonly HashSet<char> TcpFlagCharacters = new("FSRPAUEC");
+    private const int MaximumBufferBytes = int.MaxValue;
+    private static readonly HashSet<char> TcpFlagCharacters = new("FSRPAUECN");
     private static readonly HashSet<string> KcpModes = new(StringComparer.OrdinalIgnoreCase)
     {
         "normal", "fast", "fast2", "fast3", "manual",
@@ -49,21 +49,49 @@ public static partial class PaqetConfigurationValidator
         }
 
         ValidateMac(profile.RouterMac, "router MAC address", errors);
-        ValidateOptionalIpv6(profile, errors);
         ValidateFlags(profile.LocalTcpFlags, "local", errors);
         ValidateFlags(profile.RemoteTcpFlags, "remote", errors);
+
+        ValidateSocksCredentials(profile.SocksUsername, profile.SocksPassword, errors);
+        ValidateForwardRules(profile.ForwardRules, errors);
+        if (RequiresTransportKey(profile.KcpBlock) || !string.IsNullOrEmpty(transportKey))
+            ValidateTransportKey(transportKey, errors);
+        ValidateTuning(profile, errors);
+        return errors;
+    }
+
+    public static IReadOnlyList<string> ValidateAdvanced(PaqetAdvancedOptions? options, string kcpMode)
+    {
+        if (options is null) return ["Advanced Paqet settings are required."];
+        var errors = new List<string>();
+        var tuning = options.ApplyTo(new PaqetProfile(string.Empty, string.Empty, string.Empty,
+            string.Empty, string.Empty, string.Empty, [], [], kcpMode));
+        ValidateTuning(tuning, errors);
+        return errors;
+    }
+
+    public static bool RequiresTransportKey(string? block) =>
+        !string.Equals(block, "none", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(block, "null", StringComparison.OrdinalIgnoreCase);
+
+    private static void ValidateTuning(PaqetProfile profile, ICollection<string> errors)
+    {
+        ValidateOptionalIpv6(profile, errors);
+        ValidateRange(profile.LocalIpv4Port, 0, 65_535, "IPv4 source port", errors);
+        if (profile.LocalIpv4Port != 0 && profile.ConnectionCount != 1)
+            errors.Add("A fixed source port requires exactly one Paqet connection.");
+        if (!string.IsNullOrWhiteSpace(profile.LocalIpv6Endpoint) &&
+            TryParseNumericEndpoint(profile.LocalIpv6Endpoint, true, out _, out var ipv6Port) &&
+            ipv6Port != profile.LocalIpv4Port)
+            errors.Add("IPv4 and IPv6 source ports must match.");
 
         if (string.IsNullOrWhiteSpace(profile.LogLevel) || !LogLevels.Contains(profile.LogLevel.Trim()))
         {
             errors.Add("Log level must be none, debug, info, warn, error, or fatal.");
         }
 
-        ValidateSocksCredentials(profile.SocksUsername, profile.SocksPassword, errors);
-        ValidateForwardRules(profile.ForwardRules, errors);
-        ValidateRange(profile.PcapSocketBufferBytes, 65_536, MaximumBufferBytes, "PCAP socket buffer", errors);
+        ValidateRange(profile.PcapSocketBufferBytes, 1_024, 104_857_600, "PCAP socket buffer", errors);
         ValidateRange(profile.ConnectionCount, 1, 256, "Connection count", errors);
-        ValidateRange(profile.TcpBufferBytes, 1_024, MaximumBufferBytes, "TCP buffer", errors);
-        ValidateRange(profile.UdpBufferBytes, 1_024, MaximumBufferBytes, "UDP buffer", errors);
 
         if (string.IsNullOrWhiteSpace(profile.KcpMode) || !KcpModes.Contains(profile.KcpMode.Trim()))
         {
@@ -75,9 +103,7 @@ public static partial class PaqetConfigurationValidator
             errors.Add("KCP encryption must be one of the algorithms supported by the bundled Paqet version.");
         }
 
-        ValidateTransportKey(transportKey, errors);
         ValidateKcp(profile, errors);
-        return errors;
     }
 
     internal static bool TryParseInterfaceGuid(string? value, out Guid guid)
@@ -189,18 +215,19 @@ public static partial class PaqetConfigurationValidator
     private static void ValidateKcp(PaqetProfile profile, ICollection<string> errors)
     {
         ValidateRange(profile.KcpMtu, 50, 1_500, "KCP MTU", errors);
-        ValidateRange(profile.KcpReceiveWindow, 1, 65_535, "KCP receive window", errors);
-        ValidateRange(profile.KcpSendWindow, 1, 65_535, "KCP send window", errors);
+        ValidateRange(profile.KcpReceiveWindow, 1, 32_768, "KCP receive window", errors);
+        ValidateRange(profile.KcpSendWindow, 1, 32_768, "KCP send window", errors);
         ValidateRange(profile.SmuxBufferBytes, 1_024, MaximumBufferBytes, "SMUX buffer", errors);
         ValidateRange(profile.StreamBufferBytes, 1_024, MaximumBufferBytes, "Stream buffer", errors);
         ValidateRange(profile.SmuxKeepAliveSeconds, 1, 86_400, "SMUX keepalive", errors);
         ValidateRange(profile.SmuxKeepAliveTimeoutSeconds, 1, 86_400, "SMUX keepalive timeout", errors);
 
-        if (profile.SmuxKeepAliveSeconds is { } keepAlive &&
-            profile.SmuxKeepAliveTimeoutSeconds is { } keepAliveTimeout &&
-            keepAliveTimeout <= keepAlive)
+        if ((profile.StreamBufferBytes ?? 2 * 1024 * 1024) > (profile.SmuxBufferBytes ?? 4 * 1024 * 1024))
+            errors.Add("Stream buffer must not exceed the SMUX buffer (defaults: 2 MiB and 4 MiB).");
+
+        if ((profile.SmuxKeepAliveTimeoutSeconds ?? 8) < (profile.SmuxKeepAliveSeconds ?? 2))
         {
-            errors.Add("SMUX keepalive timeout must be greater than its keepalive interval.");
+            errors.Add("SMUX keepalive timeout must be at least its keepalive interval (defaults: 8 and 2 seconds).");
         }
 
         if (string.Equals(profile.KcpMode, "manual", StringComparison.OrdinalIgnoreCase))
@@ -216,9 +243,9 @@ public static partial class PaqetConfigurationValidator
             errors.Add("Both FEC data and parity shard counts are required when FEC is enabled.");
         }
         else if (profile.FecDataShards is { } data && profile.FecParityShards is { } parity &&
-                 (data < 1 || parity < 1 || data + parity > 255))
+                 !((data == 0 && parity == 0) || (data > 0 && parity > 0 && (long)data + parity <= 256)))
         {
-            errors.Add("FEC shard counts must be positive and their total must not exceed 255.");
+            errors.Add("FEC shard counts must both be zero to disable FEC, or positive with a total of at most 256.");
         }
     }
 
@@ -326,7 +353,7 @@ public static partial class PaqetConfigurationValidator
         string label,
         ICollection<string> errors)
     {
-        if (flags is null || flags.Count == 0 || flags.Count > 32 || flags.Any(flag =>
+        if (flags is null || flags.Count == 0 || flags.Count > 64 || flags.Any(flag =>
                 string.IsNullOrWhiteSpace(flag) || flag.Length > TcpFlagCharacters.Count ||
                 flag.Any(character => !TcpFlagCharacters.Contains(character))))
         {

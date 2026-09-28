@@ -172,6 +172,7 @@ public sealed class BrokerWorker(
         }
 
         return previous.ProfileName == current.ProfileName &&
+               previous.Advanced == current.Advanced &&
                previous.ServerEndpoint == current.ServerEndpoint &&
                previous.HasTransportKey == current.HasTransportKey &&
                previous.RoutingMode == current.RoutingMode &&

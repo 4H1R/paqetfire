@@ -111,6 +111,24 @@ public sealed class AtomicConfigurationStore : IAtomicConfigurationStore
         }
     }
 
+    public async Task DeleteAsync(string destinationPath, CancellationToken cancellationToken = default)
+    {
+        var destination = ValidateDestination(destinationPath);
+        await _commitLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            destination = ValidateDestination(destination);
+            var backup = ValidateSidecarPath(destination + ".bak");
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Delete(backup);
+            File.Delete(destination);
+        }
+        finally
+        {
+            _commitLock.Release();
+        }
+    }
+
     private async Task CommitTextAsync(
         string destination,
         string backup,

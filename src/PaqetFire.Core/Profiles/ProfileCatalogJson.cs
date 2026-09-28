@@ -8,15 +8,18 @@ namespace PaqetFire.Core.Profiles;
 
 /// <summary>
 /// The only JSON seam for profile catalogs. Persistence always delegates secrets to
-/// a protector; portable exports use a schema in which secret fields do not exist.
+/// a protector; portable exports contain transport keys, while legacy redacted
+/// exports have no secret fields. New portable exports omit local sharing authentication.
 /// </summary>
 public static class ProfileCatalogJson
 {
     public const int CurrentSchemaVersion = 1;
+    public const int PortableSchemaVersion = 2;
     public const int MaximumDocumentBytes = 8 * 1024 * 1024;
 
     private const string CatalogKind = "paqetfire-profile-catalog";
     private const string ExportKind = "paqetfire-profile-export";
+    private const string PortableExportKind = "paqetfire-portable-profile-export";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -97,6 +100,40 @@ public static class ProfileCatalogJson
             JsonOptions);
     }
 
+    /// <summary>Portable connection backup, including transport keys. Treat the file as a secret.</summary>
+    public static string WritePortableExport(ProfileCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        return Serialize(new PortableExportDocument(PortableSchemaVersion, PortableExportKind,
+            catalog.ActiveProfileId, catalog.DefaultProfileId,
+            catalog.Profiles.Select(PortableConnectionProfile.FromProfile).ToArray()), JsonOptions);
+    }
+
+    /// <summary>Accepts both complete portable exports and older redacted exports.</summary>
+    public static ProfileCatalog ReadImport(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        if (Encoding.UTF8.GetByteCount(json) > MaximumDocumentBytes)
+            throw new InvalidDataException($"A profile document cannot exceed {MaximumDocumentBytes} bytes.");
+        try
+        {
+            using var header = JsonDocument.Parse(json);
+            if (header.RootElement.TryGetProperty("kind", out var kind) && kind.GetString() == ExportKind)
+                return ReadRedactedExport(json);
+            var document = Deserialize<PortableExportDocument>(json);
+            ValidateHeader(document.SchemaVersion, document.Kind, PortableExportKind, PortableSchemaVersion);
+            return ProfileCatalog.Rehydrate(RequiredProfiles(document.Profiles).Select(profile =>
+            {
+                ArgumentNullException.ThrowIfNull(profile);
+                return profile.ToProfile();
+            }), document.ActiveProfileId, document.DefaultProfileId);
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or InvalidOperationException)
+        {
+            throw new InvalidDataException("The profile export is invalid.", exception);
+        }
+    }
+
     /// <summary>
     /// Reads a portable export. Imported profiles deliberately have empty secret values
     /// and therefore must receive credentials before connection validation can succeed.
@@ -153,12 +190,12 @@ public static class ProfileCatalogJson
     private static IReadOnlyList<T> RequiredProfiles<T>(IReadOnlyList<T>? profiles) =>
         profiles ?? throw new InvalidDataException("The profile document has no profile list.");
 
-    private static void ValidateHeader(int version, string? kind, string expectedKind)
+    private static void ValidateHeader(int version, string? kind, string expectedKind, int expectedVersion = CurrentSchemaVersion)
     {
-        if (version != CurrentSchemaVersion)
+        if (version != expectedVersion)
         {
             throw new InvalidDataException(
-                $"Profile schema version {version} is not supported; expected {CurrentSchemaVersion}.");
+                $"Profile schema version {version} is not supported; expected {expectedVersion}.");
         }
 
         if (!string.Equals(kind, expectedKind, StringComparison.Ordinal))
@@ -218,12 +255,17 @@ public static class ProfileCatalogJson
 
     private sealed record ExportedProfile(Guid Id, ProfileSettingsData? Settings);
 
+    private sealed record PortableExportDocument(int SchemaVersion, string Kind,
+        Guid ActiveProfileId, Guid DefaultProfileId, IReadOnlyList<PortableConnectionProfile>? Profiles);
+
     private sealed record ProtectedSecrets(
         string? ProtectedTransportKey,
         string? ProtectedLanSocksPassword);
 
     private sealed record ProfileSettingsData
     {
+        public PaqetAdvancedOptions Advanced { get; init; } = new();
+
         public Guid? NetworkInterfaceGuid { get; init; }
 
         public string ProfileName { get; init; } = "Default";
@@ -264,7 +306,8 @@ public static class ProfileCatalogJson
 
         public int LanSocksPort { get; init; } = 1082;
 
-        public string LanSocksUsername { get; init; } = "paqetfire";
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? LanSocksUsername { get; init; } = "paqetfire";
 
         public bool ShareViaHotspot { get; init; }
 
@@ -278,6 +321,7 @@ public static class ProfileCatalogJson
 
         public static ProfileSettingsData FromSettings(PaqetFireSettings settings) => new()
         {
+            Advanced = settings.Advanced,
             NetworkInterfaceGuid = settings.NetworkInterfaceGuid,
             ProfileName = settings.ProfileName,
             ServerEndpoint = settings.ServerEndpoint,
@@ -308,6 +352,7 @@ public static class ProfileCatalogJson
 
         public PaqetFireSettings ToSettings() => new()
         {
+            Advanced = Advanced ?? new(),
             NetworkInterfaceGuid = NetworkInterfaceGuid,
             ProfileName = ProfileName,
             ServerEndpoint = ServerEndpoint,
@@ -329,7 +374,7 @@ public static class ProfileCatalogJson
             KillSwitchEnabled = KillSwitchEnabled,
             ShareWithLan = ShareWithLan,
             LanSocksPort = LanSocksPort,
-            LanSocksUsername = LanSocksUsername,
+            LanSocksUsername = LanSocksUsername ?? "paqetfire",
             LanSocksPassword = string.Empty,
             ShareViaHotspot = ShareViaHotspot,
             HotspotSocksPort = HotspotSocksPort,

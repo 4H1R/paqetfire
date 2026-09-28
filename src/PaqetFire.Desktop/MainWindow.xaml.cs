@@ -55,7 +55,8 @@ public sealed partial class MainWindow : Window
     private bool trackingConfigurationChanges;
     private bool updatingProfileSelection;
     private bool hasPendingConfigurationChanges;
-    private readonly NetworkAutomationPolicy networkAutomationPolicy = new();
+    private NetworkAutomationPolicy networkAutomationPolicy = new();
+    private bool factoryResetInProgress;
     private BrokerSnapshot? lastSnapshot;
     private NetworkContext? currentNetworkContext;
     private string unidentifiedNetworkNonce = Guid.NewGuid().ToString("N");
@@ -100,6 +101,7 @@ public sealed partial class MainWindow : Window
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         InitializeComponent();
+        InitializeAdvancedOptions();
         var versionText = GitHubUpdateService.FormatVersion(CurrentVersion);
         VersionBadgeText.Text = $"v{versionText}";
         AboutVersionText.Text = $"PaqetFire {versionText}";
@@ -949,7 +951,7 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             Title = $"Delete '{selected.Name}'?",
-            Content = "This removes the profile and its protected secrets. The last remaining profile cannot be deleted.",
+            Content = "This removes the profile and its transport key. If it is the last profile, a fresh empty profile will appear. Your SOCKS username and password are kept.",
             PrimaryButtonText = "Delete profile",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
@@ -982,8 +984,8 @@ public sealed partial class MainWindow : Window
         if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
         await File.WriteAllTextAsync(dialog.FileName, json);
         ShowInfo(ConnectionInfoBar, InfoBarSeverity.Success, "Profiles exported",
-            "The export was saved without transport keys or sharing passwords.");
-        AddActivity("Redacted profiles exported.");
+            "The export includes transport keys. Keep it private and share it only with trusted recipients. SOCKS credentials stay on this PC.");
+        AddActivity("Portable profiles exported.");
     }
 
     private async void ImportProfilesButton_Click(object sender, RoutedEventArgs e)
@@ -1007,7 +1009,7 @@ public sealed partial class MainWindow : Window
         var confirmation = new ContentDialog
         {
             Title = "Replace all saved profiles?",
-            Content = "Import replaces the entire saved profile catalog. The route must be disconnected, and imported profiles will need their transport keys and sharing passwords entered again.",
+            Content = "Import replaces the entire saved profile catalog. The route must be disconnected. Transport keys are restored from portable exports; older redacted exports need keys entered again. Your SOCKS username and password are kept.",
             PrimaryButtonText = "Replace profiles",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
@@ -1017,9 +1019,9 @@ public sealed partial class MainWindow : Window
 
         var json = await File.ReadAllTextAsync(dialog.FileName);
         await RunProfileActionAsync(
-            new ProfileAction(ProfileActionKind.ImportRedacted, Payload: json),
+            new ProfileAction(ProfileActionKind.Import, Payload: json),
             reloadSettings: true,
-            "Imported profiles. Re-enter their transport keys and sharing passwords before connecting.");
+            "Imported profiles. Keys included in the file are ready to use; select any profile with a missing key to complete it. Your SOCKS credentials are unchanged.");
     }
 
     private async Task RunProfileActionAsync(ProfileAction action, bool reloadSettings, string successMessage)
@@ -1104,6 +1106,7 @@ public sealed partial class MainWindow : Window
     private void SetConfigurationEditingEnabled(bool enabled)
     {
         foreach (var control in ConfigurationControls()) control.IsEnabled = enabled;
+        AdvancedTransportExpander.IsEnabled = enabled;
     }
 
     private void FormGrid_SizeChanged(object sender, SizeChangedEventArgs args)
@@ -1142,7 +1145,7 @@ public sealed partial class MainWindow : Window
     private void ShowFieldErrors(IReadOnlyList<string> errors)
     {
         ClearFieldErrors();
-        AdvancedTransportExpander.IsExpanded |= errors.Any(message => message.Contains("TCP flag") || message.Contains("KCP mode"));
+        AdvancedTransportExpander.IsExpanded |= errors.Any(IsAdvancedOptionError);
         Control? first = null;
         foreach (var message in errors)
         {
@@ -1154,6 +1157,7 @@ public sealed partial class MainWindow : Window
                 var m when m.Contains("KCP mode") => KcpModeBox,
                 var m when m.Contains("local TCP") => LocalFlagsBox,
                 var m when m.Contains("remote TCP") => RemoteFlagsBox,
+                var m when IsAdvancedOptionError(m) => AdvancedTransportExpander,
                 var m when m.Contains("hotspot") && m.Contains("port") => HotspotPortBox,
                 var m when m.Contains("SOCKS5 port") => LanSharePortBox,
                 var m when m.Contains("username") => ShareUsernameBox,
@@ -1186,7 +1190,7 @@ public sealed partial class MainWindow : Window
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(control, message);
         }
         if (first is null) return;
-        NavigateTo(new Control[] { ProfileNameBox, ServerEndpointBox, TransportKeyBox, KcpModeBox, LocalFlagsBox, RemoteFlagsBox }.Contains(first) ? "connection" : "routing");
+        NavigateTo(new Control[] { ProfileNameBox, ServerEndpointBox, TransportKeyBox, KcpModeBox, LocalFlagsBox, RemoteFlagsBox, AdvancedTransportExpander }.Contains(first) ? "connection" : "routing");
         for (DependencyObject? ancestor = first; ancestor is not null; ancestor = VisualTreeHelper.GetParent(ancestor))
             if (ancestor is Expander expander) expander.IsExpanded = true;
         var invalidControl = first;
@@ -1267,6 +1271,58 @@ public sealed partial class MainWindow : Window
         {
             ShowInfo(SettingsInfoBar, InfoBarSeverity.Error, "Settings could not be saved", exception.Message);
             AddActivity("Application settings could not be saved.", "ERROR");
+        }
+    }
+
+    private async void FactoryResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy || factoryResetInProgress || Content?.XamlRoot is null) return;
+        var confirmation = new ContentDialog
+        {
+            Title = "Reset PaqetFire to defaults?",
+            Content = "This disconnects the route, turns off the kill switch, and removes all profiles, transport keys, SOCKS credentials, network rules, and app preferences. Export your profiles first if you want to keep them.",
+            PrimaryButtonText = "Reset app",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
+        factoryResetInProgress = true;
+        FactoryResetButton.IsEnabled = false;
+        networkAutomationCancellation?.Cancel();
+        pendingNetworkAutomationTrigger = null;
+        try
+        {
+            if (!await ViewModel.ManageProfileAsync(new(ProfileActionKind.FactoryReset)))
+            {
+                ShowInfo(SettingsInfoBar, InfoBarSeverity.Error, "Reset could not finish",
+                    ViewModel.ErrorMessage ?? "The broker could not reset the app. Try again.");
+                return;
+            }
+            preferences = new DesktopPreferences();
+            ApplyStartupRegistration(false);
+            await preferencesStore.SaveAsync(preferences);
+            networkAutomationPolicy = new();
+            hasSavedTransportKey = hasSavedLanSocksPassword = false;
+            TransportKeyBox.Password = SharePasswordBox.Password = string.Empty;
+            ApplyPreferences(preferences);
+            brokerSettingsApplied = false;
+            if (lastSnapshot is { } snapshot) OnSnapshotReceived(snapshot);
+            SetPendingChanges(false);
+            ClearFieldErrors();
+            VerificationEntries.Clear();
+            ActivityEntries.Clear();
+            ShowInfo(SettingsInfoBar, InfoBarSeverity.Success, "App reset",
+                "All settings are back to their defaults. Add or import a connection profile to get started.");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ShowInfo(SettingsInfoBar, InfoBarSeverity.Error, "Reset could not finish", exception.Message);
+        }
+        finally
+        {
+            factoryResetInProgress = false;
+            FactoryResetButton.IsEnabled = true;
         }
     }
 
@@ -1450,6 +1506,7 @@ public sealed partial class MainWindow : Window
     {
         settings = new PaqetFireSettings
         {
+            Advanced = advancedOptions,
             ProfileName = ProfileNameBox.Text.Trim(),
             ServerEndpoint = ServerEndpointBox.Text.Trim(),
             NetworkInterfaceGuid = networkAdapterPreview.SelectedInterfaceGuid,
@@ -1489,6 +1546,12 @@ public sealed partial class MainWindow : Window
             RemoteTcpFlags = SplitEntries(RemoteFlagsBox.Text),
         };
 
+        if (advancedNumberInputs.Any(control => !double.IsNaN(control.Value) &&
+            (!double.IsFinite(control.Value) || control.Value != Math.Truncate(control.Value) || control.Value < int.MinValue || control.Value > int.MaxValue)))
+        {
+            error = "Advanced Paqet number fields require whole numbers within their supported ranges.";
+            return false;
+        }
         var validationCandidate = settings;
         if (hasSavedTransportKey && validationCandidate.TransportKey.Length == 0)
         {
@@ -1507,6 +1570,7 @@ public sealed partial class MainWindow : Window
 
     private void ApplyPreferences(DesktopPreferences source)
     {
+        LoadAdvancedOptions(source.Advanced ?? new());
         ProfileNameBox.Text = source.ProfileName;
         ServerEndpointBox.Text = source.ServerEndpoint;
         SocksEndpointBox.Text = source.LocalSocksEndpoint;
@@ -1518,6 +1582,7 @@ public sealed partial class MainWindow : Window
             "normal" => 0,
             "fast2" => 2,
             "fast3" => 3,
+            "manual" => 4,
             _ => 1,
         };
 
@@ -1582,6 +1647,7 @@ public sealed partial class MainWindow : Window
 
     private void CapturePreferences()
     {
+        preferences.Advanced = advancedOptions;
         preferences.ProfileName = ProfileNameBox.Text.Trim();
         preferences.ServerEndpoint = ServerEndpointBox.Text.Trim();
         preferences.LocalSocksEndpoint = SocksEndpointBox.Text.Trim();
@@ -1678,6 +1744,7 @@ public sealed partial class MainWindow : Window
 
         if (!brokerSettingsApplied && snapshot.Settings is { } settings)
         {
+            LoadAdvancedOptions(settings.Advanced);
             brokerSettingsApplied = true;
             TransportKeyBox.Password = string.Empty;
             SharePasswordBox.Password = string.Empty;
@@ -1738,6 +1805,7 @@ public sealed partial class MainWindow : Window
                 "normal" => 0,
                 "fast2" => 2,
                 "fast3" => 3,
+                "manual" => 4,
                 _ => 1,
             };
 
@@ -2103,6 +2171,7 @@ public sealed partial class MainWindow : Window
 
     private void ScheduleNetworkAutomation(NetworkAutomationTrigger trigger, TimeSpan? delay = null)
     {
+        if (factoryResetInProgress) return;
         networkAutomationCancellation?.Cancel();
         networkAutomationCancellation?.Dispose();
         networkAutomationCancellation = new CancellationTokenSource();
@@ -2123,7 +2192,7 @@ public sealed partial class MainWindow : Window
 
     private async Task EvaluateNetworkAutomationAsync(NetworkAutomationTrigger trigger)
     {
-        if (lastSnapshot is null)
+        if (lastSnapshot is null || factoryResetInProgress)
         {
             return;
         }

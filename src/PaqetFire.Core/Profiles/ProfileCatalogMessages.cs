@@ -8,6 +8,8 @@ public enum ProfileActionKind
     Activate,
     MakeDefault,
     ImportRedacted,
+    Import,
+    FactoryReset,
 }
 
 public sealed record ProfileAction(

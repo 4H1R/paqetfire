@@ -6,9 +6,6 @@ public static class PaqetFireSettingsValidator
 {
     private const int MaxRoutingEntries = 128;
     private const int MaxRoutingCharacters = 8 * 1024;
-    private static readonly HashSet<string> KcpModes = new(
-        ["normal", "fast", "fast2", "fast3"],
-        StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlyList<string> Validate(PaqetFireSettings? settings)
     {
@@ -30,17 +27,13 @@ public static class PaqetFireSettingsValidator
             errors.Add("The server must be a hostname or IP address followed by a port.");
         }
 
-        if (string.IsNullOrEmpty(settings.TransportKey) ||
-            settings.TransportKey.Length > 1024 ||
-            settings.TransportKey.Any(char.IsControl))
+        if ((PaqetConfigurationValidator.RequiresTransportKey(settings.Advanced?.KcpBlock) && string.IsNullOrEmpty(settings.TransportKey)) ||
+            settings.TransportKey is { } key && (key.Length > 1024 || key.Any(char.IsControl)))
         {
             errors.Add("The transport key is required and must contain no control characters.");
         }
 
-        if (!KcpModes.Contains(settings.KcpMode ?? string.Empty))
-        {
-            errors.Add("KCP mode must be normal, fast, fast2, or fast3.");
-        }
+        errors.AddRange(PaqetConfigurationValidator.ValidateAdvanced(settings.Advanced, settings.KcpMode));
 
         if (!Enum.IsDefined(settings.RoutingMode))
         {
@@ -160,8 +153,8 @@ public static class PaqetFireSettingsValidator
         string label,
         ICollection<string> errors)
     {
-        const string valid = "FSRPAUEC";
-        if (flags is null || flags.Count == 0 || flags.Any(flag =>
+        const string valid = "FSRPAUECN";
+        if (flags is null || flags.Count == 0 || flags.Count > 64 || flags.Any(flag =>
                 string.IsNullOrWhiteSpace(flag) || flag.Any(character => !valid.Contains(character))))
         {
             errors.Add($"At least one valid {label} TCP flag is required.");

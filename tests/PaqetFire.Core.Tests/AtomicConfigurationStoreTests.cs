@@ -6,6 +6,35 @@ namespace PaqetFire.Core.Tests;
 public sealed class AtomicConfigurationStoreTests
 {
     [Fact]
+    public async Task DeleteRemovesOnlyTheRegisteredConfigurationAndItsBackup()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "PFTest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var destination = Path.Combine(root, "config.yaml");
+        var unrelated = Path.Combine(root, "keep.txt");
+        try
+        {
+            var store = new AtomicConfigurationStore(root, [destination]);
+            await File.WriteAllTextAsync(destination, "test configuration");
+            await File.WriteAllTextAsync(destination + ".bak", "test backup");
+            await File.WriteAllTextAsync(unrelated, "keep");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => store.DeleteAsync(unrelated));
+            await store.DeleteAsync(destination);
+            await store.DeleteAsync(destination);
+            Assert.False(File.Exists(destination));
+            Assert.False(File.Exists(destination + ".bak"));
+            Assert.Equal("keep", await File.ReadAllTextAsync(unrelated));
+        }
+        finally
+        {
+            File.Delete(destination);
+            File.Delete(destination + ".bak");
+            File.Delete(unrelated);
+            Directory.Delete(root);
+        }
+    }
+
+    [Fact]
     public async Task RejectedDestinationDoesNotCreateDirectories()
     {
         var root = Path.Combine(Path.GetTempPath(), "PFTest-" + Guid.NewGuid().ToString("N"));

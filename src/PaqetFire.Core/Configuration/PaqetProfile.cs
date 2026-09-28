@@ -17,6 +17,8 @@ public sealed record PaqetProfile(
 {
     public string LogLevel { get; init; } = "info";
 
+    public int LocalIpv4Port { get; init; }
+
     public string? SocksUsername { get; init; }
 
     public string? SocksPassword { get; init; }
@@ -31,10 +33,6 @@ public sealed record PaqetProfile(
     public int? PcapSocketBufferBytes { get; init; }
 
     public int ConnectionCount { get; init; } = 1;
-
-    public int? TcpBufferBytes { get; init; }
-
-    public int? UdpBufferBytes { get; init; }
 
     public int? KcpNoDelay { get; init; }
 

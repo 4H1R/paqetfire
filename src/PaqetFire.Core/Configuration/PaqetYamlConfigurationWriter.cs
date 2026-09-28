@@ -46,7 +46,7 @@ public sealed class PaqetYamlConfigurationWriter : IPaqetConfigurationWriter
         AppendScalar(builder, 2, "interface", profile.InterfaceName.Trim());
         AppendScalar(builder, 2, "guid", $@"\Device\NPF_{{{guid:D}}}");
         builder.Append("  ipv4:\n");
-        AppendScalar(builder, 4, "addr", $"{IPAddress.Parse(profile.LocalIpv4Address.Trim())}:0");
+        AppendScalar(builder, 4, "addr", $"{IPAddress.Parse(profile.LocalIpv4Address.Trim())}:{profile.LocalIpv4Port}");
         AppendScalar(builder, 4, "router_mac", NormalizeMac(profile.RouterMac));
 
         if (!string.IsNullOrWhiteSpace(profile.LocalIpv6Endpoint))
@@ -70,8 +70,6 @@ public sealed class PaqetYamlConfigurationWriter : IPaqetConfigurationWriter
         builder.Append("transport:\n");
         AppendScalar(builder, 2, "protocol", "kcp");
         AppendNumber(builder, 2, "conn", profile.ConnectionCount);
-        AppendOptionalNumber(builder, 2, "tcpbuf", profile.TcpBufferBytes);
-        AppendOptionalNumber(builder, 2, "udpbuf", profile.UdpBufferBytes);
         builder.Append("  kcp:\n");
         AppendScalar(builder, 4, "mode", profile.KcpMode.Trim().ToLowerInvariant());
 
@@ -162,7 +160,7 @@ public sealed class PaqetYamlConfigurationWriter : IPaqetConfigurationWriter
     {
         builder.Append(' ', indentation).Append(key).Append(": [");
         var separator = string.Empty;
-        foreach (var value in values.Select(value => value.Trim()).Distinct(StringComparer.Ordinal))
+        foreach (var value in values.Select(value => value.Trim()))
         {
             builder.Append(separator).Append(JsonSerializer.Serialize(value));
             separator = ", ";

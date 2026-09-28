@@ -65,6 +65,19 @@ public sealed class ProfileCatalog
         };
     }
 
+    /// <summary>
+    /// Sharing authentication belongs to this application, independent of the selected
+    /// connection. Keep it in each profile for compatibility with the protected v1 store.
+    /// Transport keys and all other profile settings are left untouched.
+    /// </summary>
+    public ProfileCatalog WithSharingCredentials(string username, string password) => new(
+        _profiles.Select(profile => profile with
+        {
+            Settings = profile.Settings with { LanSocksUsername = username, LanSocksPassword = password },
+        }),
+        ActiveProfileId,
+        DefaultProfileId);
+
     internal static ProfileCatalog Rehydrate(
         IEnumerable<ConnectionProfile> profiles,
         Guid activeProfileId,
@@ -292,6 +305,12 @@ public sealed class ProfileCatalog
 
     private static PaqetFireSettings CloneSettings(PaqetFireSettings settings) => settings with
     {
+        Advanced = settings.Advanced ?? new(),
+        ServerEndpoint = settings.ServerEndpoint ?? string.Empty,
+        TransportKey = settings.TransportKey ?? string.Empty,
+        LanSocksUsername = settings.LanSocksUsername ?? "paqetfire",
+        LanSocksPassword = settings.LanSocksPassword ?? string.Empty,
+        KcpMode = settings.KcpMode ?? "fast",
         SelectedApplications = AsReadOnly(settings.SelectedApplications),
         UserExclusions = AsReadOnly(settings.UserExclusions),
         DirectRouteDestinations = AsReadOnly(settings.DirectRouteDestinations),

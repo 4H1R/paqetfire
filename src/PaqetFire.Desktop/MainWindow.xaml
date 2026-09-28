@@ -191,7 +191,7 @@
                   <Button Content="Export" Click="ExportProfilesButton_Click" />
                   <Button Content="Import" Click="ImportProfilesButton_Click" />
                 </StackPanel>
-                <TextBlock Text="Exports never include transport keys or sharing passwords. Imported profiles require those secrets to be entered again."
+                <TextBlock Text="Portable exports include transport keys and settings grouped by engine. Keep exported files private. SOCKS credentials stay on each PC. Older redacted exports are also supported."
                            FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
@@ -247,13 +247,15 @@
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <ComboBox x:Name="KcpModeBox" Header="KCP mode" SelectedIndex="1" HorizontalAlignment="Stretch">
-                    <ComboBoxItem Content="normal"/><ComboBoxItem Content="fast"/><ComboBoxItem Content="fast2"/><ComboBoxItem Content="fast3"/>
+                    <ComboBoxItem Content="normal"/><ComboBoxItem Content="fast"/><ComboBoxItem Content="fast2"/><ComboBoxItem Content="fast3"/><ComboBoxItem Content="manual"/>
                   </ComboBox>
                   <TextBox x:Name="LocalFlagsBox" Grid.Column="1" Header="Local TCP flags" PlaceholderText="S" />
                   <TextBox x:Name="RemoteFlagsBox" Grid.Column="2" Header="Remote TCP flags" PlaceholderText="SA" />
                 </Grid>
-                <TextBlock Text="Advanced defaults work for most Paqet servers. Change them only to match your server configuration."
+                <TextBlock Text="Leave optional fields blank to use Paqet defaults. No-delay, interval, resend, congestion, write-delay, and immediate-ACK controls apply only in manual mode. IPv6 addresses and router MACs must match this PC's network. Encryption and FEC settings must match the server."
                             FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+                <StackPanel x:Name="AdvancedOptionsPanel" Spacing="12" />
+                <Button Content="Restore transport defaults" Click="ResetAdvancedOptionsButton_Click" HorizontalAlignment="Left" />
                </StackPanel>
               </Border>
             </Expander>
@@ -422,7 +424,7 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Visibility="Collapsed">
               <StackPanel Spacing="14">
                 <TextBlock Text="Proxy sharing credentials" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Set a password, then use Save and connect below. Sharing runs while PaqetFire is connected. On your phone, use a SOCKS5 profile with the same username and password."
+                <TextBlock Text="These credentials apply across all connection profiles and stay the same when you import or switch profiles. Set a password, then use Save and connect below. On your phone, use the same username and password."
                            FontSize="12" Opacity="0.68" TextWrapping="Wrap" />
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="12">
                   <Grid.ColumnDefinitions>
@@ -809,6 +811,14 @@
               </StackPanel>
             </Border>
             <Button Content="Save settings" Style="{StaticResource AccentButtonStyle}" Click="SaveSettingsButton_Click" HorizontalAlignment="Left" />
+            <Border Padding="24" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Factory reset" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Remove all profiles, encryption keys, SOCKS credentials, routing changes, and app preferences, then return to the installation defaults."
+                           TextWrapping="Wrap" Opacity="0.72" />
+                <Button x:Name="FactoryResetButton" Content="Reset app to defaults" Click="FactoryResetButton_Click" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
         <controls:V2rayNgGuideControl x:Name="V2rayNgGuideView" Visibility="Collapsed" />

@@ -5,6 +5,8 @@ namespace PaqetFire.Desktop.ViewModels;
 
 public sealed class DesktopPreferences
 {
+    public PaqetAdvancedOptions Advanced { get; set; } = new();
+
     public string ProfileName { get; set; } = "My Paqet route";
 
     public string ServerEndpoint { get; set; } = string.Empty;

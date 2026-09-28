@@ -32,14 +32,25 @@ client option documented by Paqet v1.0.0-alpha.21:
 - SOCKS5 listen endpoint and optional username/password authentication;
 - TCP/UDP port forwards;
 - IPv4 and optional IPv6 capture details, TCP flag cycling, and PCAP buffer;
-- connection count and TCP/UDP buffers;
+- connection count and IPv4 source port;
 - KCP presets and manual controls, MTU/windows, write/ACK delay, all upstream
   encryption choices, SMUX buffers/keepalives, and optional FEC shards.
 
-The normal UI can expose server, key, interface, SOCKS port, KCP preset and
-flags. Advanced controls can map directly to the additional init-properties on
-`PaqetProfile`. Null numeric/boolean values are deliberately omitted so the
-pinned Paqet binary supplies its own version-matched defaults.
+The Connection page exposes server, key, interface, KCP preset and flags.
+Advanced transport settings additionally expose logging, IPv4 source port,
+optional IPv6 capture details, PCAP buffering, connection count, and all KCP
+tuning fields through `PaqetAdvancedOptions`. These settings survive save,
+duplicate, switch, protected storage, and portable exports. Null numeric/boolean
+values are deliberately omitted so the bundled engine supplies its defaults.
+Manual controls are disabled when a preset would override them. The app offers
+the documented manual ranges; its keepalive inputs use positive seconds up to
+one day. Blank fields select defaults instead of upstream's zero sentinel.
+
+SOCKS listener wiring remains owned by the application. Optional low-level
+port-forward rules remain a writer capability, separate from packet tuning.
+The obsolete `transport.tcpbuf` and `transport.udpbuf` fields are no longer
+written: they do not exist in alpha.21. See the [upstream option audit](paqet-options-research.md)
+for source references, defaults, and validation constraints.
 
 ## Broker registration
 

@@ -4,6 +4,8 @@ namespace PaqetFire.Core.Configuration;
 
 public sealed record PaqetFireSettings
 {
+    public PaqetAdvancedOptions Advanced { get; init; } = new();
+
     public string ProfileName { get; init; } = "Default";
 
     public string ServerEndpoint { get; init; } = string.Empty;
@@ -90,6 +92,8 @@ public sealed record PaqetFireSettingsView(
     IReadOnlyList<string> LocalTcpFlags,
     IReadOnlyList<string> RemoteTcpFlags)
 {
+    public PaqetAdvancedOptions Advanced { get; init; } = new();
+
     public Guid? NetworkInterfaceGuid { get; init; }
 
     public static PaqetFireSettingsView FromSettings(PaqetFireSettings settings) => new(
@@ -122,6 +126,7 @@ public sealed record PaqetFireSettingsView(
         settings.RemoteTcpFlags)
     {
         NetworkInterfaceGuid = settings.NetworkInterfaceGuid,
+        Advanced = settings.Advanced,
     };
 }
 

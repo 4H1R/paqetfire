@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.Routing;
@@ -140,6 +141,62 @@ public sealed class ProfileCatalogTests
             StringComparison.Ordinal);
 
         Assert.Throws<InvalidDataException>(() => ProfileCatalogJson.ReadRedactedExport(injected));
+    }
+
+    [Fact]
+    public void PortableExportGroupsEnginesAndCarriesTransportKeysWithoutLocalAuthentication()
+    {
+        var settings = Settings("Portable") with
+        {
+            TransportKey = "portable-test-key", NetworkInterfaceGuid = WorkId,
+            Advanced = new() { KcpMtu = 1200, FecDataShards = 10, FecParityShards = 3 },
+        };
+        var catalog = ProfileCatalog.Create(HomeId, settings);
+        var json = ProfileCatalogJson.WritePortableExport(catalog);
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(2, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        var profile = document.RootElement.GetProperty("profiles")[0];
+        Assert.Equal("portable-test-key", profile.GetProperty("paqet").GetProperty("transportKey").GetString());
+        Assert.True(profile.TryGetProperty("xray", out _));
+        Assert.True(profile.TryGetProperty("proxiFyre", out _));
+        Assert.True(profile.TryGetProperty("sharing", out _));
+        Assert.False(profile.TryGetProperty("settings", out _));
+        Assert.DoesNotContain("lanSocksUsername", json);
+        Assert.DoesNotContain("lanSocksPassword", json);
+        Assert.DoesNotContain("networkInterfaceGuid", json);
+        var imported = ProfileCatalogJson.ReadImport(json).ActiveProfile.Settings;
+        Assert.Equal(settings.TransportKey, imported.TransportKey);
+        Assert.Equal(settings.Advanced, imported.Advanced);
+        Assert.Equal(settings.RoutingMode, imported.RoutingMode);
+        Assert.Equal(settings.SelectedApplications, imported.SelectedApplications);
+        Assert.Equal(settings.DirectRouteDestinations, imported.DirectRouteDestinations);
+        Assert.Equal(settings.ShareViaHotspot, imported.ShareViaHotspot);
+        Assert.Empty(imported.LanSocksPassword);
+        Assert.Null(imported.NetworkInterfaceGuid);
+    }
+
+    [Fact]
+    public void PortableReaderStillAcceptsRedactedExportsAndRejectsUnknownSchemas()
+    {
+        var catalog = ProfileCatalog.Create(HomeId, Settings("Portable"));
+        Assert.Empty(ProfileCatalogJson.ReadImport(ProfileCatalogJson.WriteRedactedExport(catalog)).ActiveProfile.Settings.TransportKey);
+        var json = ProfileCatalogJson.WritePortableExport(catalog);
+        Assert.Throws<InvalidDataException>(() => ProfileCatalogJson.ReadImport(json.Replace("\"schemaVersion\": 2", "\"schemaVersion\": 99")));
+        Assert.Throws<InvalidDataException>(() => ProfileCatalogJson.ReadImport(json.Replace("\"paqet\": {", "\"paqet\": {\"unknownOption\": true,")));
+    }
+
+    [Fact]
+    public void AdvancedOptionsSurviveProtectedPersistenceAndCredentialRotation()
+    {
+        var settings = Settings("Home") with { Advanced = new() { KcpBlock = "aes-128-gcm", KcpMtu = 1300 } };
+        var catalog = ProfileCatalog.Create(HomeId, settings)
+            .Apply(new ProfileCatalogChange.Add(WorkId, Settings("Work") with { TransportKey = "second-key" }))
+            .WithSharingCredentials("updated-user", "updated-password");
+        var loaded = ProfileCatalogJson.ReadProtected(ProfileCatalogJson.WriteProtected(catalog, new TestProtector()), new TestProtector());
+        Assert.Equal(settings.Advanced, loaded.ActiveProfile.Settings.Advanced);
+        Assert.Equal(settings.TransportKey, loaded.ActiveProfile.Settings.TransportKey);
+        Assert.Equal("second-key", loaded.Profiles[1].Settings.TransportKey);
+        Assert.All(loaded.Profiles, profile => Assert.Equal("updated-password", profile.Settings.LanSocksPassword));
     }
 
     [Fact]

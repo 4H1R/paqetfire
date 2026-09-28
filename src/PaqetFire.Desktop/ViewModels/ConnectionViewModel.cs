@@ -819,7 +819,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
 
     private static string CreateEffectiveRoutingText(PaqetFireSettingsView? settings)
     {
-        if (settings is null || !settings.HasTransportKey)
+        if (settings is null || (!settings.HasTransportKey && PaqetConfigurationValidator.RequiresTransportKey(settings.Advanced.KcpBlock)))
         {
             return "Set up a profile to preview which traffic will use PaqetFire.";
         }
