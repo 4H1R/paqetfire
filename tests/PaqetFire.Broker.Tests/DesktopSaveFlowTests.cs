@@ -77,6 +77,8 @@ public sealed class DesktopSaveFlowTests
         public ValueTask<BrokerSnapshot> VerifyConnectionAsync(TimeSpan timeout, CancellationToken cancellationToken) => new(Snapshot());
         public ValueTask<BrokerSnapshot> ManageProfilesAsync(ProfileAction action, TimeSpan timeout, CancellationToken cancellationToken) => new(Snapshot());
         public ValueTask<string> ExportProfilesAsync(TimeSpan timeout, CancellationToken cancellationToken) => new("{}");
+        public ValueTask<LiveConnectionStats> GetLiveStatsAsync(TimeSpan timeout, CancellationToken cancellationToken) =>
+            new(new LiveConnectionStats(DateTimeOffset.UtcNow, IsConnected: false));
         public ValueTask<BrokerSnapshot> SaveSettingsAsync(PaqetFireSettings settings, bool connectAfterSave, TimeSpan timeout, CancellationToken cancellationToken)
         {
             SaveCount++;

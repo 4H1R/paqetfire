@@ -73,4 +73,4 @@ generated engine configurations and their backups, and restores desktop
 preferences including startup registration and network automation rules.
 It does not uninstall PaqetFire or its drivers. Exported files are unaffected.
 
-The broker and desktop use IPC v10 and must be upgraded together.
+The broker and desktop use IPC v11 and must be upgraded together.

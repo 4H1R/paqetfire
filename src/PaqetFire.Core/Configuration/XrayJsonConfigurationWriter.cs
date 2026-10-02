@@ -7,6 +7,8 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
 {
     public const int InboundPort = 1081;
     public const int PaqetPort = 1080;
+    public const int StatsApiPort = 10085;
+    public const string PaqetOutboundTag = "paqet";
 
     public string Write(XrayRoutingPolicy policy)
     {
@@ -34,6 +36,24 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             writer.WriteStartObject();
             writer.WriteStartObject("log");
             writer.WriteString("loglevel", "warning");
+            writer.WriteEndObject();
+
+            // Loopback-only StatsService exposes traffic counters for the live
+            // connection card. HandlerService is deliberately not enabled.
+            writer.WriteStartObject("api");
+            writer.WriteString("tag", "api");
+            writer.WriteString("listen", $"127.0.0.1:{StatsApiPort}");
+            writer.WriteStartArray("services");
+            writer.WriteStringValue("StatsService");
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+            writer.WriteStartObject("stats");
+            writer.WriteEndObject();
+            writer.WriteStartObject("policy");
+            writer.WriteStartObject("system");
+            writer.WriteBoolean("statsOutboundUplink", true);
+            writer.WriteBoolean("statsOutboundDownlink", true);
+            writer.WriteEndObject();
             writer.WriteEndObject();
 
             writer.WriteStartArray("inbounds");

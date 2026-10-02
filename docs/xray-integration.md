@@ -44,3 +44,7 @@ payload manifest and verified before a connection may start.
 
 The generated `config.json` is broker-owned and written atomically under the
 protected installation payload directory. It is not accepted from the UI.
+
+## Live session statistics
+
+Generated configurations enable Xray's `StatsService` on `127.0.0.1:10085` (loopback only; `HandlerService` is not exposed) with outbound uplink/downlink counters. The broker reads the `outbound>>>paqet>>>traffic>>>*` counters over gRPC for the Overview session card, so totals and rates include only traffic routed through Paqet, never direct or blocked traffic. Latency and the exit address are probed directly against the Paqet SOCKS5 listener, bypassing Xray so probe bytes are not counted. The exit country is resolved offline from the bundled `geoip.dat`; no address is sent to a geolocation service.

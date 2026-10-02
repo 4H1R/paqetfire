@@ -17,6 +17,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StatusRequestTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan LifecycleRequestTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan LiveStatsInterval = TimeSpan.FromSeconds(1);
 
     private readonly IBrokerClient brokerClient;
     private readonly IUiDispatcher dispatcherQueue;
@@ -38,6 +39,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     private string? lastActivitySummary;
     private bool isBusy;
     private bool disposed;
+    private CancellationTokenSource? livePolling;
 
     public ConnectionViewModel(
         IBrokerClient brokerClient,
@@ -54,6 +56,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
 
     public event Action<BrokerSnapshot>? SnapshotReceived;
 
+    public LiveStatsViewModel Live { get; } = new();
+
     public BrokerConnectionState ConnectionState
     {
         get => connectionState;
@@ -66,6 +70,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                 OnPropertyChanged(nameof(CanDisconnect));
                 OnPropertyChanged(nameof(CanPrimaryAction));
                 OnPropertyChanged(nameof(PrimaryActionText));
+                UpdateLivePolling();
             }
         }
     }
@@ -603,6 +608,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             }
 
             disposed = true;
+            livePolling?.Cancel();
+            livePolling = null;
             brokerClient.EventReceived -= OnBrokerEventReceived;
             await SafeCloseTransportAsync().ConfigureAwait(false);
 
@@ -714,6 +721,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         BrokerStatusText = "Running";
         LastCheckedText = $"Updated {snapshot.CapturedAt.ToLocalTime():t}";
         EffectiveRoutingText = CreateEffectiveRoutingText(snapshot.Settings);
+        Live.ApplyProfile(snapshot.Settings);
         var engineStates = string.Join(", ", snapshot.Engines.Select(engine => $"{engine.Engine} {engine.State}"));
         var activitySummary = $"{snapshot.ConnectionState}:{engineStates}:{snapshot.StatusMessage}";
         if (!string.Equals(lastActivitySummary, activitySummary, StringComparison.Ordinal))
@@ -798,6 +806,79 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             StateLabel = "DEGRADED";
             StatusText = $"Connection incomplete · {engineSummary}";
             StatusDescription = "The engine states do not currently form a safe route.";
+        }
+    }
+
+    private void UpdateLivePolling()
+    {
+        if (IsConnected && !disposed)
+        {
+            if (livePolling is null)
+            {
+                livePolling = new CancellationTokenSource();
+                _ = PollLiveStatsAsync(livePolling.Token);
+            }
+
+            return;
+        }
+
+        livePolling?.Cancel();
+        livePolling = null;
+        Live.Reset();
+    }
+
+    private async Task PollLiveStatsAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(LiveStatsInterval);
+        try
+        {
+            do
+            {
+                // A cancelled or timed-out broker request resets the shared pipe, so never
+                // interrupt one and never overlap a lifecycle operation; skip the tick instead.
+                if (!await operationLock.WaitAsync(0, CancellationToken.None).ConfigureAwait(false))
+                {
+                    continue;
+                }
+
+                LiveConnectionStats? stats = null;
+                try
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        stats = await brokerClient.GetLiveStatsAsync(StatusRequestTimeout, CancellationToken.None)
+                            .ConfigureAwait(false);
+                    }
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    // Live telemetry is best-effort; lifecycle state comes from snapshots.
+                }
+                finally
+                {
+                    operationLock.Release();
+                }
+
+                if (stats is not null)
+                {
+                    _ = dispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            Live.Apply(stats);
+                        }
+                    });
+                }
+            }
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Polling stops when the route leaves the connected state.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The view model was disposed while a tick was pending.
         }
     }
 

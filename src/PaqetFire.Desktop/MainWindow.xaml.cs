@@ -2456,6 +2456,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    public Brush QualityBrush(LatencyQuality quality)
+    {
+        var resourceKey = quality switch
+        {
+            LatencyQuality.Excellent or LatencyQuality.Good => "PaqetFireSuccessBrush",
+            LatencyQuality.Fair => "PaqetFireWarningBrush",
+            LatencyQuality.Poor or LatencyQuality.Unreachable => "PaqetFireErrorBrush",
+            _ => "PaqetFireNeutralBrush",
+        };
+        return (Brush)Application.Current.Resources[resourceKey];
+    }
+
     private void UpdateConnectionVisuals()
     {
         if (ConnectionStateIndicator is null || ConnectionStateIcon is null || ConnectionStateIconSurface is null)

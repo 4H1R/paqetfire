@@ -2,7 +2,8 @@
     x:Class="PaqetFire.Desktop.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:PaqetFire.Desktop.Controls">
+    xmlns:controls="using:PaqetFire.Desktop.Controls"
+    xmlns:vm="using:PaqetFire.Desktop.ViewModels">
 
   <Grid x:Name="RootGrid" Loaded="RootGrid_Loaded">
     <Grid.RowDefinitions>
@@ -52,6 +53,7 @@
         <ScrollViewer x:Name="OverviewPage">
           <Grid MaxWidth="1120" Padding="36,28,36,48" HorizontalAlignment="Stretch">
             <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
@@ -111,7 +113,134 @@
               </Grid>
             </Border>
 
-            <Grid Grid.Row="2" Margin="0,18,0,0" ColumnSpacing="18" HorizontalAlignment="Stretch">
+            <Border x:Name="LiveSessionCard" Grid.Row="2" Margin="0,18,0,0" Padding="24" CornerRadius="24"
+                    HorizontalAlignment="Stretch"
+                    Visibility="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{StaticResource PaqetFireSuccessBrush}" BorderThickness="1">
+              <Grid ColumnSpacing="24" RowSpacing="18">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="CONNECTED FOR" FontSize="11" FontWeight="SemiBold" Opacity="0.65" CharacterSpacing="110" />
+                    <TextBlock Text="{x:Bind ViewModel.Live.ElapsedText, Mode=OneWay}" FontSize="38" FontWeight="SemiBold"
+                               FontFamily="Cascadia Mono, Consolas"
+                               AutomationProperties.Name="Connected duration" />
+                  </StackPanel>
+
+                  <Border Padding="14,9" CornerRadius="16" HorizontalAlignment="Left"
+                          Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <TextBlock Text="Exit IP" FontSize="12" Opacity="0.65" VerticalAlignment="Center" />
+                      <Border Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
+                              Visibility="{x:Bind ViewModel.Live.HasCountryCode, Mode=OneWay}"
+                              Background="{StaticResource PaqetFireSuccessBrush}">
+                        <TextBlock Text="{x:Bind ViewModel.Live.CountryCode, Mode=OneWay}" FontSize="11" FontWeight="Bold"
+                                   Foreground="Black" AutomationProperties.Name="Exit country" />
+                      </Border>
+                      <TextBlock Text="{x:Bind ViewModel.Live.PublicAddressText, Mode=OneWay}" FontSize="15" FontWeight="SemiBold"
+                                 FontFamily="Cascadia Mono, Consolas" VerticalAlignment="Center" IsTextSelectionEnabled="True" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14,10" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid ColumnSpacing="12">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Protocol" FontSize="12" Opacity="0.65" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.Live.ProtocolText, Mode=OneWay}" FontWeight="SemiBold"
+                                 FontFamily="Cascadia Mono, Consolas" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                  </Border>
+
+                  <Border Padding="14,10" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid ColumnSpacing="12">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Endpoint" FontSize="12" Opacity="0.65" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.Live.EndpointText, Mode=OneWay}" FontWeight="SemiBold"
+                                 FontFamily="Cascadia Mono, Consolas" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="12">
+                  <Border Padding="16,14" CornerRadius="14" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid ColumnSpacing="16">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Border Width="34" Height="34" CornerRadius="17" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
+                          <FontIcon Glyph="&#xE74B;" FontSize="14" Foreground="{StaticResource PaqetFireSuccessBrush}"
+                                    AutomationProperties.AccessibilityView="Raw" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                          <TextBlock Text="{x:Bind ViewModel.Live.DownloadRateText, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
+                                     FontFamily="Cascadia Mono, Consolas" AutomationProperties.Name="Download rate" />
+                          <TextBlock Text="{x:Bind ViewModel.Live.DownloadTotalText, Mode=OneWay}" FontSize="11" Opacity="0.65" />
+                        </StackPanel>
+                      </StackPanel>
+                      <Rectangle Grid.Column="1" Width="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12">
+                        <Border Width="34" Height="34" CornerRadius="17" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
+                          <FontIcon Glyph="&#xE74A;" FontSize="14" Foreground="{StaticResource PaqetFireSuccessBrush}"
+                                    AutomationProperties.AccessibilityView="Raw" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                          <TextBlock Text="{x:Bind ViewModel.Live.UploadRateText, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
+                                     FontFamily="Cascadia Mono, Consolas" AutomationProperties.Name="Upload rate" />
+                          <TextBlock Text="{x:Bind ViewModel.Live.UploadTotalText, Mode=OneWay}" FontSize="11" Opacity="0.65" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+
+                  <Border Padding="16,14" CornerRadius="14" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <StackPanel Spacing="10">
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="Latency" FontSize="12" Opacity="0.65" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind ViewModel.Live.LatencyText, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
+                                   FontFamily="Cascadia Mono, Consolas" AutomationProperties.Name="Latency" />
+                      </StackPanel>
+                      <Grid>
+                        <TextBlock Text="Ping strength" FontSize="11" Opacity="0.65" />
+                        <TextBlock Text="{x:Bind ViewModel.Live.QualityText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Right"
+                                   Foreground="{x:Bind QualityBrush(ViewModel.Live.Quality), Mode=OneWay}" />
+                      </Grid>
+                      <ItemsControl ItemsSource="{x:Bind ViewModel.Live.PingBars}" Height="24"
+                                    AutomationProperties.AccessibilityView="Raw">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="5" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:PingBar">
+                            <Rectangle Width="7" Height="{x:Bind Height}" RadiusX="3.5" RadiusY="3.5"
+                                       VerticalAlignment="Center" Opacity="{x:Bind Opacity}"
+                                       Fill="{StaticResource PaqetFireSuccessBrush}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Grid Grid.Row="3" Margin="0,18,0,0" ColumnSpacing="18" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
@@ -140,7 +269,7 @@
               </Border>
             </Grid>
 
-            <Border Grid.Row="3" Margin="0,18,0,0" Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
+            <Border Grid.Row="4" Margin="0,18,0,0" Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <Grid ColumnSpacing="24">
                 <Grid.ColumnDefinitions>

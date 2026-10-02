@@ -1,3 +1,4 @@
+using PaqetFire.Broker.Diagnostics;
 using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
@@ -7,7 +8,8 @@ using PaqetFire.Core.Profiles;
 namespace PaqetFire.Broker.Ipc;
 
 public sealed class ConnectionBrokerRequestHandler(
-    IPaqetFireRuntime runtime) : IBrokerRequestHandler
+    IPaqetFireRuntime runtime,
+    ILiveStatsService liveStats) : IBrokerRequestHandler
 {
     public async ValueTask<BrokerResponse> HandleAsync(
         BrokerRequest request,
@@ -64,6 +66,13 @@ public sealed class ConnectionBrokerRequestHandler(
                         request.RequestId,
                         await runtime.SaveSettingsAsync(request.Settings, request.ConnectAfterSave, cancellationToken)
                             .ConfigureAwait(false));
+
+                case BrokerCommand.GetLiveStats:
+                    return new BrokerResponse(
+                        request.RequestId,
+                        IpcProtocol.Version,
+                        true,
+                        LiveStats: await liveStats.GetAsync(cancellationToken).ConfigureAwait(false));
 
                 case BrokerCommand.GetSnapshot:
                     return BrokerResponse.Succeeded(

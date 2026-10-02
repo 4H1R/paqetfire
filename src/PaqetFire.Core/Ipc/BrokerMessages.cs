@@ -16,6 +16,7 @@ public enum BrokerCommand
     VerifyConnection,
     ManageProfiles,
     ExportProfiles,
+    GetLiveStats,
 }
 
 public enum BrokerMessageType
@@ -56,7 +57,8 @@ public sealed record BrokerResponse(
     bool Success,
     BrokerSnapshot? Snapshot = null,
     BrokerError? Error = null,
-    string? ExportedProfiles = null)
+    string? ExportedProfiles = null,
+    LiveConnectionStats? LiveStats = null)
 {
     public static BrokerResponse Succeeded(Guid requestId, BrokerSnapshot? snapshot = null) =>
         new(requestId, IpcProtocol.Version, true, snapshot);

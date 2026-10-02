@@ -162,6 +162,19 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
             throw new InvalidDataException("The broker profile export was empty.");
     }
 
+    public async ValueTask<LiveConnectionStats> GetLiveStatsAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var response = await SendResponseAsync(
+                BrokerCommand.GetLiveStats,
+                timeout,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return response.LiveStats ??
+            throw new InvalidDataException("The broker live statistics response was empty.");
+    }
+
     private async ValueTask<BrokerSnapshot> SendAsync(
         BrokerCommand command,
         TimeSpan timeout,
