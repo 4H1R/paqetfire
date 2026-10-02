@@ -11,7 +11,14 @@
     <SuppressIces>ICE03</SuppressIces>
     <DesktopPublishDir>$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64\desktop</DesktopPublishDir>
     <BrokerPublishDir>$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64\broker</BrokerPublishDir>
-    <DefineConstants>DesktopPublishDir=$(DesktopPublishDir);BrokerPublishDir=$(BrokerPublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
+    <!--
+      Both publishes are self-contained, so the .NET runtime appears twice.
+      Stage-InstallerPayload.ps1 splits the byte-identical root files into a
+      shared tree that the MSI stores once and duplicates into the broker folder.
+    -->
+    <InstallerStageDir>$(MSBuildThisFileDirectory)obj\stage</InstallerStageDir>
+    <SharedRuntimeFragment>$(InstallerStageDir)\SharedRuntime.wxs</SharedRuntimeFragment>
+    <DefineConstants>DesktopPublishDir=$(InstallerStageDir)\desktop;BrokerPublishDir=$(InstallerStageDir)\broker;SharedPublishDir=$(InstallerStageDir)\shared;ProductVersion=$(ProductVersion)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,4 +26,12 @@
     <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
     <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
   </ItemGroup>
+
+  <Target Name="StageInstallerPayload" BeforeTargets="CoreCompile">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\Stage-InstallerPayload.ps1&quot; -DesktopPublishDir &quot;$(DesktopPublishDir)&quot; -BrokerPublishDir &quot;$(BrokerPublishDir)&quot; -StageRoot &quot;$(InstallerStageDir)&quot; -SharedFragmentPath &quot;$(SharedRuntimeFragment)&quot;" />
+
+    <ItemGroup>
+      <Compile Include="$(SharedRuntimeFragment)" />
+    </ItemGroup>
+  </Target>
 </Project>

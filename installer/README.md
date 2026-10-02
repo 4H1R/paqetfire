@@ -19,6 +19,14 @@ ICE03 validation is suppressed because .NET 10's self-contained native runtime
 files expose version-resource language metadata that is not representable in the
 MSI `File.Language` column. Other Windows Installer validation remains enabled.
 
+The desktop app and broker are both self-contained, so their .NET runtime files
+are byte-identical. Before compiling, `Stage-InstallerPayload.ps1` splits the
+publish output under `obj\stage` and generates `SharedRuntime.wxs`: each shared
+file is stored once in the cabinet, installed to `app\`, and duplicated into
+`broker\` through the MSI `DuplicateFile` table. The installed layout is
+unchanged. Keep the broker and desktop on the same Windows SDK target version so
+`Microsoft.Windows.SDK.NET.dll` stays shareable.
+
 Npcap and Windows Packet Filter are kernel drivers and remain separately
 licensed prerequisites. The app detects both and links to their official setup
 when missing. Npcap Free must not be copied into this MSI; a fully unattended,

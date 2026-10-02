@@ -117,6 +117,7 @@
     <Feature Id="Complete" Title="PaqetFire" Level="1">
       <ComponentGroupRef Id="DesktopPayload" />
       <ComponentGroupRef Id="BrokerPayload" />
+      <ComponentGroupRef Id="SharedRuntimePayload" />
     </Feature>
   </Package>
 
