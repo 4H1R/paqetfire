@@ -892,7 +892,7 @@
                               OnContent="Enabled" OffContent="Disabled" />
                 <ToggleSwitch x:Name="CloseToTraySwitch" Header="Close to notification area"
                               OnContent="Closing hides PaqetFire" OffContent="Closing exits PaqetFire" IsOn="True" />
-                <ToggleSwitch x:Name="CheckForUpdatesSwitch" Header="Check for updates when PaqetFire opens"
+                <ToggleSwitch x:Name="CheckForUpdatesSwitch" Header="Check for updates automatically"
                               OnContent="Enabled" OffContent="Disabled" IsOn="True" />
               </StackPanel>
             </Border>
@@ -952,6 +952,23 @@
         </ScrollViewer>
         <controls:V2rayNgGuideControl x:Name="V2rayNgGuideView" Visibility="Collapsed" />
         <controls:HappGuideControl x:Name="HappGuideView" Visibility="Collapsed" />
+        <Border x:Name="UpdateToast" Visibility="Collapsed" MaxWidth="440" Margin="24"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" CornerRadius="8"
+                Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
+                Translation="0,0,32">
+          <Border.Shadow>
+            <ThemeShadow />
+          </Border.Shadow>
+          <InfoBar x:Name="UpdateToastInfoBar" IsOpen="True" IsClosable="True" Severity="Informational"
+                   Title="Update available" Closed="UpdateToastInfoBar_Closed">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+              <Button x:Name="UpdateToastInstallButton" Content="Update now"
+                      Style="{StaticResource AccentButtonStyle}" Click="UpdateToastInstallButton_Click" />
+              <Button Content="Release notes" Click="ViewReleaseButton_Click" />
+              <Button Content="Later" Click="UpdateToastLaterButton_Click" />
+            </StackPanel>
+          </InfoBar>
+        </Border>
       </Grid>
     </NavigationView>
   </Grid>

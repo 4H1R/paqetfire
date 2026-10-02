@@ -16,7 +16,7 @@ public static class SoftwareUpdateInstaller
         using var process = Process.Start(new ProcessStartInfo
         {
             FileName = "msiexec.exe",
-            ArgumentList = { "/i", installerPath, "/passive", "/norestart" },
+            ArgumentList = { "/i", installerPath, "/passive", "/norestart", "PAQETFIRE_RELAUNCH=1" },
             UseShellExecute = true,
             Verb = "runas",
         });

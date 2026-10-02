@@ -72,6 +72,12 @@ public sealed partial class MainWindow : Window
     private readonly CancellationTokenSource updateCancellation = new();
     private SoftwareRelease? availableUpdate;
     private bool updateActionInProgress;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? updateCheckTimer;
+    private Version? announcedUpdateVersion;
+    private Version? dismissedUpdateVersion;
+    private bool updateBalloonPending;
+
+    private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromDays(1);
 
     private static readonly Version CurrentVersion = typeof(MainWindow).Assembly.GetName().Version
         ?? new Version(0, 0, 0);
@@ -161,6 +167,18 @@ public sealed partial class MainWindow : Window
         {
             _ = CheckForUpdatesAsync(showCurrentVersionResult: false);
         }
+
+        updateCheckTimer = DispatcherQueue.CreateTimer();
+        updateCheckTimer.Interval = UpdateCheckInterval;
+        updateCheckTimer.IsRepeating = true;
+        updateCheckTimer.Tick += (_, _) =>
+        {
+            if (preferences.CheckForUpdatesOnLaunch && !exitRequested)
+            {
+                _ = CheckForUpdatesAsync(showCurrentVersionResult: false);
+            }
+        };
+        updateCheckTimer.Start();
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e) =>
@@ -204,7 +222,7 @@ public sealed partial class MainWindow : Window
                     InfoBarSeverity.Informational,
                     "Update available",
                     $"PaqetFire {latestVersion} is newer than the installed version. The installer will be verified before it opens.");
-                AddActivity($"PaqetFire update {latestVersion} is available.");
+                AnnounceUpdate(availableUpdate);
             }
             else
             {
@@ -214,6 +232,7 @@ public sealed partial class MainWindow : Window
                 ToolTipService.SetToolTip(VersionBadge, $"Installed version {versionText}");
                 InstallUpdateButton.Visibility = Visibility.Collapsed;
                 ViewReleaseButton.Visibility = Visibility.Collapsed;
+                UpdateToastInfoBar.IsOpen = false;
                 if (showCurrentVersionResult)
                 {
                     ShowInfo(
@@ -246,6 +265,61 @@ public sealed partial class MainWindow : Window
                 InstallUpdateButton.IsEnabled = availableUpdate is not null;
             }
         }
+    }
+
+    private void AnnounceUpdate(SoftwareRelease release)
+    {
+        var latestVersion = GitHubUpdateService.FormatVersion(release.Version);
+        if (release.Version != dismissedUpdateVersion)
+        {
+            UpdateToastInfoBar.Title = $"PaqetFire {latestVersion} is available";
+            UpdateToastInfoBar.Message =
+                $"You have {GitHubUpdateService.FormatVersion(CurrentVersion)}. The installer is checksum-verified before it opens.";
+            UpdateToastInstallButton.IsEnabled = true;
+            UpdateToast.Visibility = Visibility.Visible;
+            UpdateToastInfoBar.IsOpen = true;
+        }
+
+        if (release.Version == announcedUpdateVersion)
+        {
+            return;
+        }
+
+        announcedUpdateVersion = release.Version;
+        AddActivity($"PaqetFire update {latestVersion} is available.");
+        if (trayIcon is not null && trayIcon.Visible && !AppWindow.IsVisible)
+        {
+            updateBalloonPending = true;
+            trayIcon.ShowBalloonTip(
+                10000,
+                $"PaqetFire {latestVersion} is available",
+                "Click to open PaqetFire and install the update.",
+                System.Windows.Forms.ToolTipIcon.Info);
+        }
+    }
+
+    private void UpdateToastInstallButton_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateToastInfoBar.IsOpen = false;
+        NavigateTo("settings");
+        InstallUpdateButton.StartBringIntoView();
+        InstallUpdateButton_Click(sender, e);
+    }
+
+    private void UpdateToastLaterButton_Click(object sender, RoutedEventArgs e)
+    {
+        dismissedUpdateVersion = availableUpdate?.Version;
+        UpdateToastInfoBar.IsOpen = false;
+    }
+
+    private void UpdateToastInfoBar_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        if (args.Reason == InfoBarCloseReason.CloseButton)
+        {
+            dismissedUpdateVersion = availableUpdate?.Version;
+        }
+
+        UpdateToast.Visibility = Visibility.Collapsed;
     }
 
     private async void InstallUpdateButton_Click(object sender, RoutedEventArgs e)
@@ -482,6 +556,12 @@ public sealed partial class MainWindow : Window
 
     private void NavigateTo(string destination)
     {
+        if (destination == "settings")
+        {
+            Navigation.SelectedItem = Navigation.SettingsItem;
+            return;
+        }
+
         var item = Navigation.MenuItems
             .OfType<NavigationViewItem>()
             .FirstOrDefault(candidate => string.Equals(
@@ -2440,6 +2520,18 @@ public sealed partial class MainWindow : Window
             BalloonTipText = "Right-click the icon to connect, disconnect, reopen, or exit PaqetFire.",
         };
         trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+        trayIcon.BalloonTipClicked += (_, _) =>
+        {
+            if (!updateBalloonPending)
+            {
+                return;
+            }
+
+            updateBalloonPending = false;
+            RestoreFromTray();
+            _ = DispatcherQueue.TryEnqueue(() => NavigateTo("settings"));
+        };
+        trayIcon.BalloonTipClosed += (_, _) => updateBalloonPending = false;
         UpdateTrayState();
     }
 
@@ -2587,6 +2679,7 @@ public sealed partial class MainWindow : Window
         Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         networkAutomationCancellation?.Cancel();
         networkAutomationCancellation?.Dispose();
+        updateCheckTimer?.Stop();
         updateCancellation.Cancel();
         updateCancellation.Dispose();
         updateHttpClient.Dispose();

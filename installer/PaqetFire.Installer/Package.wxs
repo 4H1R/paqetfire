@@ -39,6 +39,21 @@
     <Property Id="MSIRMSHUTDOWN" Value="1" />
     <Property Id="MSIDISABLERMRESTART" Value="1" />
 
+    <!-- The in-app updater sets PAQETFIRE_RELAUNCH=1. Explorer starts the app at the user's
+         normal integrity level instead of inheriting the elevated installer token. -->
+    <CustomAction
+        Id="RelaunchPaqetFireDesktop"
+        Directory="ApplicationFolder"
+        ExeCommand="&quot;[WindowsFolder]explorer.exe&quot; &quot;[#PaqetFireDesktopExe]&quot;"
+        Execute="immediate"
+        Return="asyncNoWait" />
+    <InstallExecuteSequence>
+      <Custom
+          Action="RelaunchPaqetFireDesktop"
+          After="InstallFinalize"
+          Condition="PAQETFIRE_RELAUNCH=&quot;1&quot; AND NOT (REMOVE~=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
+
     <UI Id="PaqetFireUI">
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
       <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
