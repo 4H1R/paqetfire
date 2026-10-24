@@ -10,6 +10,7 @@ PaqetFire.Desktop (asInvoker)
 PaqetFire.Broker (LocalSystem service)
         |-- Paqet adapter ------> bundled paqet.exe + generated config.yaml
         |-- Xray adapter -------> bundled xray.exe + generated config.json
+        |-- Psiphon adapter ----> bundled psiphon-tunnel-core + config.json (exit proxy, optional)
         `-- ProxiFyre adapter --> bundled ProxiFyre engine + app-config.json
 ```
 
@@ -43,10 +44,12 @@ The installed layout is owned by PaqetFire and treated as one product:
       engines\
         paqet\x64\      paqet_windows_amd64.exe, config.yaml
         xray\x64\       xray.exe, geoip.dat, geosite.dat, config.json
+        psiphon\x64\    psiphon-tunnel-core-i686.exe, config.json
         proxifyre\x64\  ProxiFyre.exe and dependencies, app-config.json
 %ProgramData%\PaqetFire\
   settings.json, profiles.json, engine-credentials.json, broker-state.json
   routing-data\        downloaded GeoIP/GeoSite releases (optional)
+  psiphon\             Psiphon server list and data store (exit proxy only)
 ```
 
 Each manifest file entry includes a relative path, size, and SHA-256 digest. The
@@ -59,10 +62,12 @@ started. Generated engine configurations are written
 atomically beside each engine with a `.bak` copy, restricted to SYSTEM and
 Administrators, and regenerated from the saved profile on every connect.
 
-The three upstream engines remain distinct processes because their runtime and
+The upstream engines remain distinct processes because their runtime and
 driver models are different. Paqet and Xray run in a kill-on-close job object
 and the service restarts automatically after a failure. Leftover Paqet and Xray
-processes are stopped when the broker starts. A leftover ProxiFyre is kept while
+processes are stopped when the broker starts. Psiphon, the optional
+[exit proxy](psiphon-exit.md), runs only for profiles that select it, in the
+same job, and is stopped at broker start as well. A leftover ProxiFyre is kept while
 the kill switch is on or a reconnect is pending, so routed applications stay
 blocked during a broker restart; it is replaced when the broker starts its own,
 or stopped if the route is released without the kill switch. They are nevertheless internal implementation
@@ -100,7 +105,7 @@ installed from its official site because its free license forbids redistribution
 
 The default **All supported applications** routing mode emits ProxiFyre's
 catch-all application entry (`""`). The generated exclusion list always contains
-the full installed paths of Paqet, Xray, ProxiFyre, and `PaqetFire.Broker.exe`.
+the full installed paths of Paqet, Xray, Psiphon, ProxiFyre, and `PaqetFire.Broker.exe`.
 These are locked system exclusions: users may add exclusions but cannot remove or
 override them. Full paths are used because ProxiFyre treats a name-only exclusion
 as a substring match. Paqet's and Xray's upstream sockets must never be captured
@@ -111,7 +116,9 @@ route over TCP.
 Npcap and Windows Packet Filter are kernel drivers, not carrier applications,
 so they do not create user-mode traffic that needs a process exclusion.
 
-Paqet and Xray start in parallel. Before ProxiFyre starts, the broker waits for
+Paqet and Xray start in parallel. With an exit proxy, Psiphon starts once Paqet
+is ready and counts as ready when it reports an established tunnel; capture
+waits for it. Before ProxiFyre starts, the broker waits for
 a SOCKS5 greeting from Paqet and for Xray's local listener, both detected from
 the Windows TCP listener table. ProxiFyre counts as ready shortly after its log
 reports the SOCKS5 local router started, with a fixed two-second wait as the

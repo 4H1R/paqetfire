@@ -48,6 +48,10 @@ _Avoid_: Manual, tutorial, docs website
 The common authentication username and password used across all inbound share listeners (LAN share and Hotspot share) for local devices.
 _Avoid_: Master password, account, user credentials
 
+**Exit proxy**:
+An optional second network, currently Psiphon, that routed TCP leaves through after the Paqet server; the exit engine reaches its network only through Paqet transport.
+_Avoid_: Double VPN, chain, second tunnel
+
 **Encrypted DNS**:
 Xray answering captured lookups itself, over DNS-over-HTTPS through Paqet transport, with the network's own resolver kept only for local and direct-routed domains.
 _Avoid_: Secure DNS, DNS proxy, DNS leak protection

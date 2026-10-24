@@ -536,7 +536,7 @@
                   <RadioButton Content="Only selected applications" />
                 </RadioButtons>
                 <TextBlock x:Name="RoutingModeHelpText"
-                           Text="All application traffic enters the PaqetFire route. Paqet, Xray, ProxiFyre, and the broker are excluded to prevent a loop; Npcap runs below application routing."
+                           Text="All application traffic enters the PaqetFire route. Paqet, Xray, Psiphon, ProxiFyre, and the broker are excluded to prevent a loop; Npcap runs below application routing."
                            Opacity="0.65" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
@@ -593,6 +593,27 @@
                          AcceptsReturn="True" MinHeight="116" />
                 <TextBlock Text="A domain also covers its subdomains; *.domain is accepted too. IP addresses and CIDR ranges support IPv4 and IPv6. These entries take priority over the optional blocking rules and use your normal connection, outside Paqet. For protocols where no hostname is visible, add the IP or CIDR."
                            TextWrapping="Wrap" Opacity="0.68" />
+              </StackPanel>
+            </Border>
+
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="14">
+                <TextBlock Text="Exit proxy" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Optionally leave the internet through a second network after your Paqet server, so websites see that network's address and country instead of the server's."
+                           FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                <ComboBox x:Name="ExitProxyBox" Header="Exit" SelectedIndex="0" HorizontalAlignment="Stretch"
+                          SelectionChanged="ExitProxyBox_SelectionChanged">
+                  <ComboBoxItem Content="None — Leave from the Paqet server (recommended)" Tag="none" />
+                  <ComboBoxItem Content="Psiphon — Leave through the Psiphon network" Tag="psiphon" />
+                </ComboBox>
+                <StackPanel x:Name="PsiphonOptionsPanel" Spacing="10" Visibility="Collapsed">
+                  <ComboBox x:Name="PsiphonRegionBox" Header="Psiphon exit country" HorizontalAlignment="Stretch" />
+                  <TextBlock x:Name="PsiphonStatusText" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold"
+                             TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                  <TextBlock Text="Psiphon reaches its servers only through Paqet, and destinations see a Psiphon server in the chosen country. It carries TCP only: UDP, such as calls and games, still leaves from the Paqet server. Connecting takes longer, most of all the first time while Psiphon downloads its server list through Paqet; a country Psiphon cannot serve right now fails to connect. PaqetFire uses Psiphon's public network configuration, which Psiphon Inc. may change or limit."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
               </StackPanel>
             </Border>
 
@@ -874,7 +895,7 @@
             </Grid>
 
             <Grid ColumnSpacing="14" HorizontalAlignment="Stretch">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <Border Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="5"><TextBlock Text="Broker service" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.BrokerStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
               </Border>
@@ -885,6 +906,9 @@
                 <StackPanel Spacing="5"><TextBlock Text="Xray" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.XrayStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
               </Border>
               <Border Grid.Column="3" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="5"><TextBlock Text="Psiphon exit" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.ExitStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
+              </Border>
+              <Border Grid.Column="4" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="5"><TextBlock Text="ProxiFyre" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.RoutingStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
               </Border>
             </Grid>

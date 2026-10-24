@@ -27,6 +27,8 @@ public static class SaveConfirmation
             submitted.ShareWithLan == stored.ShareWithLan &&
             submitted.ShareViaHotspot == stored.ShareViaHotspot &&
             submitted.DnsResolver == stored.DnsResolver &&
+            submitted.ExitProxy == stored.ExitProxy &&
+            string.Equals(submitted.Psiphon?.EgressRegion ?? string.Empty, stored.Psiphon?.EgressRegion ?? string.Empty, StringComparison.Ordinal) &&
             (submitted.TransportKey.Length == 0 || stored.HasTransportKey) &&
             (submitted.LanSocksPassword.Length == 0 || stored.HasLanSocksPassword);
     }

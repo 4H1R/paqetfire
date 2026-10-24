@@ -20,8 +20,15 @@ public sealed class XrayStatsClient : IXrayTrafficStats, IDisposable
 {
     private const string QueryStatsPath = "/xray.app.stats.command.StatsService/QueryStats";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(1);
-    private static readonly string CounterPrefix =
-        $"outbound>>>{XrayJsonConfigurationWriter.PaqetOutboundTag}>>>traffic>>>";
+    private const string CounterPattern = "outbound>>>";
+
+    // Traffic that leaves through the route: Paqet itself, and the exit that rides on it.
+    // Direct, blocked, and DNS outbounds are not counted.
+    private static readonly string[] RoutedCounterPrefixes =
+    [
+        $"outbound>>>{XrayJsonConfigurationWriter.PaqetOutboundTag}>>>traffic>>>",
+        $"outbound>>>{XrayJsonConfigurationWriter.ExitOutboundTag}>>>traffic>>>",
+    ];
 
     private readonly HttpClient client;
 
@@ -47,7 +54,7 @@ public sealed class XrayStatsClient : IXrayTrafficStats, IDisposable
         {
             Version = HttpVersion.Version20,
             VersionPolicy = HttpVersionPolicy.RequestVersionExact,
-            Content = new ByteArrayContent(CreateFrame(EncodeQueryRequest(CounterPrefix))),
+            Content = new ByteArrayContent(CreateFrame(EncodeQueryRequest(CounterPattern))),
         };
         request.Content.Headers.TryAddWithoutValidation("Content-Type", "application/grpc");
         request.Headers.TryAddWithoutValidation("TE", "trailers");
@@ -103,6 +110,11 @@ public sealed class XrayStatsClient : IXrayTrafficStats, IDisposable
                 }
 
                 var (name, value) = ParseStat(reader.ReadBytes());
+                if (!RoutedCounterPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
                 if (name.EndsWith(">>>uplink", StringComparison.Ordinal))
                 {
                     uplink += value;

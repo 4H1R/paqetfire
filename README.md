@@ -36,6 +36,9 @@ PaqetFire brings three complementary networking tools into one desktop app:
   including regional direct-routing presets and domain blocking.
 - **[ProxiFyre](https://github.com/wiresock/proxifyre)** transparently captures
   selected Windows applications—or everything—and sends them to the route.
+- **[Psiphon](https://github.com/Psiphon-Labs/psiphon-tunnel-core)** is an
+  optional exit proxy that routed TCP leaves through after the Paqet server,
+  in a country you choose.
 
 The user manages one profile and one connection. A protected Windows service
 validates configuration, verifies bundled engine hashes, and starts the engine
@@ -50,9 +53,11 @@ chain in a safe order.
 - Tune advanced Paqet packet/KCP settings and restore application defaults with Factory reset.
 - Follow each connect step on Overview, then watch the live session: connected time, exit IP and country, Paqet traffic rates and totals, and tunnel latency.
 - Independently enable TCP, UDP, IPv4, and IPv6 routing.
-- Lock Paqet, Xray, ProxiFyre, and the broker out of catch-all rules to prevent
+- Lock Paqet, Xray, Psiphon, ProxiFyre, and the broker out of catch-all rules to prevent
   recursive proxy loops.
 - Use the Iran-direct Xray preset or route all destinations through Paqet.
+- Optionally leave through a [Psiphon exit](docs/psiphon-exit.md) in a chosen
+  country, reached only through Paqet.
 - Route chosen domains, wildcard subdomains, IP addresses, and CIDR ranges directly.
 - Block advertising domains (including Persian ad networks with updated routing
   data), block malware and phishing domains, block QUIC, or send BitTorrent
@@ -77,7 +82,7 @@ chain in a safe order.
 - Run from the notification area with state icons, quick profile switching, and
   notifications when the route drops or recovers; optionally start with Windows
   in the background and connect on launch.
-- Install the desktop app, broker, Paqet, Xray, and ProxiFyre as one product.
+- Install the desktop app, broker, Paqet, Xray, Psiphon, and ProxiFyre as one product.
 
 ## Traffic flow
 
@@ -97,6 +102,10 @@ Paqet SOCKS5 :1080
 Paqet server -> destination
 ```
 
+With the optional Psiphon exit, Xray sends routed TCP to Psiphon's local
+SOCKS5 listener instead; Psiphon connects to its network through Paqet, so the
+destination sees a Psiphon server in the chosen country. UDP stays on Paqet.
+
 Trusted LAN devices can optionally enter through a separate authenticated Xray
 SOCKS5 listener. ProxiFyre is not involved in LAN-client traffic, but the same
 Xray regional and blocking policy applies.
@@ -115,7 +124,7 @@ SOCKS5 listener, sharing the identical Xray regional and blocking policy.
   and the [Microsoft Visual C++ v14 x64 runtime](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)
   for ProxiFyre.
 
-Paqet, Xray, and ProxiFyre are bundled in release installers. The Diagnostics
+Paqet, Xray, Psiphon, and ProxiFyre are bundled in release installers. The Diagnostics
 page detects every prerequisite and offers verified, on-demand installation
 where redistribution allows it. Prerequisite installers are not bundled with
 PaqetFire, so this helper does not increase the app's installed size. Npcap is

@@ -66,6 +66,8 @@ public sealed partial class MainWindow
             BlockMalwareSwitch.IsOn = state.BlockMalware;
             BlockQuicSwitch.IsOn = state.BlockQuic;
             DirectBitTorrentSwitch.IsOn = state.DirectBitTorrent;
+            SelectExitProxy(state.ExitProxy);
+            SelectPsiphonRegion(state.PsiphonRegion);
             KillSwitchToggle.IsOn = state.KillSwitch;
             ShareWithLanSwitch.IsOn = state.ShareWithLan;
             LanShareOptions.Visibility = state.ShareWithLan ? Visibility.Visible : Visibility.Collapsed;
@@ -130,6 +132,8 @@ public sealed partial class MainWindow
         BlockMalware = BlockMalwareSwitch.IsOn,
         BlockQuic = BlockQuicSwitch.IsOn,
         DirectBitTorrent = DirectBitTorrentSwitch.IsOn,
+        ExitProxy = SelectedExitProxy(),
+        PsiphonRegion = SelectedPsiphonRegion(),
         KillSwitch = KillSwitchToggle.IsOn,
         ShareWithLan = ShareWithLanSwitch.IsOn,
         LanSocksPort = double.IsNaN(LanSharePortBox.Value) ? 0 : (int)LanSharePortBox.Value,
@@ -275,7 +279,8 @@ public sealed partial class MainWindow
             LocalFlagsBox, RemoteFlagsBox, RoutingModeButtons, SelectedApplicationsBox,
             UserExclusionsBox, BypassLanSwitch, RegionalPresetBox, DomainStrategyBox, DnsResolverBox, FakeDnsSwitch,
             DirectRouteDestinationsBox,
-            BlockAdsSwitch, BlockMalwareSwitch, BlockQuicSwitch, DirectBitTorrentSwitch, KillSwitchToggle,
+            BlockAdsSwitch, BlockMalwareSwitch, BlockQuicSwitch, DirectBitTorrentSwitch,
+            ExitProxyBox, PsiphonRegionBox, KillSwitchToggle,
             ShareWithLanSwitch, LanSharePortBox,
             ShareViaHotspotSwitch, HotspotPortBox,
             ShareUsernameBox, SharePasswordBox,
@@ -314,6 +319,8 @@ public sealed partial class MainWindow
             var control = message switch
             {
                 var m when m.Contains("profile name") => (Control)ProfilePicker,
+                var m when m.Contains("Psiphon exit country") => PsiphonRegionBox,
+                var m when m.Contains("exit proxy") || m.Contains("Psiphon exit") => ExitProxyBox,
                 var m when m.Contains("server must") => ServerEndpointBox,
                 var m when m.Contains("transport key") => TransportKeyBox,
                 var m when m.Contains("KCP mode") => KcpModeBox,

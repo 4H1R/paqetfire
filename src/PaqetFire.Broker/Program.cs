@@ -99,7 +99,7 @@ builder.Services.AddSingleton<IMachineProfileCatalogStore>(services =>
 builder.Services.AddSingleton<IAtomicConfigurationStore>(_ =>
     new AtomicConfigurationStore(
         paths.PayloadRoot,
-        [paths.PaqetConfigurationPath, paths.XrayConfigurationPath, paths.ProxiFyreConfigurationPath]));
+        [paths.PaqetConfigurationPath, paths.XrayConfigurationPath, paths.ProxiFyreConfigurationPath, paths.PsiphonConfigurationPath]));
 builder.Services.AddSingleton<BrokerSignal>();
 builder.Services.AddSingleton(services =>
 {
@@ -134,10 +134,17 @@ builder.Services.AddSingleton(services =>
     adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
     return adapter;
 });
+builder.Services.AddSingleton(services =>
+{
+    var adapter = new PsiphonProcessAdapter(BundledEngineOptions.CreatePsiphon(paths));
+    adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
+    return adapter;
+});
 builder.Services.AddSingleton<IConnectionController>(services => new ConnectionController(
     services.GetRequiredService<PaqetProcessAdapter>(),
     services.GetRequiredService<XrayProcessAdapter>(),
-    services.GetRequiredService<ProxiFyreProcessAdapter>()));
+    services.GetRequiredService<ProxiFyreProcessAdapter>(),
+    services.GetRequiredService<PsiphonProcessAdapter>()));
 builder.Services.AddSingleton<IRoutingDataSource, GitHubRoutingDataSource>();
 builder.Services.AddSingleton<IRoutingDataValidator, XrayRoutingDataValidator>();
 builder.Services.AddSingleton(services =>

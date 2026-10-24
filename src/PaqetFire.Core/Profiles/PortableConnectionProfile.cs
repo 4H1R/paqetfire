@@ -13,6 +13,8 @@ internal sealed record PortableConnectionProfile
     public PortableXraySettings Xray { get; init; } = new();
     public PortableProxiFyreSettings ProxiFyre { get; init; } = new();
     public PortableSharingSettings Sharing { get; init; } = new();
+    // Absent from files exported before exit proxies existed.
+    public PortableExitSettings? Exit { get; init; } = new();
 
     public static PortableConnectionProfile FromProfile(ConnectionProfile profile) => new()
     {
@@ -58,6 +60,11 @@ internal sealed record PortableConnectionProfile
             ShareViaHotspot = profile.Settings.ShareViaHotspot,
             HotspotSocksPort = profile.Settings.HotspotSocksPort,
         },
+        Exit = new()
+        {
+            Provider = profile.Settings.ExitProxy,
+            Psiphon = profile.Settings.Psiphon ?? new(),
+        },
     };
 
     public ConnectionProfile ToProfile()
@@ -66,6 +73,7 @@ internal sealed record PortableConnectionProfile
         ArgumentNullException.ThrowIfNull(Xray);
         ArgumentNullException.ThrowIfNull(ProxiFyre);
         ArgumentNullException.ThrowIfNull(Sharing);
+        var exit = Exit ?? new();
         return new(Id, new PaqetFireSettings
         {
             ProfileName = Name,
@@ -97,6 +105,8 @@ internal sealed record PortableConnectionProfile
             LanSocksPort = Sharing.LanSocksPort,
             ShareViaHotspot = Sharing.ShareViaHotspot,
             HotspotSocksPort = Sharing.HotspotSocksPort,
+            ExitProxy = exit.Provider,
+            Psiphon = exit.Psiphon ?? new(),
         });
     }
 }
@@ -135,6 +145,12 @@ internal sealed record PortableProxiFyreSettings
     public bool RouteIpv4 { get; init; } = true;
     public bool RouteIpv6 { get; init; } = true;
     public bool KillSwitchEnabled { get; init; } = false;
+}
+
+internal sealed record PortableExitSettings
+{
+    public ExitProxyKind Provider { get; init; } = ExitProxyKind.None;
+    public PsiphonExitOptions? Psiphon { get; init; } = new();
 }
 
 internal sealed record PortableSharingSettings

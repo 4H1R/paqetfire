@@ -111,7 +111,19 @@ public sealed record BrokerSnapshot(
     ProfileCatalogView? ProfileCatalog = null,
     TunnelHealthReport? Tunnel = null,
     ConnectionProgress? Progress = null,
-    RoutingDataStatus? RoutingData = null);
+    RoutingDataStatus? RoutingData = null)
+{
+    /// <summary>The exit engine's own view of its tunnel while it runs.</summary>
+    public ExitProxyStatus? ExitProxy { get; init; }
+}
+
+/// <param name="ConnectedRegion">The country of the exit server in use, when the exit reports it.</param>
+/// <param name="AvailableRegions">The countries the exit can serve right now; empty until it reports them.</param>
+public sealed record ExitProxyStatus(
+    ExitProxyKind Kind,
+    bool TunnelActive,
+    string? ConnectedRegion,
+    IReadOnlyList<string> AvailableRegions);
 
 public sealed record BrokerError(BrokerErrorCode Code, string Message);
 
@@ -122,6 +134,7 @@ public enum ConnectionStage
     VerifyingPayload,
     StartingTransport,
     StartingPolicy,
+    StartingExit,
     StartingCapture,
     ProbingTunnel,
     RecoveringTransport,

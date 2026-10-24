@@ -5,4 +5,5 @@ public enum EngineKind
     Paqet,
     Xray,
     ProxiFyre,
+    Psiphon,
 }

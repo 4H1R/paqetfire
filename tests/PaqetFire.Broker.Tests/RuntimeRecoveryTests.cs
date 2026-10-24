@@ -24,6 +24,55 @@ namespace PaqetFire.Broker.Tests;
 public sealed class RuntimeRecoveryTests
 {
     [Fact]
+    public async Task APsiphonProfileWritesItsExitAndLocksItOutOfCapture()
+    {
+        var psiphon = new PsiphonProcessAdapter(new PsiphonProcessOptions
+        {
+            ExecutablePath = "missing-psiphon.exe",
+            ConfigurationPath = "missing-config.json",
+            DataDirectory = Path.GetTempPath(),
+            ExpectedExecutableSha256 = new string('0', 64),
+            Version = "test",
+            DataDirectoryPolicy = null,
+        });
+        await using var fixture = await RuntimeFixture.StartAsync(
+            settings => settings with { ExitProxy = ExitProxyKind.Psiphon, Psiphon = new PsiphonExitOptions("nl") },
+            psiphon: psiphon);
+
+        await fixture.Runtime.ConnectAsync(CancellationToken.None);
+
+        Assert.True(psiphon.IsEnabled);
+        Assert.Equal(new ExitProxyOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort), fixture.Xray.Last!.Exit);
+        var configuration = fixture.Configurations.Files[fixture.Paths.PsiphonConfigurationPath];
+        Assert.Contains("\"EgressRegion\": \"NL\"", configuration, StringComparison.Ordinal);
+        Assert.Contains("@127.0.0.1:1080", configuration, StringComparison.Ordinal);
+        var capture = fixture.Configurations.Files[fixture.Paths.ProxiFyreConfigurationPath];
+        Assert.Contains(Path.GetFileName(fixture.Paths.PsiphonExecutablePath), capture, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AProfileWithoutAnExitLeavesPsiphonOff()
+    {
+        var psiphon = new PsiphonProcessAdapter(new PsiphonProcessOptions
+        {
+            ExecutablePath = "missing-psiphon.exe",
+            ConfigurationPath = "missing-config.json",
+            DataDirectory = Path.GetTempPath(),
+            ExpectedExecutableSha256 = new string('0', 64),
+            Version = "test",
+            DataDirectoryPolicy = null,
+        });
+        psiphon.UseExit(true);
+        await using var fixture = await RuntimeFixture.StartAsync(psiphon: psiphon);
+
+        await fixture.Runtime.ConnectAsync(CancellationToken.None);
+
+        Assert.False(psiphon.IsEnabled);
+        Assert.Null(fixture.Xray.Last!.Exit);
+        Assert.False(fixture.Configurations.Files.ContainsKey(fixture.Paths.PsiphonConfigurationPath));
+    }
+
+    [Fact]
     public async Task RepeatedConnectKeepsAWorkingTunnel()
     {
         await using var fixture = await RuntimeFixture.StartAsync(settings => settings with { KillSwitchEnabled = true });
@@ -260,9 +309,10 @@ internal sealed class RuntimeFixture : IAsyncDisposable
         IBrokerStateStore? state = null,
         CatalogStore? catalog = null,
         IIpv6CapabilityProbe? ipv6Probe = null,
-        RoutingDataService? routingData = null)
+        RoutingDataService? routingData = null,
+        PsiphonProcessAdapter? psiphon = null)
     {
-        var fixture = new RuntimeFixture(configure, state, catalog, ipv6Probe, routingData);
+        var fixture = new RuntimeFixture(configure, state, catalog, ipv6Probe, routingData, psiphon);
         await fixture.Runtime.InitializeAsync(CancellationToken.None);
         return fixture;
     }
@@ -272,7 +322,8 @@ internal sealed class RuntimeFixture : IAsyncDisposable
         IBrokerStateStore? state = null,
         CatalogStore? catalog = null,
         IIpv6CapabilityProbe? ipv6Probe = null,
-        RoutingDataService? routingData = null)
+        RoutingDataService? routingData = null,
+        PsiphonProcessAdapter? psiphon = null)
     {
         root = Path.Combine(Path.GetTempPath(), "PaqetFire-runtime-tests", Guid.NewGuid().ToString("N"));
         var payload = Path.Combine(root, "payload");
@@ -328,7 +379,8 @@ internal sealed class RuntimeFixture : IAsyncDisposable
             Progress,
             ipv6Probe,
             Clock,
-            routingData);
+            routingData,
+            psiphon);
     }
 
     public XrayProcessAdapter XrayAdapter => xray;

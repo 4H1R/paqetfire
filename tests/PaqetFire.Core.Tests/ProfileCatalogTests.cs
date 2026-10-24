@@ -134,6 +134,44 @@ public sealed class ProfileCatalogTests
         Assert.Equal(sharingSecret, loaded.ActiveProfile.Settings.LanSocksPassword);
         Assert.Equal(XrayDnsResolver.Quad9, loaded.ActiveProfile.Settings.DnsResolver);
         Assert.True(loaded.ActiveProfile.Settings.FakeDns);
+        Assert.Equal(ExitProxyKind.Psiphon, loaded.ActiveProfile.Settings.ExitProxy);
+        Assert.Equal("DE", loaded.ActiveProfile.Settings.Psiphon.EgressRegion);
+    }
+
+    [Fact]
+    public void CatalogsSavedBeforeExitProxiesLeaveFromThePaqetServer()
+    {
+        var protector = new TestProtector();
+        var document = System.Text.Json.Nodes.JsonNode.Parse(
+            ProfileCatalogJson.WriteProtected(ProfileCatalog.Create(HomeId, Settings("Home")), protector))!;
+        foreach (var profile in document["profiles"]!.AsArray())
+        {
+            var settings = profile!["settings"]!.AsObject();
+            Assert.True(settings.Remove("exitProxy"));
+            Assert.True(settings.Remove("psiphon"));
+        }
+
+        var loaded = ProfileCatalogJson.ReadProtected(document.ToJsonString(), protector);
+
+        Assert.Equal(ExitProxyKind.None, loaded.ActiveProfile.Settings.ExitProxy);
+        Assert.Equal(string.Empty, loaded.ActiveProfile.Settings.Psiphon.EgressRegion);
+    }
+
+    [Fact]
+    public void PortableExportCarriesTheExitAndOlderFilesImportWithoutOne()
+    {
+        var catalog = ProfileCatalog.Create(HomeId, Settings("Portable"));
+        var json = ProfileCatalogJson.WritePortableExport(catalog);
+        var document = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+        var exit = document["profiles"]![0]!["exit"]!;
+        Assert.Equal("psiphon", exit["provider"]!.GetValue<string>());
+        Assert.Equal("DE", exit["psiphon"]!["egressRegion"]!.GetValue<string>());
+        Assert.Equal(ExitProxyKind.Psiphon, ProfileCatalogJson.ReadImport(json).ActiveProfile.Settings.ExitProxy);
+
+        Assert.True(document["profiles"]![0]!.AsObject().Remove("exit"));
+        var older = ProfileCatalogJson.ReadImport(document.ToJsonString()).ActiveProfile.Settings;
+        Assert.Equal(ExitProxyKind.None, older.ExitProxy);
+        Assert.Equal(string.Empty, older.Psiphon.EgressRegion);
     }
 
     [Fact]
@@ -312,6 +350,8 @@ public sealed class ProfileCatalogTests
         BlockAds = false,
         BlockQuic = true,
         DirectBitTorrent = false,
+        ExitProxy = ExitProxyKind.Psiphon,
+        Psiphon = new PsiphonExitOptions("DE"),
         KillSwitchEnabled = true,
         ShareWithLan = true,
         LanSocksPort = 2082,

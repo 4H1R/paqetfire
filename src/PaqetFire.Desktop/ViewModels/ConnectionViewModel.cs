@@ -35,6 +35,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     private string statusDescription = "PaqetFire will verify its broker and bundled engines.";
     private string paqetStatusText = "Not checked";
     private string xrayStatusText = "Not checked";
+    private string exitStatusText = "Not used";
     private string routingStatusText = "Not active";
     private string paqetDetailText = "Waiting for the broker readiness check.";
     private string routingDetailText = "Routing is currently inactive.";
@@ -99,6 +100,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
 
     public BrokerSnapshot? LastSnapshot => lastSnapshot;
 
+    private bool UsesExitProxy => lastSnapshot?.Settings?.ExitProxy == ExitProxyKind.Psiphon;
+
     public BrokerConnectionState ConnectionState
     {
         get => connectionState;
@@ -155,6 +158,13 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     {
         get => xrayStatusText;
         private set => SetProperty(ref xrayStatusText, value);
+    }
+
+    /// <summary>The exit proxy engine, or "Not used" when the profile has no exit.</summary>
+    public string ExitStatusText
+    {
+        get => exitStatusText;
+        private set => SetProperty(ref exitStatusText, value);
     }
 
     public string PaqetDetailText
@@ -313,7 +323,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             if (stageChanged)
             {
                 ProgressSteps.Clear();
-                foreach (var step in ConnectionProgressText.CreateSteps(value))
+                foreach (var step in ConnectionProgressText.CreateSteps(value, UsesExitProxy))
                 {
                     ProgressSteps.Add(step);
                 }
@@ -1404,6 +1414,10 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         XrayStatusText = xray is null
             ? "Unavailable"
             : EngineStateText.GetDisplayName(xray.State);
+        var exit = snapshot.Engines.FirstOrDefault(engine => engine.Engine == EngineKind.Psiphon);
+        ExitStatusText = exit is not null
+            ? EngineStateText.GetDisplayName(exit.State)
+            : snapshot.Settings?.ExitProxy == ExitProxyKind.Psiphon ? "Stopped" : "Not used";
         RoutingStatusText = snapshot.IsRouting
             ? $"{RoutingScopeText.Create(snapshot.Settings)} · loop exclusions locked"
             : snapshot.IsKillSwitchEnabled
@@ -1682,7 +1696,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     }
 
     private void UpdateProgressSummary() =>
-        ProgressSummary = ConnectionProgressText.CreateSummary(Progress, time.GetUtcNow());
+        ProgressSummary = ConnectionProgressText.CreateSummary(Progress, time.GetUtcNow(), UsesExitProxy);
 
     private void UpdateProgressTicker()
     {

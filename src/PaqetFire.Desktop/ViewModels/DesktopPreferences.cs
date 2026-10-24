@@ -47,6 +47,10 @@ public sealed class DesktopPreferences
 
     public bool DirectBitTorrent { get; set; } = true;
 
+    public ExitProxyKind ExitProxy { get; set; } = ExitProxyKind.None;
+
+    public string PsiphonRegion { get; set; } = string.Empty;
+
     public bool KillSwitch { get; set; }
 
     public bool ShareWithLan { get; set; }

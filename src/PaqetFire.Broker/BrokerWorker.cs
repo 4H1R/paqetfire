@@ -217,6 +217,8 @@ public sealed class BrokerWorker(
                previous.BlockMalware == current.BlockMalware &&
                previous.BlockQuic == current.BlockQuic &&
                previous.DirectBitTorrent == current.DirectBitTorrent &&
+               previous.ExitProxy == current.ExitProxy &&
+               previous.Psiphon == current.Psiphon &&
                previous.KillSwitchEnabled == current.KillSwitchEnabled &&
                previous.ShareWithLan == current.ShareWithLan &&
                previous.LanSocksPort == current.LanSocksPort &&
