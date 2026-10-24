@@ -30,13 +30,17 @@ public static class ConnectionRecoveryPolicy
         var paqet = Find(engines, EngineKind.Paqet);
         var xray = Find(engines, EngineKind.Xray);
         var proxiFyre = Find(engines, EngineKind.ProxiFyre);
+        // The exit engine is listed only while the profile uses it.
+        var exit = Find(engines, EngineKind.Psiphon);
         var allHealthy = paqet?.State == EngineState.Running &&
                          xray?.State == EngineState.Running &&
-                         proxiFyre?.State == EngineState.Running;
+                         proxiFyre?.State == EngineState.Running &&
+                         exit?.State is null or EngineState.Running;
         var guarded = isKillSwitchEnabled &&
                       paqet?.State == EngineState.Stopped &&
                       xray?.State == EngineState.Stopped &&
-                      proxiFyre?.State == EngineState.Running;
+                      proxiFyre?.State == EngineState.Running &&
+                      exit?.State is null or EngineState.Stopped;
         var anyEngineActive = engines.Any(engine =>
             engine.State is EngineState.Running or EngineState.Starting or EngineState.Faulted);
 
@@ -55,10 +59,22 @@ public static class ConnectionRecoveryPolicy
         IReadOnlyList<EngineStatus> engines) =>
         Evaluate(connectionState, isKillSwitchEnabled, engines) == ConnectionRecoveryAction.SafeRecovery;
 
-    public static bool IsTransportOnlyFault(IReadOnlyList<EngineStatus> engines) =>
-        Find(engines, EngineKind.Paqet)?.State is EngineState.Faulted or EngineState.Stopped &&
-        Find(engines, EngineKind.Xray)?.State == EngineState.Running &&
-        Find(engines, EngineKind.ProxiFyre)?.State == EngineState.Running;
+    /// <summary>
+    /// Paqet, the exit that rides on it, or both are down while Xray and ProxiFyre keep
+    /// routed traffic failing closed; restarting the transport restarts both.
+    /// </summary>
+    public static bool IsTransportOnlyFault(IReadOnlyList<EngineStatus> engines)
+    {
+        var paqet = Find(engines, EngineKind.Paqet)?.State;
+        var exit = Find(engines, EngineKind.Psiphon)?.State;
+        var exitSettled = exit is null or EngineState.Running or EngineState.Faulted or EngineState.Stopped;
+        var transportDown = paqet is EngineState.Faulted or EngineState.Stopped
+            ? exitSettled
+            : paqet == EngineState.Running && exit is EngineState.Faulted or EngineState.Stopped;
+        return transportDown &&
+               Find(engines, EngineKind.Xray)?.State == EngineState.Running &&
+               Find(engines, EngineKind.ProxiFyre)?.State == EngineState.Running;
+    }
 
     private static EngineStatus? Find(IReadOnlyList<EngineStatus> engines, EngineKind kind) =>
         engines.FirstOrDefault(engine => engine.Engine == kind);

@@ -19,6 +19,7 @@ public sealed class DesktopPresentationTests
     [InlineData(ConnectionStage.VerifyingPayload, 1, "Checking engine files")]
     [InlineData(ConnectionStage.StartingTransport, 1, "Starting Paqet transport")]
     [InlineData(ConnectionStage.StartingPolicy, 1, "Starting Xray policy")]
+    [InlineData(ConnectionStage.StartingExit, 1, "Connecting the exit proxy")]
     [InlineData(ConnectionStage.StartingCapture, 1, "Starting application capture")]
     [InlineData(ConnectionStage.ProbingTunnel, 1, "Testing tunnel")]
     [InlineData(ConnectionStage.RecoveringTransport, 3, "Reconnecting transport (attempt 3)")]
@@ -237,6 +238,8 @@ public sealed class DesktopPresentationTests
             LocalTcpFlags = ["PA"],
             RemoteTcpFlags = ["PA"],
             HotspotSocksPort = 10900,
+            ExitProxy = ExitProxyKind.Psiphon,
+            Psiphon = new PsiphonExitOptions("SE"),
         };
         var settings = ConnectionFormState.FromSettings(PaqetFireSettingsView.FromSettings(original))
             .ToSettings("key", "sharing-password");

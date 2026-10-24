@@ -43,10 +43,11 @@ public sealed class LiveStatsService(
             return new LiveConnectionStats(now, IsConnected: false);
         }
 
-        var connectedSince = new[] { status.Paqet.ChangedAt, status.Xray.ChangedAt, status.ProxiFyre.ChangedAt }
+        var connectedSince = status.Engines
+            .Select(engine => engine.ChangedAt)
             .Where(value => value is not null)
             .Max() ?? now;
-        var current = GetOrStartSession(connectedSince);
+        var current = GetOrStartSession(connectedSince, throughExit: status.Exit is not null);
 
         XrayTrafficCounters? counters = null;
         try
@@ -75,17 +76,17 @@ public sealed class LiveStatsService(
             PublicAddressCountryCode: current.PublicAddressCountryCode);
     }
 
-    private Session GetOrStartSession(DateTimeOffset connectedSince)
+    private Session GetOrStartSession(DateTimeOffset connectedSince, bool throughExit)
     {
         lock (sync)
         {
-            if (session?.ConnectedSince == connectedSince)
+            if (session?.ConnectedSince == connectedSince && session.ThroughExit == throughExit)
             {
                 return session;
             }
 
             session?.Dispose();
-            session = new Session(this, connectedSince);
+            session = new Session(this, connectedSince, throughExit);
             return session;
         }
     }
@@ -99,7 +100,7 @@ public sealed class LiveStatsService(
         }
     }
 
-    private sealed class Session(LiveStatsService owner, DateTimeOffset connectedSince) : IDisposable
+    private sealed class Session(LiveStatsService owner, DateTimeOffset connectedSince, bool throughExit) : IDisposable
     {
         private readonly CancellationTokenSource cancellation = new();
         private int probing;
@@ -107,6 +108,9 @@ public sealed class LiveStatsService(
         private DateTimeOffset nextPublicAddressAt;
 
         public DateTimeOffset ConnectedSince { get; } = connectedSince;
+
+        /// <summary>Destinations see the exit's address, so that is the one shown.</summary>
+        public bool ThroughExit { get; } = throughExit;
 
         public volatile string? PublicAddress;
 
@@ -158,7 +162,7 @@ public sealed class LiveStatsService(
 
                     if (needsAddress)
                     {
-                        var address = await owner.tunnelProbe.GetPublicAddressAsync(token).ConfigureAwait(false);
+                        var address = await owner.tunnelProbe.GetPublicAddressAsync(ThroughExit, token).ConfigureAwait(false);
                         if (address is not null)
                         {
                             PublicAddressCountryCode = await TryFindCountryAsync(address, token).ConfigureAwait(false);

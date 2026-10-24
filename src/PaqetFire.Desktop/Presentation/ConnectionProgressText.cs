@@ -53,12 +53,28 @@ public static class ConnectionProgressText
         ConnectionStage.ProbingTunnel,
     ];
 
+    // A profile with an exit proxy starts it between the policy and capture.
+    private static readonly ConnectionStage[] ExitConnectStages =
+    [
+        ConnectionStage.Preparing,
+        ConnectionStage.VerifyingPayload,
+        ConnectionStage.StartingTransport,
+        ConnectionStage.StartingPolicy,
+        ConnectionStage.StartingExit,
+        ConnectionStage.StartingCapture,
+        ConnectionStage.ProbingTunnel,
+    ];
+
+    private static ConnectionStage[] StagesFor(ConnectionProgress progress, bool withExit) =>
+        withExit || progress.Stage == ConnectionStage.StartingExit ? ExitConnectStages : ConnectStages;
+
     public static string GetStageLabel(ConnectionStage stage, int attempt = 1) => stage switch
     {
         ConnectionStage.Preparing => "Preparing",
         ConnectionStage.VerifyingPayload => "Checking engine files",
         ConnectionStage.StartingTransport => "Starting Paqet transport",
         ConnectionStage.StartingPolicy => "Starting Xray policy",
+        ConnectionStage.StartingExit => "Connecting the exit proxy",
         ConnectionStage.StartingCapture => "Starting application capture",
         ConnectionStage.ProbingTunnel => "Testing tunnel",
         ConnectionStage.RecoveringTransport => string.Create(
@@ -67,7 +83,7 @@ public static class ConnectionProgressText
         _ => "Working",
     };
 
-    public static IReadOnlyList<ConnectionProgressStep> CreateSteps(ConnectionProgress? progress)
+    public static IReadOnlyList<ConnectionProgressStep> CreateSteps(ConnectionProgress? progress, bool withExit = false)
     {
         if (progress is null)
         {
@@ -79,8 +95,9 @@ public static class ConnectionProgressText
             return [new(GetStageLabel(progress.Stage, progress.Attempt), ProgressStepState.Active)];
         }
 
-        var current = Array.IndexOf(ConnectStages, progress.Stage);
-        return ConnectStages
+        var stages = StagesFor(progress, withExit);
+        var current = Array.IndexOf(stages, progress.Stage);
+        return stages
             .Select((stage, index) => new ConnectionProgressStep(
                 GetStageLabel(stage),
                 index < current ? ProgressStepState.Done :
@@ -102,7 +119,7 @@ public static class ConnectionProgressText
     }
 
     /// <summary>One line for the status card, InfoBar, and tray tooltip, e.g. "Step 3 of 6 · Starting Paqet transport · 12 s".</summary>
-    public static string CreateSummary(ConnectionProgress? progress, DateTimeOffset now)
+    public static string CreateSummary(ConnectionProgress? progress, DateTimeOffset now, bool withExit = false)
     {
         if (progress is null)
         {
@@ -111,12 +128,13 @@ public static class ConnectionProgressText
 
         var label = GetStageLabel(progress.Stage, progress.Attempt);
         var elapsed = FormatElapsed(now - progress.StartedAt);
-        var index = Array.IndexOf(ConnectStages, progress.Stage);
+        var stages = StagesFor(progress, withExit);
+        var index = Array.IndexOf(stages, progress.Stage);
         return index < 0
             ? $"{label} · {elapsed}"
             : string.Create(
                 CultureInfo.InvariantCulture,
-                $"Step {index + 1} of {ConnectStages.Length} · {label} · {elapsed}");
+                $"Step {index + 1} of {stages.Length} · {label} · {elapsed}");
     }
 
     /// <summary>A short form that fits the 127-character notification-area tooltip.</summary>

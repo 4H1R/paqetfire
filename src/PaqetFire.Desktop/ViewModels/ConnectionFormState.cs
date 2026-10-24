@@ -30,6 +30,9 @@ public sealed record ConnectionFormState
     public bool BlockMalware { get; init; } = true;
     public bool BlockQuic { get; init; } = true;
     public bool DirectBitTorrent { get; init; } = true;
+    public ExitProxyKind ExitProxy { get; init; } = ExitProxyKind.None;
+    /// <summary>Psiphon's exit country, or empty for the best available server.</summary>
+    public string PsiphonRegion { get; init; } = string.Empty;
     public bool KillSwitch { get; init; }
     public bool ShareWithLan { get; init; }
     public int LanSocksPort { get; init; } = 1082;
@@ -63,6 +66,8 @@ public sealed record ConnectionFormState
         BlockMalware = source.BlockMalware,
         BlockQuic = source.BlockQuic,
         DirectBitTorrent = source.DirectBitTorrent,
+        ExitProxy = source.ExitProxy,
+        PsiphonRegion = source.PsiphonRegion ?? string.Empty,
         KillSwitch = source.KillSwitch,
         ShareWithLan = source.ShareWithLan,
         LanSocksPort = source.LanSocksPort,
@@ -97,6 +102,8 @@ public sealed record ConnectionFormState
         BlockMalware = settings.BlockMalware,
         BlockQuic = settings.BlockQuic,
         DirectBitTorrent = settings.DirectBitTorrent,
+        ExitProxy = settings.ExitProxy,
+        PsiphonRegion = settings.Psiphon?.EgressRegion ?? string.Empty,
         KillSwitch = settings.KillSwitchEnabled,
         ShareWithLan = settings.ShareWithLan,
         LanSocksPort = settings.LanSocksPort,
@@ -121,6 +128,7 @@ public sealed record ConnectionFormState
         UserExclusions = string.Join('\n', SplitLines(UserExclusions)),
         DirectRouteDestinations = string.Join('\n', SplitLines(DirectRouteDestinations)),
         LanSocksUsername = LanSocksUsername.Trim(),
+        PsiphonRegion = (PsiphonRegion ?? string.Empty).Trim().ToUpperInvariant(),
         Advanced = Advanced ?? new(),
     };
 
@@ -158,6 +166,8 @@ public sealed record ConnectionFormState
         BlockMalware = BlockMalware,
         BlockQuic = BlockQuic,
         DirectBitTorrent = DirectBitTorrent,
+        ExitProxy = ExitProxy,
+        Psiphon = new PsiphonExitOptions((PsiphonRegion ?? string.Empty).Trim().ToUpperInvariant()),
         KcpMode = string.IsNullOrWhiteSpace(KcpMode) ? "fast" : KcpMode.Trim(),
         LocalTcpFlags = SplitEntries(LocalTcpFlags),
         RemoteTcpFlags = SplitEntries(RemoteTcpFlags),
@@ -186,6 +196,8 @@ public sealed record ConnectionFormState
         preferences.BlockMalware = BlockMalware;
         preferences.BlockQuic = BlockQuic;
         preferences.DirectBitTorrent = DirectBitTorrent;
+        preferences.ExitProxy = ExitProxy;
+        preferences.PsiphonRegion = (PsiphonRegion ?? string.Empty).Trim().ToUpperInvariant();
         preferences.KillSwitch = KillSwitch;
         preferences.ShareWithLan = ShareWithLan;
         preferences.ShareViaHotspot = ShareViaHotspot;

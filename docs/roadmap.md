@@ -9,6 +9,14 @@ Open work only; shipped changes are recorded in [release notes](releases/).
 - Machine-wide Windows Firewall kill-switch mode for traffic ProxiFyre cannot
   attribute to a routed application.
 
+## Exit proxy
+
+- Windows Firewall rule that blocks Psiphon from everything but loopback, as
+  defence in depth for its upstream-proxy configuration.
+- Dedicated Psiphon network identifiers from Psiphon Inc. instead of the public
+  community parameters.
+- Further exit providers (for example a user's own SOCKS5 or WARP endpoint).
+
 ## Reliability
 
 - Check Paqet client/server version compatibility.

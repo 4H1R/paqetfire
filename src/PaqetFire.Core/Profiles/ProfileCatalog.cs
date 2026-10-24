@@ -365,6 +365,7 @@ public sealed class ProfileCatalog
         LanSocksUsername = settings.LanSocksUsername ?? "paqetfire",
         LanSocksPassword = settings.LanSocksPassword ?? string.Empty,
         KcpMode = settings.KcpMode ?? "fast",
+        Psiphon = settings.Psiphon ?? new(),
         SelectedApplications = AsReadOnly(settings.SelectedApplications),
         UserExclusions = AsReadOnly(settings.UserExclusions),
         DirectRouteDestinations = AsReadOnly(settings.DirectRouteDestinations),

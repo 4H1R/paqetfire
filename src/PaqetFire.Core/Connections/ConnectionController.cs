@@ -9,6 +9,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
     private readonly IEngineAdapter _paqet;
     private readonly IEngineAdapter _xray;
     private readonly IEngineAdapter _proxiFyre;
+    private readonly IExitEngineAdapter? _exit;
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private ConnectionState? _transitionState;
     private bool _disposed;
@@ -16,7 +17,8 @@ public sealed class ConnectionController : IConnectionController, IDisposable
     public ConnectionController(
         IEngineAdapter paqet,
         IEngineAdapter xray,
-        IEngineAdapter proxiFyre)
+        IEngineAdapter proxiFyre,
+        IExitEngineAdapter? exit = null)
     {
         ArgumentNullException.ThrowIfNull(paqet);
         ArgumentNullException.ThrowIfNull(xray);
@@ -42,6 +44,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         _paqet = paqet;
         _xray = xray;
         _proxiFyre = proxiFyre;
+        _exit = exit;
     }
 
     // Deliberately does not take the transition gate so the desktop can observe a long
@@ -54,7 +57,8 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         var paqetStatus = await _paqet.GetStatusAsync(cancellationToken).ConfigureAwait(false);
         var xrayStatus = await _xray.GetStatusAsync(cancellationToken).ConfigureAwait(false);
         var proxiFyreStatus = await _proxiFyre.GetStatusAsync(cancellationToken).ConfigureAwait(false);
-        var derivedState = DeriveState(paqetStatus.State, xrayStatus.State, proxiFyreStatus.State);
+        var exitStatus = await GetExitStatusAsync(cancellationToken).ConfigureAwait(false);
+        var derivedState = DeriveState(paqetStatus.State, xrayStatus.State, proxiFyreStatus.State, exitStatus?.State);
 
         if (transitionState is not null && transitionState == _transitionState)
         {
@@ -66,8 +70,11 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             paqetStatus,
             xrayStatus,
             proxiFyreStatus,
-            CreateStatusDetail(derivedState, paqetStatus.State, xrayStatus.State, proxiFyreStatus.State),
-            DateTimeOffset.UtcNow);
+            CreateStatusDetail(derivedState, paqetStatus.State, xrayStatus.State, proxiFyreStatus.State, exitStatus?.State),
+            DateTimeOffset.UtcNow)
+        {
+            Exit = exitStatus,
+        };
     }
 
     public ValueTask ConnectAsync(CancellationToken cancellationToken) => ConnectAsync(null, cancellationToken);
@@ -84,13 +91,16 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             var paqetInitiallyRunning = await IsRunningAsync(_paqet, cancellationToken).ConfigureAwait(false);
             var xrayInitiallyRunning = await IsRunningAsync(_xray, cancellationToken).ConfigureAwait(false);
             var proxiFyreInitiallyRunning = await IsRunningAsync(_proxiFyre, cancellationToken).ConfigureAwait(false);
+            var exit = _exit is { IsEnabled: true } ? _exit : null;
+            var exitInitiallyRunning = exit is null || await IsRunningAsync(exit, cancellationToken).ConfigureAwait(false);
 
-            if (paqetInitiallyRunning && xrayInitiallyRunning && proxiFyreInitiallyRunning)
+            if (paqetInitiallyRunning && xrayInitiallyRunning && proxiFyreInitiallyRunning && exitInitiallyRunning)
             {
                 return;
             }
 
             var proxiFyreStartAttempted = false;
+            var exitStartAttempted = false;
 
             // Paqet and Xray start together: Xray only dials Paqet when traffic arrives.
             // ProxiFyre starts last so application capture is only enabled once the
@@ -104,6 +114,23 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                 .ConfigureAwait(false);
             var failedEngine = carrierEngine;
             var error = carrierError;
+            if (error is null && !exitInitiallyRunning)
+            {
+                // The exit reaches its network through Paqet, so it starts once Paqet is ready,
+                // and capture waits for it: routed traffic must never leave without the exit.
+                try
+                {
+                    stageStarted?.Invoke(ConnectionStage.StartingExit);
+                    exitStartAttempted = true;
+                    await StartAndVerifyAsync(exit!, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception exitError)
+                {
+                    failedEngine = exit!.Kind;
+                    error = exitError;
+                }
+            }
+
             if (error is null)
             {
                 try
@@ -127,7 +154,8 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                 var rollbackErrors = await RollBackConnectAsync(
                         !paqetInitiallyRunning,
                         !xrayInitiallyRunning,
-                        proxiFyreStartAttempted)
+                        proxiFyreStartAttempted,
+                        exitStartAttempted)
                     .ConfigureAwait(false);
 
                 if (error is OperationCanceledException && rollbackErrors.Count == 0)
@@ -168,6 +196,8 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             {
                 throw new ConnectionTransitionException("disconnect", EngineKind.ProxiFyre, error);
             }
+
+            await StopExitAsync("disconnect", cancellationToken).ConfigureAwait(false);
 
             try
             {
@@ -224,6 +254,8 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                 throw new ConnectionTransitionException("arm routing kill switch", EngineKind.ProxiFyre, error);
             }
 
+            await StopExitAsync("arm routing kill switch", cancellationToken).ConfigureAwait(false);
+
             try
             {
                 await StopAndVerifyAsync(_xray, cancellationToken).ConfigureAwait(false);
@@ -278,6 +310,13 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                     await StopAndVerifyAsync(_xray, cancellationToken).ConfigureAwait(false);
                 }
 
+                // The exit's tunnel runs over Paqet and does not survive its restart.
+                if (_exit is not null)
+                {
+                    stoppingEngine = _exit.Kind;
+                    await StopAndVerifyAsync(_exit, cancellationToken).ConfigureAwait(false);
+                }
+
                 stoppingEngine = EngineKind.Paqet;
                 await StopAndVerifyAsync(_paqet, cancellationToken).ConfigureAwait(false);
             }
@@ -305,6 +344,22 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             {
                 throw new ConnectionTransitionException("restart transport", failedEngine, startError);
             }
+
+            if (_exit is { IsEnabled: true } exit)
+            {
+                try
+                {
+                    await StartAndVerifyAsync(exit, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception error)
+                {
+                    throw new ConnectionTransitionException("restart transport", exit.Kind, error);
+                }
+            }
         }
         finally
         {
@@ -322,6 +377,39 @@ public sealed class ConnectionController : IConnectionController, IDisposable
 
         _disposed = true;
         _transitionGate.Dispose();
+    }
+
+    private async ValueTask<EngineStatus?> GetExitStatusAsync(CancellationToken cancellationToken)
+    {
+        if (_exit is null)
+        {
+            return null;
+        }
+
+        var status = await _exit.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        // A disabled exit still counts until it has stopped, so a stray process is not ignored.
+        return _exit.IsEnabled || status.State is not (EngineState.Stopped or EngineState.NotInstalled) ? status : null;
+    }
+
+    private async ValueTask StopExitAsync(string operation, CancellationToken cancellationToken)
+    {
+        if (_exit is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await StopAndVerifyAsync(_exit, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            throw new ConnectionTransitionException(operation, _exit.Kind, error);
+        }
     }
 
     private static async ValueTask<bool> IsRunningAsync(
@@ -437,13 +525,19 @@ public sealed class ConnectionController : IConnectionController, IDisposable
     private async ValueTask<IReadOnlyList<Exception>> RollBackConnectAsync(
         bool paqetStartAttempted,
         bool xrayStartAttempted,
-        bool proxiFyreStartAttempted)
+        bool proxiFyreStartAttempted,
+        bool exitStartAttempted)
     {
         List<Exception>? errors = null;
 
         if (proxiFyreStartAttempted)
         {
             await TryRollbackStopAsync(_proxiFyre).ConfigureAwait(false);
+        }
+
+        if (exitStartAttempted && _exit is not null)
+        {
+            await TryRollbackStopAsync(_exit).ConfigureAwait(false);
         }
 
         if (xrayStartAttempted)
@@ -479,39 +573,42 @@ public sealed class ConnectionController : IConnectionController, IDisposable
     private static ConnectionState DeriveState(
         EngineState paqet,
         EngineState xray,
-        EngineState proxiFyre)
+        EngineState proxiFyre,
+        EngineState? exit = null)
     {
-        if (paqet == EngineState.NotInstalled || xray == EngineState.NotInstalled || proxiFyre == EngineState.NotInstalled)
+        // The exit belongs with the carriers: it runs exactly when Paqet does.
+        EngineState[] carriers = exit is { } exitState ? [paqet, xray, exitState] : [paqet, xray];
+        if (carriers.Contains(EngineState.NotInstalled) || proxiFyre == EngineState.NotInstalled)
         {
             return ConnectionState.NotReady;
         }
 
-        if (paqet == EngineState.Running && xray == EngineState.Running && proxiFyre == EngineState.Running)
+        if (carriers.All(state => state == EngineState.Running) && proxiFyre == EngineState.Running)
         {
             return ConnectionState.Connected;
         }
 
-        if (paqet == EngineState.Stopped && xray == EngineState.Stopped && proxiFyre == EngineState.Stopped)
+        if (carriers.All(state => state == EngineState.Stopped) && proxiFyre == EngineState.Stopped)
         {
             return ConnectionState.Disconnected;
         }
 
-        if (paqet == EngineState.Stopped && xray == EngineState.Stopped && proxiFyre == EngineState.Running)
+        if (carriers.All(state => state == EngineState.Stopped) && proxiFyre == EngineState.Running)
         {
             return ConnectionState.Guarded;
         }
 
-        if (paqet == EngineState.Faulted || xray == EngineState.Faulted || proxiFyre == EngineState.Faulted)
+        if (carriers.Contains(EngineState.Faulted) || proxiFyre == EngineState.Faulted)
         {
             return ConnectionState.Faulted;
         }
 
-        if (paqet == EngineState.Starting || xray == EngineState.Starting || proxiFyre == EngineState.Starting)
+        if (carriers.Contains(EngineState.Starting) || proxiFyre == EngineState.Starting)
         {
             return ConnectionState.Connecting;
         }
 
-        if (paqet == EngineState.Stopping || xray == EngineState.Stopping || proxiFyre == EngineState.Stopping)
+        if (carriers.Contains(EngineState.Stopping) || proxiFyre == EngineState.Stopping)
         {
             return ConnectionState.Disconnecting;
         }
@@ -523,12 +620,19 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         ConnectionState connection,
         EngineState paqet,
         EngineState xray,
-        EngineState proxiFyre) => connection switch
+        EngineState proxiFyre,
+        EngineState? exit)
+    {
+        var engines = exit is { } exitState
+            ? $"Paqet: {paqet}, Xray: {xray}, Psiphon: {exitState}, ProxiFyre: {proxiFyre}"
+            : $"Paqet: {paqet}, Xray: {xray}, ProxiFyre: {proxiFyre}";
+        return connection switch
         {
             ConnectionState.NotReady => "One or more bundled engines are not installed.",
             ConnectionState.Guarded => "The routing kill switch is active; routed applications cannot connect directly.",
-            ConnectionState.Degraded => $"Engine states do not form a safe connection (Paqet: {paqet}, Xray: {xray}, ProxiFyre: {proxiFyre}).",
-            ConnectionState.Faulted => $"An engine is faulted (Paqet: {paqet}, Xray: {xray}, ProxiFyre: {proxiFyre}).",
+            ConnectionState.Degraded => $"Engine states do not form a safe connection ({engines}).",
+            ConnectionState.Faulted => $"An engine is faulted ({engines}).",
             _ => null,
         };
+    }
 }

@@ -12,6 +12,10 @@ public interface ITunnelProbe
 
     ValueTask<IPAddress?> GetPublicAddressAsync(CancellationToken cancellationToken);
 
+    /// <summary>The address destinations see: the exit's when the route uses one, otherwise Paqet's.</summary>
+    ValueTask<IPAddress?> GetPublicAddressAsync(bool throughExit, CancellationToken cancellationToken) =>
+        GetPublicAddressAsync(cancellationToken);
+
     /// <summary>Whether a fresh SOCKS stream through Paqet reaches either connectivity endpoint.</summary>
     ValueTask<bool> CheckReachabilityAsync(CancellationToken cancellationToken);
 }
@@ -38,6 +42,7 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
 
     private readonly HttpClient client;
     private readonly HttpClient reachabilityClient;
+    private readonly HttpClient exitClient;
     private long lastSuccessTimestamp;
 
     public PaqetTunnelProbe(EngineSocksCredentials credentials)
@@ -72,6 +77,18 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
         {
             Timeout = ReachabilityTimeout,
         };
+
+        // The exit engine's loopback listener takes no credentials.
+        exitClient = new HttpClient(new SocketsHttpHandler
+        {
+            Proxy = new WebProxy(new Uri($"socks5://127.0.0.1:{PsiphonJsonConfigurationWriter.LocalSocksPort}")),
+            UseProxy = true,
+            ConnectTimeout = ProbeTimeout,
+            PooledConnectionLifetime = TimeSpan.Zero,
+        })
+        {
+            Timeout = ProbeTimeout,
+        };
     }
 
     public async ValueTask<int?> MeasureLatencyAsync(CancellationToken cancellationToken)
@@ -98,11 +115,15 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
         }
     }
 
-    public async ValueTask<IPAddress?> GetPublicAddressAsync(CancellationToken cancellationToken)
+    public ValueTask<IPAddress?> GetPublicAddressAsync(CancellationToken cancellationToken) =>
+        GetPublicAddressAsync(throughExit: false, cancellationToken);
+
+    public async ValueTask<IPAddress?> GetPublicAddressAsync(bool throughExit, CancellationToken cancellationToken)
     {
         try
         {
-            var text = (await client.GetStringAsync(PublicAddressUri, cancellationToken).ConfigureAwait(false)).Trim();
+            var text = (await (throughExit ? exitClient : client).GetStringAsync(PublicAddressUri, cancellationToken)
+                .ConfigureAwait(false)).Trim();
             return IPAddress.TryParse(text, out var address) ? address : null;
         }
         catch (Exception exception) when (IsProbeFailure(exception, cancellationToken))
@@ -134,6 +155,7 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
     {
         client.Dispose();
         reachabilityClient.Dispose();
+        exitClient.Dispose();
     }
 
     private async Task<bool> ReachAsync(Uri uri, CancellationToken cancellationToken)

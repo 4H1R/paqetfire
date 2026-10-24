@@ -9,6 +9,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
     public const int PaqetPort = 1080;
     public const int StatsApiPort = 10085;
     public const string PaqetOutboundTag = "paqet";
+    public const string ExitOutboundTag = "exit";
     private const string DnsOutboundTag = "dns-out";
     private const string RemoteDnsTag = "dns-remote";
     private const string DomesticDnsTag = "dns-domestic";
@@ -33,6 +34,11 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
         if (!Enum.IsDefined(policy.DomainStrategy))
         {
             throw new ConfigurationValidationException(["The Xray domain strategy is invalid."]);
+        }
+
+        if (policy.Exit is { Port: < 1024 or > 65535 or PaqetPort or InboundPort or StatsApiPort })
+        {
+            throw new ConfigurationValidationException(["The exit proxy port is invalid."]);
         }
 
         var directDestinations = ParseDirectDestinations(policy.DirectRouteDestinations);
@@ -189,6 +195,24 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
 
             writer.WriteStartArray("outbounds");
             WritePaqetOutbound(writer, policy.EngineCredentials);
+            if (policy.Exit is { } exit)
+            {
+                // The exit engine's loopback listener; the engine itself reaches its
+                // network only through Paqet.
+                writer.WriteStartObject();
+                writer.WriteString("tag", ExitOutboundTag);
+                writer.WriteString("protocol", "socks");
+                writer.WriteStartObject("settings");
+                writer.WriteStartArray("servers");
+                writer.WriteStartObject();
+                writer.WriteString("address", "127.0.0.1");
+                writer.WriteNumber("port", exit.Port);
+                writer.WriteEndObject();
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
+
             if (dns is null)
             {
                 WriteSimpleOutbound(writer, "direct", "freedom");
@@ -284,11 +308,17 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
                 WriteNetworkRule(writer, "udp", "443", "block");
             }
 
-            writer.WriteStartObject();
-            writer.WriteString("type", "field");
-            writer.WriteString("network", "tcp,udp");
-            writer.WriteString("outboundTag", "paqet");
-            writer.WriteEndObject();
+            if (policy.Exit is not null)
+            {
+                // The exit relays TCP only, so UDP still leaves from the Paqet server.
+                WriteNetworkRule(writer, "tcp", port: null, ExitOutboundTag);
+                WriteNetworkRule(writer, "udp", port: null, PaqetOutboundTag);
+            }
+            else
+            {
+                WriteNetworkRule(writer, "tcp,udp", port: null, PaqetOutboundTag);
+            }
+
             writer.WriteEndArray();
             writer.WriteEndObject();
             writer.WriteEndObject();
@@ -331,7 +361,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             throw new ConfigurationValidationException(["The shared SOCKS5 listener requires a specific private LAN IPv4 address."]);
         }
 
-        if (share.Port is < 1024 or > 65535 || share.Port is PaqetPort or InboundPort)
+        if (share.Port is < 1024 or > 65535 || share.Port is PaqetPort or InboundPort or PsiphonJsonConfigurationWriter.LocalSocksPort)
         {
             throw new ConfigurationValidationException(["The shared SOCKS5 port is invalid."]);
         }
@@ -353,13 +383,17 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
     private static void WriteNetworkRule(
         Utf8JsonWriter writer,
         string network,
-        string port,
+        string? port,
         string outboundTag)
     {
         writer.WriteStartObject();
         writer.WriteString("type", "field");
         writer.WriteString("network", network);
-        writer.WriteString("port", port);
+        if (port is not null)
+        {
+            writer.WriteString("port", port);
+        }
+
         writer.WriteString("outboundTag", outboundTag);
         writer.WriteEndObject();
     }

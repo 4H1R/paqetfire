@@ -112,6 +112,7 @@ public sealed partial class MainWindow : Window
 
         InitializeComponent();
         InitializeAdvancedOptions();
+        InitializeExitProxyOptions();
         var versionText = GitHubUpdateService.FormatVersion(CurrentVersion);
         VersionBadgeText.Text = $"v{versionText}";
         AboutVersionText.Text = $"PaqetFire {versionText}";
@@ -580,7 +581,7 @@ public sealed partial class MainWindow : Window
         SelectedAppsCard.Visibility = selectedOnly ? Visibility.Visible : Visibility.Collapsed;
         RoutingModeHelpText.Text = selectedOnly
             ? "Only the listed executables are proxied. Other applications connect directly."
-            : "All application traffic enters the PaqetFire route. Paqet, Xray, ProxiFyre, and the broker are excluded to prevent a loop.";
+            : "All application traffic enters the PaqetFire route. Paqet, Xray, Psiphon, ProxiFyre, and the broker are excluded to prevent a loop.";
     }
 
     private void ApplicationPicker_Expanding(Expander sender, ExpanderExpandingEventArgs args) =>
@@ -1128,6 +1129,7 @@ public sealed partial class MainWindow : Window
         }
 
         UpdatePrerequisites(snapshot, previousSnapshot);
+        UpdateExitProxyStatus(snapshot);
         if (RouteNotificationPolicy.Classify(previousSnapshot, snapshot, ViewModel.IsUserTransition) is { } notification)
         {
             NotifyRouteTransition(notification);

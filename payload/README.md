@@ -1,6 +1,6 @@
 # Bundled payload staging
 
-Release automation stages architecture-specific Paqet, Xray, and ProxiFyre artifacts
+Release automation stages architecture-specific Paqet, Xray, Psiphon, and ProxiFyre artifacts
 under `payload/engines/`. Driver installers that have approved redistribution
 rights are staged under `payload/prerequisites/`.
 
@@ -15,7 +15,10 @@ packages. A release build must:
 5. fail closed when a version, architecture, signature, or digest differs.
 
 `release-assets.json` locks the official upstream archive URLs and archive
-SHA-256 values. From the repository root, stage the complete verified x64
+SHA-256 values. Psiphon publishes its Windows console client as a bare
+executable in a binaries repository rather than as a release archive, so its
+entry is a URL pinned to a full commit; the staging script accepts a bare
+executable only in that form and only as an engine's single file. From the repository root, stage the complete verified x64
 payload with:
 
 ```powershell

@@ -307,6 +307,11 @@ public static class ProfileCatalogJson
 
         public bool DirectBitTorrent { get; init; } = true;
 
+        // Profiles saved before exit proxies existed keep leaving from the Paqet server.
+        public ExitProxyKind ExitProxy { get; init; } = ExitProxyKind.None;
+
+        public PsiphonExitOptions? Psiphon { get; init; } = new();
+
         public bool KillSwitchEnabled { get; init; }
 
         public bool ShareWithLan { get; init; }
@@ -349,6 +354,8 @@ public static class ProfileCatalogJson
             BlockMalware = settings.BlockMalware,
             BlockQuic = settings.BlockQuic,
             DirectBitTorrent = settings.DirectBitTorrent,
+            ExitProxy = settings.ExitProxy,
+            Psiphon = settings.Psiphon ?? new(),
             KillSwitchEnabled = settings.KillSwitchEnabled,
             ShareWithLan = settings.ShareWithLan,
             LanSocksPort = settings.LanSocksPort,
@@ -384,6 +391,8 @@ public static class ProfileCatalogJson
             BlockMalware = BlockMalware,
             BlockQuic = BlockQuic,
             DirectBitTorrent = DirectBitTorrent,
+            ExitProxy = ExitProxy,
+            Psiphon = Psiphon ?? new(),
             KillSwitchEnabled = KillSwitchEnabled,
             ShareWithLan = ShareWithLan,
             LanSocksPort = LanSocksPort,

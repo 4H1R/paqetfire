@@ -47,7 +47,8 @@ public sealed class PaqetFireRuntime(
     ConnectionProgressTracker? progress = null,
     IIpv6CapabilityProbe? ipv6Probe = null,
     TimeProvider? timeProvider = null,
-    RoutingDataService? routingData = null) : IPaqetFireRuntime
+    RoutingDataService? routingData = null,
+    PsiphonProcessAdapter? psiphonAdapter = null) : IPaqetFireRuntime
 {
     private const int RecentLogBudgetBytes = 24 * 1024;
     private static readonly TimeSpan SystemResolverTimeout = TimeSpan.FromMilliseconds(1500);
@@ -60,6 +61,7 @@ public sealed class PaqetFireRuntime(
     private readonly ConnectionProgressTracker progress = progress ?? new ConnectionProgressTracker(timeProvider);
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly RouteRecoveryPolicy recovery = new(RecoveryOptions);
+    private readonly PsiphonJsonConfigurationWriter psiphonWriter = new();
     private readonly Lock stateSync = new();
     private readonly SemaphoreSlim stateWriteGate = new(1, 1);
     private readonly Lock operationSync = new();
@@ -82,12 +84,12 @@ public sealed class PaqetFireRuntime(
         brokerState = stateStore.Load();
         desiredConnected = brokerState.DesiredConnected;
 
-        // Paqet and Xray are bound to the broker's kill-on-close job, so they rarely
-        // survive it. ProxiFyre is not: it may still be blocking routed applications for
-        // the kill switch or a route the user left connected, and is replaced only when
+        // Paqet, Xray, and Psiphon are bound to the broker's kill-on-close job, so they
+        // rarely survive it. ProxiFyre is not: it may still be blocking routed applications
+        // for the kill switch or a route the user left connected, and is replaced only when
         // the broker starts its own instance.
         var orphans = await OrphanedEngineCleanup.TerminateAsync(
-                [paths.PaqetExecutablePath, paths.XrayExecutablePath],
+                [paths.PaqetExecutablePath, paths.XrayExecutablePath, paths.PsiphonExecutablePath],
                 cancellationToken)
             .ConfigureAwait(false);
         if (orphans.Count > 0)
@@ -734,7 +736,7 @@ public sealed class PaqetFireRuntime(
             // profile that became active meanwhile is never connected in the background.
             var routeWanted = desiredConnected && settings is not null &&
                               profileCatalog?.ActiveProfileId == DesiredProfileId;
-            var engines = new[] { status.Paqet, status.Xray, status.ProxiFyre };
+            var engines = status.Engines;
             var now = clock.GetUtcNow();
             if (tunnelHealth.Report.LastSuccessAt is { } healthyAt &&
                 recovery.LastAttemptAt is { } attemptAt &&
@@ -936,6 +938,8 @@ public sealed class PaqetFireRuntime(
                 .Select(entry => (entry.OccurredAt, Text: $"{entry.OccurredAt:HH:mm:ss}  {(entry.IsError ? "ERR" : "INF")}  Paqet · {entry.Message}"))
                 .Concat(xrayAdapter.GetRecentLogs()
                     .Select(entry => (entry.OccurredAt, Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Xray · {entry.Message}")))
+                .Concat((psiphonAdapter?.GetRecentLogs() ?? [])
+                    .Select(entry => (entry.OccurredAt, Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Psiphon · {entry.Message}")))
                 .OrderBy(entry => entry.OccurredAt)
                 .Select(entry => entry.Text)
                 .TakeLast(120)
@@ -1602,6 +1606,13 @@ public sealed class PaqetFireRuntime(
                        : await routingData.ResolveForLaunchAsync(cancellationToken).ConfigureAwait(false));
         var blockMalware = settings.BlockMalware && data.SupportsMalwareCategories;
         var paqetText = paqetWriter.Write(paqetProfile, settings.TransportKey);
+        var psiphonText = settings.ExitProxy == ExitProxyKind.Psiphon
+            ? psiphonWriter.Write(new PsiphonClientProfile(
+                PsiphonJsonConfigurationWriter.LocalSocksPort,
+                XrayJsonConfigurationWriter.PaqetPort,
+                engineCredentials,
+                settings.Psiphon?.EgressRegion ?? string.Empty))
+            : null;
         var xrayText = xrayWriter.Write(new XrayRoutingPolicy(
             settings.RegionalPreset,
             settings.DomainStrategy,
@@ -1625,7 +1636,8 @@ public sealed class PaqetFireRuntime(
                 ResolveIpv6: resolveIpv6,
                 UseFakeDns: settings.FakeDns),
             engineCredentials,
-            blockMalware));
+            blockMalware,
+            psiphonText is null ? null : new ExitProxyOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort)));
         return new EngineConfigurationSet(
             paqetText,
             xrayText,
@@ -1635,7 +1647,10 @@ public sealed class PaqetFireRuntime(
             NetworkFingerprint.From(network, hotspotAddress),
             notices.Count == 0 ? null : string.Join(" ", notices),
             data,
-            blockMalware);
+            blockMalware)
+        {
+            PsiphonText = psiphonText,
+        };
     }
 
     private async ValueTask WriteEngineConfigurationsAsync(
@@ -1649,6 +1664,14 @@ public sealed class PaqetFireRuntime(
         await configurationStore.WriteAsync(paths.XrayConfigurationPath, configuration.XrayText, cancellationToken)
             .ConfigureAwait(false);
         xrayAdapter.UseRoutingData(configuration.RoutingData);
+        if (configuration.PsiphonText is { } psiphonText)
+        {
+            await configurationStore.WriteAsync(paths.PsiphonConfigurationPath, psiphonText, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // Xray's configuration above dials the exit only when it is selected.
+        psiphonAdapter?.UseExit(configuration.PsiphonText is not null);
     }
 
     private NetworkFingerprint? TryDetectFingerprint(PaqetFireSettings settings)
@@ -1808,15 +1831,17 @@ public sealed class PaqetFireRuntime(
             Username: engineCredentials.Username,
             Password: engineCredentials.Password);
         var brokerExecutablePath = Path.Combine(AppContext.BaseDirectory, "PaqetFire.Broker.exe");
+        // Psiphon's sockets go to Paqet over loopback; capturing any of them would loop.
+        string[] engineExecutables = [paths.XrayExecutablePath, paths.PsiphonExecutablePath, brokerExecutablePath];
         var lockedExclusions = RoutingPolicyCompiler.CreateLockedExclusions(
             paths.PaqetExecutablePath,
             paths.ProxiFyreExecutablePath,
-            [paths.XrayExecutablePath, brokerExecutablePath]);
+            engineExecutables);
         var routePlan = RoutingPolicyCompiler.Compile(
             policy,
             paths.PaqetExecutablePath,
             paths.ProxiFyreExecutablePath,
-            [paths.XrayExecutablePath, brokerExecutablePath]);
+            engineExecutables);
         return proxiFyreWriter.Write(routePlan, lockedExclusions);
     }
 
@@ -1829,7 +1854,7 @@ public sealed class PaqetFireRuntime(
         var currentProgress = progress.Current;
         // While Paqet alone is being restarted the route is recovering, not broken.
         var recoveringTransport = currentProgress?.Stage == ConnectionStage.RecoveringTransport &&
-                                  ConnectionRecoveryPolicy.IsTransportOnlyFault([status.Paqet, status.Xray, status.ProxiFyre]);
+                                  ConnectionRecoveryPolicy.IsTransportOnlyFault(status.Engines);
         var connectionState = recoveringTransport ? ConnectionState.Connecting : status.State;
         var prerequisites = snapshotMetadata.GetPrerequisites(prerequisiteInspector.Inspect);
         var missing = prerequisites.Where(item => !item.IsInstalled).Select(item => item.DisplayName).ToArray();
@@ -1853,13 +1878,22 @@ public sealed class PaqetFireRuntime(
             .Select(entry => (
                 entry.OccurredAt,
                 Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Xray · {entry.Message}"));
+        var psiphonLogs = (psiphonAdapter?.GetRecentLogs() ?? [])
+            .TakeLast(20)
+            .Select(entry => (
+                entry.OccurredAt,
+                Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Psiphon · {entry.Message}"));
         var logs = TakeRecentLogsWithinBudget(paqetLogs
             .Concat(xrayLogs)
+            .Concat(psiphonLogs)
             .OrderBy(entry => entry.OccurredAt)
             .Select(entry => entry.Text));
 
+        var exitProxy = status.Exit is { State: EngineState.Running } && psiphonAdapter?.Session is { } session
+            ? new ExitProxyStatus(ExitProxyKind.Psiphon, session.TunnelActive, session.ConnectedRegion, session.AvailableRegions)
+            : null;
         return new BrokerSnapshot(
-            [status.Paqet, status.Xray, status.ProxiFyre],
+            status.Engines,
             IsRouting: status.State == ConnectionState.Connected,
             IsKillSwitchEnabled: settings?.KillSwitchEnabled == true &&
                                  status.ProxiFyre.State == EngineState.Running,
@@ -1877,7 +1911,10 @@ public sealed class PaqetFireRuntime(
             ProfileCatalog: profileCatalog is null ? null : ProfileCatalogView.FromCatalog(profileCatalog),
             Tunnel: status.State == ConnectionState.Connected ? tunnelHealth.Report : null,
             Progress: currentProgress,
-            RoutingData: routingData?.Status);
+            RoutingData: routingData?.Status)
+        {
+            ExitProxy = exitProxy,
+        };
     }
 
     private async ValueTask<PaqetFireSettings?> TryLoadSettingsAsync(
@@ -1943,6 +1980,7 @@ public sealed class PaqetFireRuntime(
         ServerEndpoint = settings.ServerEndpoint.Trim(),
         LanSocksUsername = settings.LanSocksUsername.Trim(),
         KcpMode = settings.KcpMode.Trim().ToLowerInvariant(),
+        Psiphon = new PsiphonExitOptions((settings.Psiphon?.EgressRegion ?? string.Empty).Trim().ToUpperInvariant()),
         SelectedApplications = NormalizeList(settings.SelectedApplications),
         UserExclusions = NormalizeList(settings.UserExclusions),
         DirectRouteDestinations = NormalizeList(settings.DirectRouteDestinations),
@@ -2062,7 +2100,11 @@ public sealed class PaqetFireRuntime(
         NetworkFingerprint Fingerprint,
         string? Notice,
         RoutingDataSet RoutingData,
-        bool BlockMalware);
+        bool BlockMalware)
+    {
+        /// <summary>The exit engine's configuration; null when the profile uses no exit.</summary>
+        public string? PsiphonText { get; init; }
+    }
 }
 
 /// <summary>The network details the engines are configured from; any change may need a restart.</summary>
@@ -2093,7 +2135,18 @@ public sealed record RuntimePaths(
     string XrayGeoSitePath,
     string ProxiFyreExecutablePath,
     string ProxiFyreConfigurationPath,
-    string MachineSettingsPath);
+    string MachineSettingsPath)
+{
+    public string PsiphonExecutablePath { get; init; } =
+        Path.Combine(PayloadRoot, "engines", "psiphon", "x64", "psiphon-tunnel-core-i686.exe");
+
+    public string PsiphonConfigurationPath { get; init; } =
+        Path.Combine(PayloadRoot, "engines", "psiphon", "x64", "config.json");
+
+    /// <summary>Psiphon's server list and data store, beside the machine settings.</summary>
+    public string PsiphonDataDirectory { get; init; } =
+        Path.Combine(Path.GetDirectoryName(MachineSettingsPath) ?? PayloadRoot, "psiphon");
+}
 
 /// <summary>A request was cancelled, typically by a Disconnect, before it took effect.</summary>
 public sealed class BrokerOperationCancelledException(string message) : InvalidOperationException(message);

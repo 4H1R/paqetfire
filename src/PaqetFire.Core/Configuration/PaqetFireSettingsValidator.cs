@@ -75,6 +75,24 @@ public static class PaqetFireSettingsValidator
             }
         }
 
+        if (!Enum.IsDefined(settings.ExitProxy))
+        {
+            errors.Add("The exit proxy is invalid.");
+        }
+        else if (settings.ExitProxy == ExitProxyKind.Psiphon)
+        {
+            if (!PsiphonExitOptions.IsValidRegion(settings.Psiphon?.EgressRegion))
+            {
+                errors.Add("The Psiphon exit country is invalid.");
+            }
+
+            // Psiphon's local SOCKS5 listener relays TCP only; UDP keeps leaving through Paqet.
+            if (!settings.RouteTcp)
+            {
+                errors.Add("The Psiphon exit carries TCP only; turn on TCP routing to use it.");
+            }
+        }
+
         if (!settings.RouteTcp && !settings.RouteUdp)
         {
             errors.Add("Select at least one routed protocol: TCP or UDP.");
@@ -88,9 +106,9 @@ public static class PaqetFireSettingsValidator
         if (settings.ShareWithLan)
         {
             if (settings.LanSocksPort is < 1024 or > 65535 ||
-                settings.LanSocksPort is XrayJsonConfigurationWriter.PaqetPort or XrayJsonConfigurationWriter.InboundPort)
+                IsReservedPort(settings.LanSocksPort))
             {
-                errors.Add("The shared SOCKS5 port must be between 1024 and 65535 and cannot be 1080 or 1081.");
+                errors.Add("The shared SOCKS5 port must be between 1024 and 65535 and cannot be 1080, 1081, or 1084.");
             }
 
             if (string.IsNullOrWhiteSpace(settings.LanSocksUsername) ||
@@ -115,8 +133,8 @@ public static class PaqetFireSettingsValidator
                 errors.Add("Hotspot sharing requires direct access for local network devices.");
             }
             if (settings.HotspotSocksPort is < 1024 or > 65535 ||
-                settings.HotspotSocksPort is XrayJsonConfigurationWriter.PaqetPort or XrayJsonConfigurationWriter.InboundPort)
-                errors.Add("The hotspot SOCKS port must be between 1024 and 65535 and cannot be 1080 or 1081.");
+                IsReservedPort(settings.HotspotSocksPort))
+                errors.Add("The hotspot SOCKS port must be between 1024 and 65535 and cannot be 1080, 1081, or 1084.");
             if (settings.ShareWithLan && settings.HotspotSocksPort == settings.LanSocksPort)
                 errors.Add("The hotspot port must differ from the LAN share port.");
             if (string.IsNullOrWhiteSpace(settings.LanSocksUsername) ||
@@ -141,6 +159,10 @@ public static class PaqetFireSettingsValidator
         ValidateFlags(settings.RemoteTcpFlags, "remote", errors);
         return errors;
     }
+
+    private static bool IsReservedPort(int port) =>
+        port is XrayJsonConfigurationWriter.PaqetPort or XrayJsonConfigurationWriter.InboundPort or
+            PsiphonJsonConfigurationWriter.LocalSocksPort;
 
     private static void ValidateDirectRouteDestinations(
         IReadOnlyList<string>? entries,

@@ -11,7 +11,11 @@ LAN devices                    ------------> Xray SOCKS5 <LAN IPv4>:1082       (
 hotspot clients                ------------> Xray SOCKS5 <hotspot IPv4>:10808  (optional, authenticated)
      Xray -> direct / block outbound for matching rules
           -> Paqet SOCKS5 on 127.0.0.1:1080 for everything else
+          -> with an exit proxy: TCP to Psiphon SOCKS5 on 127.0.0.1:1084, which
+             reaches Psiphon through Paqet; UDP still to Paqet
 ```
+
+See [Exit proxy: Psiphon](psiphon-exit.md).
 
 All inbounds sniff HTTP, TLS, and QUIC hostnames and share the same routing
 rules. ProxiFyre always excludes the full installed paths of Paqet, Xray,
@@ -104,7 +108,8 @@ Rules are evaluated in this order; the first match wins:
    lower request latency than HTTP/2 (warm requests 113–117 ms against
    154–155 ms) but under half the download throughput (10–11 Mbit/s against
    17–23 Mbit/s); browsers fall back to TCP immediately when QUIC is blocked.
-8. Everything else goes to Paqet.
+8. Everything else goes to Paqet. With an exit proxy, TCP goes to the `exit`
+   outbound and UDP to Paqet.
 
 `IPIfNonMatch` is the default domain strategy; `AsIs` and `IPOnDemand` are also
 available. TCP/UDP and IPv4/IPv6 selection is enforced by ProxiFyre capture, not
@@ -168,4 +173,4 @@ protected installation payload directory. It is not accepted from the UI.
 
 ## Live session statistics
 
-Generated configurations enable Xray's `StatsService` on `127.0.0.1:10085` (loopback only; `HandlerService` is not exposed) with outbound uplink/downlink counters. The broker reads the `outbound>>>paqet>>>traffic>>>*` counters over gRPC for the Overview session card, so totals and rates include only traffic routed through Paqet, never direct or blocked traffic. Latency and the exit address are probed directly against the Paqet SOCKS5 listener, bypassing Xray so probe bytes are not counted. The exit country is resolved offline from the bundled `geoip.dat`; no address is sent to a geolocation service.
+Generated configurations enable Xray's `StatsService` on `127.0.0.1:10085` (loopback only; `HandlerService` is not exposed) with outbound uplink/downlink counters. The broker reads the `outbound>>>paqet>>>traffic>>>*` and `outbound>>>exit>>>traffic>>>*` counters over gRPC for the Overview session card, so totals and rates include only traffic routed through Paqet or the exit that rides on it, never direct or blocked traffic. Latency is probed directly against the Paqet SOCKS5 listener, bypassing Xray so probe bytes are not counted; the exit address is probed the same way, or through Psiphon's listener when the profile uses the Psiphon exit. The exit country is resolved offline from the bundled `geoip.dat`; no address is sent to a geolocation service.

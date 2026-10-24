@@ -55,7 +55,7 @@ public static class DiagnosticBundle
             : string.Empty;
         text.AppendLine(CultureInfo.InvariantCulture,
             $"Tunnel: {input.Tunnel.State} · consecutive failures {input.Tunnel.ConsecutiveFailures} · restarts {input.Tunnel.RecoveryAttempts}{lastSuccess}");
-        foreach (var engine in new[] { input.Connection.Paqet, input.Connection.Xray, input.Connection.ProxiFyre })
+        foreach (var engine in input.Connection.Engines)
         {
             var engineDetail = engine.Detail is null ? string.Empty : " · " + engine.Detail;
             text.AppendLine(CultureInfo.InvariantCulture,
@@ -156,6 +156,12 @@ public static class DiagnosticBundle
             $"Protocols: TCP {OnOff(settings.RouteTcp)} · UDP {OnOff(settings.RouteUdp)} · IPv4 {OnOff(settings.RouteIpv4)} · IPv6 {OnOff(settings.RouteIpv6)} · LAN bypass {OnOff(settings.BypassLan)}");
         text.AppendLine(CultureInfo.InvariantCulture,
             $"Xray: {settings.RegionalPreset} · {settings.DomainStrategy} · DNS {settings.DnsResolver} · FakeDNS {OnOff(settings.FakeDns)} · ads blocked {OnOff(settings.BlockAds)} · malware blocked {OnOff(settings.BlockMalware)} · QUIC blocked {OnOff(settings.BlockQuic)} · BitTorrent direct {OnOff(settings.DirectBitTorrent)}");
+        text.AppendLine(settings.ExitProxy switch
+        {
+            ExitProxyKind.Psiphon => string.Create(CultureInfo.InvariantCulture,
+                $"Exit proxy: Psiphon · country {(settings.Psiphon?.EgressRegion is { Length: > 0 } region ? region : "best available")}"),
+            _ => "Exit proxy: none",
+        });
         text.AppendLine(CultureInfo.InvariantCulture,
             $"Kill switch: {OnOff(settings.KillSwitchEnabled)} · LAN share {OnOff(settings.ShareWithLan)} ({settings.LanSocksPort}) · hotspot share {OnOff(settings.ShareViaHotspot)} ({settings.HotspotSocksPort})");
         text.AppendLine(CultureInfo.InvariantCulture,
@@ -172,6 +178,7 @@ public static class DiagnosticBundle
             ("Xray SOCKS5", XrayJsonConfigurationWriter.InboundPort),
             ("Xray statistics", XrayJsonConfigurationWriter.StatsApiPort),
         };
+        if (settings?.ExitProxy == ExitProxyKind.Psiphon) ports.Add(("Psiphon SOCKS5", PsiphonJsonConfigurationWriter.LocalSocksPort));
         if (settings?.ShareWithLan == true) ports.Add(("LAN share", settings.LanSocksPort));
         if (settings?.ShareViaHotspot == true) ports.Add(("Hotspot share", settings.HotspotSocksPort));
 

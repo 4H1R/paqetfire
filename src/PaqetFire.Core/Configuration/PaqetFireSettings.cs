@@ -52,6 +52,10 @@ public sealed record PaqetFireSettings
 
     public bool DirectBitTorrent { get; init; } = true;
 
+    public ExitProxyKind ExitProxy { get; init; } = ExitProxyKind.None;
+
+    public PsiphonExitOptions Psiphon { get; init; } = new();
+
     public bool KillSwitchEnabled { get; init; }
 
     public bool ShareWithLan { get; init; }
@@ -112,6 +116,10 @@ public sealed record PaqetFireSettingsView(
 
     public bool BlockMalware { get; init; }
 
+    public ExitProxyKind ExitProxy { get; init; }
+
+    public PsiphonExitOptions Psiphon { get; init; } = new();
+
     public static PaqetFireSettingsView FromSettings(PaqetFireSettings settings) => new(
         settings.ProfileName,
         settings.ServerEndpoint,
@@ -146,6 +154,8 @@ public sealed record PaqetFireSettingsView(
         DnsResolver = settings.DnsResolver,
         FakeDns = settings.FakeDns,
         BlockMalware = settings.BlockMalware,
+        ExitProxy = settings.ExitProxy,
+        Psiphon = settings.Psiphon ?? new(),
     };
 }
 
@@ -183,7 +193,8 @@ public sealed record XrayRoutingPolicy(
     IReadOnlyList<string>? DirectRouteDestinations = null,
     XrayDnsPolicy? Dns = null,
     EngineSocksCredentials? EngineCredentials = null,
-    bool BlockMalware = false);
+    bool BlockMalware = false,
+    ExitProxyOutbound? Exit = null);
 
 /// <param name="DomesticServers">IPv4 resolvers of the active network, used directly for local and direct-routed domains.</param>
 public sealed record XrayDnsPolicy(

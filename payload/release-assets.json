@@ -14,6 +14,12 @@
       "sha256": "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad"
     },
     {
+      "engine": "Psiphon",
+      "version": "d95d7f9",
+      "url": "https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/raw/d95d7f964c043a5a0ebd25cca801bc2753e14f74/windows/psiphon-tunnel-core-i686.exe",
+      "sha256": "34139a07deca9e9b94e5b55ebdf5e2583ca87f3d838873f105488681d22f4a0e"
+    },
+    {
       "engine": "ProxiFyre",
       "version": "2.6.4",
       "url": "https://github.com/wiresock/proxifyre/releases/download/v2.6.4/ProxiFyre-v2.6.4-x64.zip",
