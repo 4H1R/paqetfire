@@ -1730,6 +1730,11 @@ public sealed class PaqetFireRuntime(
 
         if (configuration.OpenVpn is { } openVpn)
         {
+            if (openVpnAdapter is not null)
+            {
+                await openVpnAdapter.PrepareAdapterAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             await configurationStore.WriteAsync(paths.OpenVpnSocksCredentialsPath, openVpn.SocksCredentials, cancellationToken)
                 .ConfigureAwait(false);
             if (openVpn.UserCredentials is { } account)

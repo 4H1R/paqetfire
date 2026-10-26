@@ -187,7 +187,7 @@ public static class DiagnosticBundle
             var adapter = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(candidate =>
                 string.Equals(candidate.Name, OpenVpnConfigurationWriter.AdapterName, StringComparison.OrdinalIgnoreCase));
             text.AppendLine(CultureInfo.InvariantCulture,
-                $"{OpenVpnConfigurationWriter.AdapterName} adapter: {(adapter is null ? "missing" : adapter.OperationalStatus.ToString())}");
+                $"{OpenVpnConfigurationWriter.AdapterName} adapter: {DescribeExitAdapter(adapter)}");
         }
 
         IPEndPoint[] listeners;
@@ -207,6 +207,24 @@ public static class DiagnosticBundle
             text.AppendLine(CultureInfo.InvariantCulture,
                 $"{name} ({port}): {(bound.Length == 0 ? "not listening" : string.Join(", ", bound))}");
         }
+    }
+
+    /// <summary>State that would affect the rest of the computer if the OpenVPN exit misbehaved.</summary>
+    private static string DescribeExitAdapter(NetworkInterface? adapter)
+    {
+        if (adapter is null)
+        {
+            return "missing";
+        }
+
+        var properties = adapter.GetIPProperties();
+        var addresses = properties.UnicastAddresses
+            .Where(unicast => unicast.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            .Select(unicast => $"{unicast.Address}/{unicast.PrefixLength}")
+            .ToArray();
+        var dns = properties.DnsAddresses.Count(server => !server.IsIPv6SiteLocal);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{adapter.OperationalStatus} · IPv4 {(addresses.Length == 0 ? "none" : string.Join(", ", addresses))} · DNS servers {dns} · gateways {properties.GatewayAddresses.Count}");
     }
 
     /// <summary>Like the Paqet server, the VPN server is described without its address.</summary>

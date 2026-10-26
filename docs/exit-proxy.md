@@ -61,7 +61,11 @@ LAN / hotspot devices ------------> Xray SOCKS5 shares
   that would have gone to Paqet is affected.
 - Both exits reach their own network only through Paqet's authenticated loopback
   SOCKS5 listener, so nothing routed to an exit leaves the computer directly.
-- DNS is unchanged: Xray's DNS-over-HTTPS queries still go through Paqet.
+- Xray stays the only resolver: it answers captured lookups itself, and an exit's
+  own DNS servers are never used. With an exit, Xray's DNS-over-HTTPS queries
+  leave through the exit as well, so CDNs answer for the place destinations see;
+  they fail with the exit rather than fall back to the Paqet server. Lookups for
+  local and direct-routed domains still use the network's own resolver.
 
 ### Psiphon
 
@@ -80,9 +84,17 @@ default route. PaqetFire runs it so that it changes nothing outside its own
 adapter:
 
 - OpenVPN uses a dedicated TAP adapter named **PaqetFire Exit**, created with
-  `tapctl` the first time it is needed (`--hwid root\tap0901`). OpenVPN's data
-  channel offload driver cannot be used: `--socks-proxy` turns it off, and
-  OpenVPN then uses TAP-Windows6.
+  `tapctl` the first time it is needed (`--hwid root\tap0901`), before Paqet
+  starts: adding a network adapter rebinds packet filter drivers, which must not
+  happen under Paqet's running capture. OpenVPN's data channel offload driver
+  cannot be used: `--socks-proxy` turns it off, and OpenVPN then uses
+  TAP-Windows6.
+- Before each start, a default route a crashed OpenVPN left on that adapter is
+  deleted; no other route is touched. Stopping asks OpenVPN to close its tunnel
+  through its `--service` exit event, so it removes its own route.
+- Once connected, the adapter must have no DNS servers. Pushed DNS options are
+  filtered, so a DNS server there means a filter failed, and the exit is ended
+  rather than let Windows send other applications' lookups into the tunnel.
 - It reaches the VPN server through `socks-proxy 127.0.0.1 1080` with Paqet's
   engine credentials, read from a file. SOCKS5 carries TCP only, so the server
   must accept TCP; a UDP configuration is refused at import.

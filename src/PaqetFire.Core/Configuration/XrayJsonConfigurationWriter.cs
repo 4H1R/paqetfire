@@ -252,7 +252,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             writer.WriteStartArray("rules");
             if (dns is not null)
             {
-                WriteDnsRules(writer, dns, userInboundTags);
+                WriteDnsRules(writer, dns, userInboundTags, policy.Exit is null ? PaqetOutboundTag : ExitOutboundTag);
             }
 
             if (directDomains.Length > 0)
@@ -545,7 +545,8 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
     private static void WriteDnsRules(
         Utf8JsonWriter writer,
         XrayDnsPolicy dns,
-        IReadOnlyList<string> userInboundTags)
+        IReadOnlyList<string> userInboundTags,
+        string remoteResolverOutbound)
     {
         // Resolver traffic must be pinned before user rules: a custom direct IP or
         // regional rule matching a resolver address would otherwise leak queries.
@@ -554,7 +555,9 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             WriteRule(writer, "inboundTag", [DomesticDnsTag], "direct");
         }
 
-        WriteRule(writer, "inboundTag", [RemoteDnsTag], "paqet");
+        // With an exit, encrypted DNS leaves from the exit too, so CDNs answer for the place
+        // destinations see; it fails with the exit instead of falling back to the Paqet server.
+        WriteRule(writer, "inboundTag", [RemoteDnsTag], remoteResolverOutbound);
 
         // Captured lookups (Windows DNS client, LAN and hotspot devices) are answered
         // by Xray instead of reaching their original, typically ISP, resolver.
