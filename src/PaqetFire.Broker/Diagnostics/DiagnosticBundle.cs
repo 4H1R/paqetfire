@@ -160,6 +160,7 @@ public static class DiagnosticBundle
         {
             ExitProxyKind.Psiphon => string.Create(CultureInfo.InvariantCulture,
                 $"Exit proxy: Psiphon · country {(settings.Psiphon?.EgressRegion is { Length: > 0 } region ? region : "best available")}"),
+            ExitProxyKind.OpenVpn => DescribeOpenVpn(settings.OpenVpn),
             _ => "Exit proxy: none",
         });
         text.AppendLine(CultureInfo.InvariantCulture,
@@ -181,6 +182,13 @@ public static class DiagnosticBundle
         if (settings?.ExitProxy == ExitProxyKind.Psiphon) ports.Add(("Psiphon SOCKS5", PsiphonJsonConfigurationWriter.LocalSocksPort));
         if (settings?.ShareWithLan == true) ports.Add(("LAN share", settings.LanSocksPort));
         if (settings?.ShareViaHotspot == true) ports.Add(("Hotspot share", settings.HotspotSocksPort));
+        if (settings?.ExitProxy == ExitProxyKind.OpenVpn)
+        {
+            var adapter = NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, OpenVpnConfigurationWriter.AdapterName, StringComparison.OrdinalIgnoreCase));
+            text.AppendLine(CultureInfo.InvariantCulture,
+                $"{OpenVpnConfigurationWriter.AdapterName} adapter: {(adapter is null ? "missing" : adapter.OperationalStatus.ToString())}");
+        }
 
         IPEndPoint[] listeners;
         try
@@ -199,6 +207,21 @@ public static class DiagnosticBundle
             text.AppendLine(CultureInfo.InvariantCulture,
                 $"{name} ({port}): {(bound.Length == 0 ? "not listening" : string.Join(", ", bound))}");
         }
+    }
+
+    /// <summary>Like the Paqet server, the VPN server is described without its address.</summary>
+    private static string DescribeOpenVpn(OpenVpnExitOptions? options)
+    {
+        var configuration = OpenVpnConfiguration.Parse(options?.Configuration);
+        var servers = configuration.Remote is { } remote
+            ? $"{configuration.Remotes.Count} server(s), first on port {remote.Port}"
+            : "no server";
+        var account = !configuration.RequiresCredentials ? "not needed"
+            : string.IsNullOrEmpty(options?.Password) ? "missing" : "set";
+        var ignored = configuration.IgnoredOptions.Count == 0 ? "none" : string.Join(", ", configuration.IgnoredOptions);
+        var errors = configuration.IsValid ? string.Empty : " · invalid: " + string.Join(" ", configuration.Errors);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"Exit proxy: OpenVPN · {servers} · account {account} · ignored options {ignored}{errors}");
     }
 
     private static string? ServerHost(string? endpoint)

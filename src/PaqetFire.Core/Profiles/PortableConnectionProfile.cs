@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Routing;
 
@@ -64,6 +65,13 @@ internal sealed record PortableConnectionProfile
         {
             Provider = profile.Settings.ExitProxy,
             Psiphon = profile.Settings.Psiphon ?? new(),
+            OpenVpn = string.IsNullOrWhiteSpace(profile.Settings.OpenVpn?.Configuration)
+                ? null
+                : new PortableOpenVpnSettings
+                {
+                    Configuration = profile.Settings.OpenVpn.Configuration,
+                    Username = profile.Settings.OpenVpn.Username,
+                },
         },
     };
 
@@ -107,6 +115,9 @@ internal sealed record PortableConnectionProfile
             HotspotSocksPort = Sharing.HotspotSocksPort,
             ExitProxy = exit.Provider,
             Psiphon = exit.Psiphon ?? new(),
+            OpenVpn = exit.OpenVpn is { } openVpn
+                ? new OpenVpnExitOptions(openVpn.Configuration ?? string.Empty, openVpn.Username ?? string.Empty)
+                : new(),
         });
     }
 }
@@ -151,6 +162,19 @@ internal sealed record PortableExitSettings
 {
     public ExitProxyKind Provider { get; init; } = ExitProxyKind.None;
     public PsiphonExitOptions? Psiphon { get; init; } = new();
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PortableOpenVpnSettings? OpenVpn { get; init; }
+}
+
+/// <summary>
+/// The imported .ovpn travels with the profile, like the transport key; the account
+/// password stays on each PC and is entered again after an import.
+/// </summary>
+internal sealed record PortableOpenVpnSettings
+{
+    public string? Configuration { get; init; }
+    public string? Username { get; init; }
 }
 
 internal sealed record PortableSharingSettings

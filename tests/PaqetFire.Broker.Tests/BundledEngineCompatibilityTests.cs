@@ -74,7 +74,16 @@ public sealed class BundledEngineCompatibilityTests
     [InlineData(XrayDomainStrategy.IPIfNonMatch, true)]
     [InlineData(XrayDomainStrategy.IPOnDemand, false)]
     [InlineData(XrayDomainStrategy.IPOnDemand, true)]
-    public async Task XrayAcceptsGeneratedPoliciesAndBundledGeoData(XrayDomainStrategy strategy, bool features)
+    public Task XrayAcceptsGeneratedPoliciesAndBundledGeoData(XrayDomainStrategy strategy, bool features) =>
+        AssertXrayAcceptsAsync(strategy, features, features ? new SocksExitOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort) : null);
+
+    [BundledEngineTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task XrayAcceptsTheOpenVpnExitBoundToItsAdapter(bool features) =>
+        AssertXrayAcceptsAsync(XrayDomainStrategy.IPIfNonMatch, features, new InterfaceExitOutbound(OpenVpnConfigurationWriter.AdapterName));
+
+    private static async Task AssertXrayAcceptsAsync(XrayDomainStrategy strategy, bool features, ExitProxyOutbound? exit)
     {
         var executable = await VerifyEngineAsync(EngineKind.Xray);
         var policy = new XrayRoutingPolicy(
@@ -85,7 +94,7 @@ public sealed class BundledEngineCompatibilityTests
             features ? ["example.com", "*.example.net", "203.0.113.10", "2001:db8::/32"] : null,
             features ? new XrayDnsPolicy(XrayDnsResolver.Cloudflare, ["192.168.50.1"], UseFakeDns: true) : null,
             features ? new EngineSocksCredentials("test-user", "test-password") : null,
-            Exit: features ? new ExitProxyOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort) : null);
+            Exit: exit);
         var configurationPath = Path.Combine(Path.GetTempPath(), $"PaqetFire-xray-{Guid.NewGuid():N}.json");
         try
         {
@@ -128,7 +137,7 @@ public sealed class BundledEngineCompatibilityTests
         var additionalExclusions = new[]
         {
             Path.Combine(directory, "xray.exe"),
-            Path.Combine(directory, "psiphon-tunnel-core-i686.exe"),
+            Path.Combine(directory, "psiphon-tunnel-core.exe"),
             Path.Combine(directory, "PaqetFire.Broker.exe"),
         };
         var policy = new RoutingPolicy(mode, "127.0.0.1:1081", ["test-app.exe"], [],
@@ -230,47 +239,6 @@ public sealed class BundledEngineCompatibilityTests
         finally
         {
             Directory.Delete(temporaryDirectory, recursive: true);
-        }
-    }
-
-    [BundledEngineTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ProductionPsiphonStartupRejectsATamperedExecutable(bool tampered)
-    {
-        var executable = await VerifyEngineAsync(EngineKind.Psiphon);
-        var directory = Path.Combine(Path.GetTempPath(), $"PaqetFire-psiphon-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var configuration = Path.Combine(directory, "config.json");
-            var paths = new RuntimePaths("unused", "unused", "unused", "unused", "unused",
-                "unused", "unused", "unused", "unused", Path.Combine(directory, "settings.json"))
-            {
-                PsiphonExecutablePath = executable,
-                PsiphonConfigurationPath = configuration,
-            };
-            var options = BundledEngineOptions.CreatePsiphon(paths) with { DataDirectoryPolicy = null };
-            var root = Environment.GetEnvironmentVariable("PAQETFIRE_TEST_PAYLOAD_ROOT")!;
-            var manifest = ProductPayloadManifest.Load(Path.Combine(root, "payload-manifest.json"));
-            Assert.Equal(manifest.Engines.Single(engine => engine.Engine == EngineKind.Psiphon).Version, options.Version);
-            if (!tampered)
-            {
-                return;
-            }
-
-            // A corrupted copy must be refused before anything runs; never alter the payload.
-            var corrupted = Path.Combine(directory, "psiphon-tunnel-core-i686.exe");
-            await File.WriteAllTextAsync(corrupted, "corrupted executable");
-            await File.WriteAllTextAsync(configuration, "{}");
-            await using var adapter = new PsiphonProcessAdapter(options with { ExecutablePath = corrupted });
-            await Assert.ThrowsAsync<System.Security.Cryptography.CryptographicException>(
-                async () => await adapter.StartAsync(CancellationToken.None));
-            Assert.Equal(EngineState.Faulted, (await adapter.GetStatusAsync(CancellationToken.None)).State);
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
         }
     }
 

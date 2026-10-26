@@ -100,7 +100,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
 
     public BrokerSnapshot? LastSnapshot => lastSnapshot;
 
-    private bool UsesExitProxy => lastSnapshot?.Settings?.ExitProxy == ExitProxyKind.Psiphon;
+    private bool UsesExitProxy => lastSnapshot?.Settings?.ExitProxy is ExitProxyKind.Psiphon or ExitProxyKind.OpenVpn;
 
     public BrokerConnectionState ConnectionState
     {
@@ -1062,6 +1062,40 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         }
     }
 
+    /// <summary>
+    /// Downloads, imports, or removes an exit engine. Like routing data, it is not serialized
+    /// with route operations; a download runs in the broker's background.
+    /// </summary>
+    /// <returns>Null on success, otherwise a message for the exit proxy card.</returns>
+    public async Task<string?> ManageExitEngineAsync(
+        ExitEngineAction action,
+        CancellationToken cancellationToken = default)
+    {
+        if (disposed)
+        {
+            return "PaqetFire is closing.";
+        }
+
+        try
+        {
+            await brokerClient.OpenAsync(ConnectTimeout, cancellationToken).ConfigureAwait(false);
+            var snapshot = await brokerClient.ManageExitEngineAsync(action, LifecycleRequestTimeout, cancellationToken)
+                .ConfigureAwait(false);
+            await UpdateUiAsync(() => ApplySnapshot(snapshot)).ConfigureAwait(false);
+            return null;
+        }
+        catch (BrokerRequestException exception)
+        {
+            return GetBrokerErrorMessage(exception.Error);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return GetFriendlyError(exception);
+        }
+    }
+
+    private static string ExitName(EngineKind engine) => engine == EngineKind.OpenVpn ? "OpenVPN" : engine.ToString();
+
     public async Task<string?> ExportProfilesAsync(CancellationToken cancellationToken = default)
     {
         if (disposed)
@@ -1414,10 +1448,10 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         XrayStatusText = xray is null
             ? "Unavailable"
             : EngineStateText.GetDisplayName(xray.State);
-        var exit = snapshot.Engines.FirstOrDefault(engine => engine.Engine == EngineKind.Psiphon);
+        var exit = snapshot.Engines.FirstOrDefault(engine => engine.Engine.IsExit());
         ExitStatusText = exit is not null
-            ? EngineStateText.GetDisplayName(exit.State)
-            : snapshot.Settings?.ExitProxy == ExitProxyKind.Psiphon ? "Stopped" : "Not used";
+            ? $"{ExitName(exit.Engine)} · {EngineStateText.GetDisplayName(exit.State)}"
+            : snapshot.Settings?.ExitProxy is ExitProxyKind.Psiphon or ExitProxyKind.OpenVpn ? "Stopped" : "Not used";
         RoutingStatusText = snapshot.IsRouting
             ? $"{RoutingScopeText.Create(snapshot.Settings)} · loop exclusions locked"
             : snapshot.IsKillSwitchEnabled

@@ -46,6 +46,12 @@ public interface IBrokerClient
         TimeSpan timeout,
         CancellationToken cancellationToken);
 
+    /// <summary>A download returns once it has started; progress and the result arrive in snapshots.</summary>
+    ValueTask<BrokerSnapshot> ManageExitEngineAsync(
+        ExitEngineAction action,
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
+
     ValueTask<string> ExportProfilesAsync(TimeSpan timeout, CancellationToken cancellationToken);
 
     ValueTask<LiveConnectionStats> GetLiveStatsAsync(TimeSpan timeout, CancellationToken cancellationToken);

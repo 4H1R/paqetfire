@@ -42,7 +42,7 @@ public sealed class RuntimeRecoveryTests
         await fixture.Runtime.ConnectAsync(CancellationToken.None);
 
         Assert.True(psiphon.IsEnabled);
-        Assert.Equal(new ExitProxyOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort), fixture.Xray.Last!.Exit);
+        Assert.Equal(new SocksExitOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort), fixture.Xray.Last!.Exit);
         var configuration = fixture.Configurations.Files[fixture.Paths.PsiphonConfigurationPath];
         Assert.Contains("\"EgressRegion\": \"NL\"", configuration, StringComparison.Ordinal);
         Assert.Contains("@127.0.0.1:1080", configuration, StringComparison.Ordinal);
@@ -310,9 +310,10 @@ internal sealed class RuntimeFixture : IAsyncDisposable
         CatalogStore? catalog = null,
         IIpv6CapabilityProbe? ipv6Probe = null,
         RoutingDataService? routingData = null,
-        PsiphonProcessAdapter? psiphon = null)
+        PsiphonProcessAdapter? psiphon = null,
+        OpenVpnProcessAdapter? openVpn = null)
     {
-        var fixture = new RuntimeFixture(configure, state, catalog, ipv6Probe, routingData, psiphon);
+        var fixture = new RuntimeFixture(configure, state, catalog, ipv6Probe, routingData, psiphon, openVpn);
         await fixture.Runtime.InitializeAsync(CancellationToken.None);
         return fixture;
     }
@@ -323,7 +324,8 @@ internal sealed class RuntimeFixture : IAsyncDisposable
         CatalogStore? catalog = null,
         IIpv6CapabilityProbe? ipv6Probe = null,
         RoutingDataService? routingData = null,
-        PsiphonProcessAdapter? psiphon = null)
+        PsiphonProcessAdapter? psiphon = null,
+        OpenVpnProcessAdapter? openVpn = null)
     {
         root = Path.Combine(Path.GetTempPath(), "PaqetFire-runtime-tests", Guid.NewGuid().ToString("N"));
         var payload = Path.Combine(root, "payload");
@@ -380,7 +382,8 @@ internal sealed class RuntimeFixture : IAsyncDisposable
             ipv6Probe,
             Clock,
             routingData,
-            psiphon);
+            psiphon,
+            openVpn);
     }
 
     public XrayProcessAdapter XrayAdapter => xray;

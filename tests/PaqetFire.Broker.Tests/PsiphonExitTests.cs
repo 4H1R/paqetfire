@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Text;
 using PaqetFire.Broker.Diagnostics;
 using PaqetFire.Broker.Engines;
+using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Engines;
 using PaqetFire.Core.Ipc;
@@ -65,6 +66,44 @@ public sealed class PsiphonExitTests
         var adapter = CreateAdapter();
         adapter.HandleOutput(line);
         Assert.Equal(line, Assert.Single(adapter.GetRecentLogs()).Message);
+    }
+
+    [Fact]
+    public async Task StartupRefusesAFileThatDoesNotMatchThePin()
+    {
+        var directory = Directory.CreateTempSubdirectory("PaqetFire-psiphon-");
+        try
+        {
+            var paths = new RuntimePaths("unused", "unused", "unused", "unused", "unused",
+                "unused", "unused", "unused", "unused", Path.Combine(directory.FullName, "settings.json"));
+            var options = ExitEngineOptions.CreatePsiphon(paths) with { DataDirectoryPolicy = null };
+            Directory.CreateDirectory(paths.ExitEnginesDirectory);
+            await File.WriteAllTextAsync(options.ExecutablePath, "corrupted executable");
+            Directory.CreateDirectory(Path.GetDirectoryName(options.ConfigurationPath)!);
+            await File.WriteAllTextAsync(options.ConfigurationPath, "{}");
+            await using var adapter = new PsiphonProcessAdapter(options with { ConfigurationPath = options.ConfigurationPath });
+
+            await Assert.ThrowsAsync<System.Security.Cryptography.CryptographicException>(
+                async () => await adapter.StartAsync(CancellationToken.None));
+            Assert.Equal(EngineState.Faulted, (await adapter.GetStatusAsync(CancellationToken.None)).State);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WithoutTheDownloadThePsiphonExitExplainsHowToGetIt()
+    {
+        var paths = new RuntimePaths("unused", "unused", "unused", "unused", "unused",
+            "unused", "unused", "unused", "unused", Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}", "settings.json"));
+        await using var adapter = new PsiphonProcessAdapter(ExitEngineOptions.CreatePsiphon(paths) with { DataDirectoryPolicy = null });
+
+        var status = await adapter.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(EngineState.NotInstalled, status.State);
+        Assert.Contains("Download it", status.Detail, StringComparison.Ordinal);
     }
 
     [Fact]

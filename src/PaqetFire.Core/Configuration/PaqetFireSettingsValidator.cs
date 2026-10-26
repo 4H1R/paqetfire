@@ -92,6 +92,10 @@ public static class PaqetFireSettingsValidator
                 errors.Add("The Psiphon exit carries TCP only; turn on TCP routing to use it.");
             }
         }
+        else if (settings.ExitProxy == ExitProxyKind.OpenVpn)
+        {
+            ValidateOpenVpn(settings.OpenVpn ?? new(), errors);
+        }
 
         if (!settings.RouteTcp && !settings.RouteUdp)
         {
@@ -158,6 +162,36 @@ public static class PaqetFireSettingsValidator
         ValidateFlags(settings.LocalTcpFlags, "local", errors);
         ValidateFlags(settings.RemoteTcpFlags, "remote", errors);
         return errors;
+    }
+
+    private static void ValidateOpenVpn(OpenVpnExitOptions options, ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(options.Configuration))
+        {
+            errors.Add("Import an OpenVPN configuration (.ovpn) to use the OpenVPN exit.");
+            return;
+        }
+
+        var configuration = OpenVpnConfiguration.Parse(options.Configuration);
+        foreach (var error in configuration.Errors)
+        {
+            errors.Add($"OpenVPN configuration: {error}");
+        }
+
+        if (!configuration.RequiresCredentials)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Username) || options.Username.Any(char.IsControl) || options.Username.Length > 256)
+        {
+            errors.Add("This OpenVPN configuration needs the OpenVPN username of your VPN account.");
+        }
+
+        if (string.IsNullOrEmpty(options.Password) || options.Password.Any(char.IsControl) || options.Password.Length > 256)
+        {
+            errors.Add("This OpenVPN configuration needs the OpenVPN password of your VPN account.");
+        }
     }
 
     private static bool IsReservedPort(int port) =>

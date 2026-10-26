@@ -9,7 +9,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
     private readonly IEngineAdapter _paqet;
     private readonly IEngineAdapter _xray;
     private readonly IEngineAdapter _proxiFyre;
-    private readonly IExitEngineAdapter? _exit;
+    private readonly IReadOnlyList<IExitEngineAdapter> _exits;
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private ConnectionState? _transitionState;
     private bool _disposed;
@@ -18,7 +18,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         IEngineAdapter paqet,
         IEngineAdapter xray,
         IEngineAdapter proxiFyre,
-        IExitEngineAdapter? exit = null)
+        params IExitEngineAdapter[] exits)
     {
         ArgumentNullException.ThrowIfNull(paqet);
         ArgumentNullException.ThrowIfNull(xray);
@@ -43,8 +43,22 @@ public sealed class ConnectionController : IConnectionController, IDisposable
 
         _paqet = paqet;
         _xray = xray;
+        foreach (var exit in exits)
+        {
+            ArgumentNullException.ThrowIfNull(exit, nameof(exits));
+            if (!exit.Kind.IsExit())
+            {
+                throw new ArgumentException($"{exit.Kind} is not an exit engine.", nameof(exits));
+            }
+        }
+
+        if (exits.DistinctBy(exit => exit.Kind).Count() != exits.Length)
+        {
+            throw new ArgumentException("Each exit engine may be registered once.", nameof(exits));
+        }
+
         _proxiFyre = proxiFyre;
-        _exit = exit;
+        _exits = exits;
     }
 
     // Deliberately does not take the transition gate so the desktop can observe a long
@@ -70,7 +84,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             paqetStatus,
             xrayStatus,
             proxiFyreStatus,
-            CreateStatusDetail(derivedState, paqetStatus.State, xrayStatus.State, proxiFyreStatus.State, exitStatus?.State),
+            CreateStatusDetail(derivedState, paqetStatus.State, xrayStatus.State, proxiFyreStatus.State, exitStatus),
             DateTimeOffset.UtcNow)
         {
             Exit = exitStatus,
@@ -91,7 +105,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             var paqetInitiallyRunning = await IsRunningAsync(_paqet, cancellationToken).ConfigureAwait(false);
             var xrayInitiallyRunning = await IsRunningAsync(_xray, cancellationToken).ConfigureAwait(false);
             var proxiFyreInitiallyRunning = await IsRunningAsync(_proxiFyre, cancellationToken).ConfigureAwait(false);
-            var exit = _exit is { IsEnabled: true } ? _exit : null;
+            var exit = EnabledExit();
             var exitInitiallyRunning = exit is null || await IsRunningAsync(exit, cancellationToken).ConfigureAwait(false);
 
             if (paqetInitiallyRunning && xrayInitiallyRunning && proxiFyreInitiallyRunning && exitInitiallyRunning)
@@ -155,7 +169,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                         !paqetInitiallyRunning,
                         !xrayInitiallyRunning,
                         proxiFyreStartAttempted,
-                        exitStartAttempted)
+                        exitStartAttempted ? exit : null)
                     .ConfigureAwait(false);
 
                 if (error is OperationCanceledException && rollbackErrors.Count == 0)
@@ -310,11 +324,11 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                     await StopAndVerifyAsync(_xray, cancellationToken).ConfigureAwait(false);
                 }
 
-                // The exit's tunnel runs over Paqet and does not survive its restart.
-                if (_exit is not null)
+                // An exit's tunnel runs over Paqet and does not survive its restart.
+                foreach (var stale in _exits)
                 {
-                    stoppingEngine = _exit.Kind;
-                    await StopAndVerifyAsync(_exit, cancellationToken).ConfigureAwait(false);
+                    stoppingEngine = stale.Kind;
+                    await StopAndVerifyAsync(stale, cancellationToken).ConfigureAwait(false);
                 }
 
                 stoppingEngine = EngineKind.Paqet;
@@ -345,7 +359,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
                 throw new ConnectionTransitionException("restart transport", failedEngine, startError);
             }
 
-            if (_exit is { IsEnabled: true } exit)
+            if (EnabledExit() is { } exit)
             {
                 try
                 {
@@ -379,36 +393,66 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         _transitionGate.Dispose();
     }
 
-    private async ValueTask<EngineStatus?> GetExitStatusAsync(CancellationToken cancellationToken)
+    /// <summary>The exit the configuration written for the next start uses, if any.</summary>
+    private IExitEngineAdapter? EnabledExit()
     {
-        if (_exit is null)
+        IExitEngineAdapter? enabled = null;
+        foreach (var exit in _exits)
         {
-            return null;
+            if (!exit.IsEnabled)
+            {
+                continue;
+            }
+
+            if (enabled is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Both the {enabled.Kind} and {exit.Kind} exits are selected; a route uses at most one.");
+            }
+
+            enabled = exit;
         }
 
-        var status = await _exit.GetStatusAsync(cancellationToken).ConfigureAwait(false);
-        // A disabled exit still counts until it has stopped, so a stray process is not ignored.
-        return _exit.IsEnabled || status.State is not (EngineState.Stopped or EngineState.NotInstalled) ? status : null;
+        return enabled;
+    }
+
+    private async ValueTask<EngineStatus?> GetExitStatusAsync(CancellationToken cancellationToken)
+    {
+        EngineStatus? stray = null;
+        foreach (var exit in _exits)
+        {
+            var status = await exit.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+            if (exit.IsEnabled)
+            {
+                return status;
+            }
+
+            // A disabled exit still counts until it has stopped, so a stray process is not ignored.
+            if (stray is null && status.State is not (EngineState.Stopped or EngineState.NotInstalled))
+            {
+                stray = status;
+            }
+        }
+
+        return stray;
     }
 
     private async ValueTask StopExitAsync(string operation, CancellationToken cancellationToken)
     {
-        if (_exit is null)
+        foreach (var exit in _exits)
         {
-            return;
-        }
-
-        try
-        {
-            await StopAndVerifyAsync(_exit, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception error)
-        {
-            throw new ConnectionTransitionException(operation, _exit.Kind, error);
+            try
+            {
+                await StopAndVerifyAsync(exit, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception error)
+            {
+                throw new ConnectionTransitionException(operation, exit.Kind, error);
+            }
         }
     }
 
@@ -420,7 +464,11 @@ public sealed class ConnectionController : IConnectionController, IDisposable
 
         if (status.State == EngineState.NotInstalled)
         {
-            throw new InvalidOperationException($"The {adapter.Kind} engine is not installed.");
+            // An optional exit engine explains how to install it.
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(status.Detail)
+                    ? $"The {adapter.Kind} engine is not installed."
+                    : status.Detail);
         }
 
         return status.State == EngineState.Running;
@@ -526,7 +574,7 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         bool paqetStartAttempted,
         bool xrayStartAttempted,
         bool proxiFyreStartAttempted,
-        bool exitStartAttempted)
+        IExitEngineAdapter? startedExit)
     {
         List<Exception>? errors = null;
 
@@ -535,9 +583,9 @@ public sealed class ConnectionController : IConnectionController, IDisposable
             await TryRollbackStopAsync(_proxiFyre).ConfigureAwait(false);
         }
 
-        if (exitStartAttempted && _exit is not null)
+        if (startedExit is not null)
         {
-            await TryRollbackStopAsync(_exit).ConfigureAwait(false);
+            await TryRollbackStopAsync(startedExit).ConfigureAwait(false);
         }
 
         if (xrayStartAttempted)
@@ -621,10 +669,10 @@ public sealed class ConnectionController : IConnectionController, IDisposable
         EngineState paqet,
         EngineState xray,
         EngineState proxiFyre,
-        EngineState? exit)
+        EngineStatus? exit)
     {
-        var engines = exit is { } exitState
-            ? $"Paqet: {paqet}, Xray: {xray}, Psiphon: {exitState}, ProxiFyre: {proxiFyre}"
+        var engines = exit is not null
+            ? $"Paqet: {paqet}, Xray: {xray}, {exit.Engine}: {exit.State}, ProxiFyre: {proxiFyre}"
             : $"Paqet: {paqet}, Xray: {xray}, ProxiFyre: {proxiFyre}";
         return connection switch
         {

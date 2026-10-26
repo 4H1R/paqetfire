@@ -33,6 +33,8 @@ public sealed record ConnectionFormState
     public ExitProxyKind ExitProxy { get; init; } = ExitProxyKind.None;
     /// <summary>Psiphon's exit country, or empty for the best available server.</summary>
     public string PsiphonRegion { get; init; } = string.Empty;
+    /// <summary>The VPN account name; the imported .ovpn and the password are secrets, kept outside the form.</summary>
+    public string OpenVpnUsername { get; init; } = string.Empty;
     public bool KillSwitch { get; init; }
     public bool ShareWithLan { get; init; }
     public int LanSocksPort { get; init; } = 1082;
@@ -104,6 +106,7 @@ public sealed record ConnectionFormState
         DirectBitTorrent = settings.DirectBitTorrent,
         ExitProxy = settings.ExitProxy,
         PsiphonRegion = settings.Psiphon?.EgressRegion ?? string.Empty,
+        OpenVpnUsername = settings.OpenVpn?.Username ?? string.Empty,
         KillSwitch = settings.KillSwitchEnabled,
         ShareWithLan = settings.ShareWithLan,
         LanSocksPort = settings.LanSocksPort,
@@ -129,13 +132,20 @@ public sealed record ConnectionFormState
         DirectRouteDestinations = string.Join('\n', SplitLines(DirectRouteDestinations)),
         LanSocksUsername = LanSocksUsername.Trim(),
         PsiphonRegion = (PsiphonRegion ?? string.Empty).Trim().ToUpperInvariant(),
+        OpenVpnUsername = (OpenVpnUsername ?? string.Empty).Trim(),
         Advanced = Advanced ?? new(),
     };
 
     public bool IsEquivalentTo(ConnectionFormState? other) =>
         other is not null && Normalize().Equals(other.Normalize());
 
-    public PaqetFireSettings ToSettings(string transportKey, string sharingPassword) => new()
+    /// <param name="openVpnConfiguration">A newly imported .ovpn, or empty to keep the saved one.</param>
+    /// <param name="openVpnPassword">A newly entered VPN password, or empty to keep the saved one.</param>
+    public PaqetFireSettings ToSettings(
+        string transportKey,
+        string sharingPassword,
+        string openVpnConfiguration = "",
+        string openVpnPassword = "") => new()
     {
         Advanced = Advanced,
         ProfileName = ProfileName.Trim(),
@@ -168,6 +178,7 @@ public sealed record ConnectionFormState
         DirectBitTorrent = DirectBitTorrent,
         ExitProxy = ExitProxy,
         Psiphon = new PsiphonExitOptions((PsiphonRegion ?? string.Empty).Trim().ToUpperInvariant()),
+        OpenVpn = new OpenVpnExitOptions(openVpnConfiguration, (OpenVpnUsername ?? string.Empty).Trim(), openVpnPassword),
         KcpMode = string.IsNullOrWhiteSpace(KcpMode) ? "fast" : KcpMode.Trim(),
         LocalTcpFlags = SplitEntries(LocalTcpFlags),
         RemoteTcpFlags = SplitEntries(RemoteTcpFlags),

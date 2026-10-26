@@ -536,7 +536,7 @@
                   <RadioButton Content="Only selected applications" />
                 </RadioButtons>
                 <TextBlock x:Name="RoutingModeHelpText"
-                           Text="All application traffic enters the PaqetFire route. Paqet, Xray, Psiphon, ProxiFyre, and the broker are excluded to prevent a loop; Npcap runs below application routing."
+                           Text="All application traffic enters the PaqetFire route. Paqet, Xray, the exit engine, ProxiFyre, and the broker are excluded to prevent a loop; Npcap runs below application routing."
                            Opacity="0.65" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
@@ -606,12 +606,43 @@
                           SelectionChanged="ExitProxyBox_SelectionChanged">
                   <ComboBoxItem Content="None — Leave from the Paqet server (recommended)" Tag="none" />
                   <ComboBoxItem Content="Psiphon — Leave through the Psiphon network" Tag="psiphon" />
+                  <ComboBoxItem Content="OpenVPN — Leave through your own VPN provider, such as Proton VPN" Tag="openvpn" />
                 </ComboBox>
                 <StackPanel x:Name="PsiphonOptionsPanel" Spacing="10" Visibility="Collapsed">
+                  <TextBlock x:Name="PsiphonEngineText" FontSize="12" TextWrapping="Wrap"
+                             AutomationProperties.LiveSetting="Polite" />
+                  <ProgressBar x:Name="PsiphonDownloadProgress" IsIndeterminate="True" Visibility="Collapsed" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="PsiphonDownloadButton" Content="Download Psiphon" Style="{StaticResource AccentButtonStyle}"
+                            Click="PsiphonDownloadButton_Click" />
+                    <Button x:Name="PsiphonImportButton" Content="Use a downloaded file…" Click="PsiphonImportButton_Click"
+                            ToolTipService.ToolTip="If the download is blocked, get the file from the link below another way and choose it here." />
+                    <Button x:Name="PsiphonRemoveButton" Content="Remove" Click="PsiphonRemoveButton_Click" />
+                  </StackPanel>
+                  <HyperlinkButton x:Name="PsiphonFileLink" Content="Psiphon file (GitHub)" Padding="0" />
                   <ComboBox x:Name="PsiphonRegionBox" Header="Psiphon exit country" HorizontalAlignment="Stretch" />
                   <TextBlock x:Name="PsiphonStatusText" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold"
                              TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
                   <TextBlock Text="Psiphon reaches its servers only through Paqet, and destinations see a Psiphon server in the chosen country. It carries TCP only: UDP, such as calls and games, still leaves from the Paqet server. Connecting takes longer, most of all the first time while Psiphon downloads its server list through Paqet; a country Psiphon cannot serve right now fails to connect. PaqetFire uses Psiphon's public network configuration, which Psiphon Inc. may change or limit."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel x:Name="OpenVpnOptionsPanel" Spacing="10" Visibility="Collapsed">
+                  <TextBlock x:Name="OpenVpnEngineText" FontSize="12" TextWrapping="Wrap"
+                             AutomationProperties.LiveSetting="Polite" />
+                  <HyperlinkButton x:Name="OpenVpnDownloadLink" Content="Get OpenVPN Community for Windows"
+                                   NavigateUri="https://openvpn.net/community-downloads/" Padding="0" />
+                  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="OpenVpnImportButton" Content="Import .ovpn file…" Click="OpenVpnImportButton_Click" />
+                    <TextBlock x:Name="OpenVpnConfigurationText" VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <TextBlock x:Name="OpenVpnIgnoredText" Visibility="Collapsed" FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                  <TextBox x:Name="OpenVpnUsernameBox" Header="OpenVPN username" HorizontalAlignment="Stretch" MaxLength="256" />
+                  <PasswordBox x:Name="OpenVpnPasswordBox" Header="OpenVPN password" HorizontalAlignment="Stretch" MaxLength="256" />
+                  <TextBlock x:Name="OpenVpnStatusText" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold"
+                             TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                  <TextBlock Text="Download the Windows TCP configuration from your provider. For Proton VPN, sign in at account.protonvpn.com, open Downloads, choose OpenVPN configuration files for Windows with the TCP protocol, and use the OpenVPN / IKEv2 username and password from Account → OpenVPN / IKEv2 username, not your Proton login."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                  <TextBlock Text="OpenVPN reaches its server only through Paqet and changes no system routes or DNS settings: only traffic PaqetFire routes leaves through it, TCP and UDP, while the rest of the computer is unaffected. If its tunnel drops, routed traffic fails instead of leaving through the Paqet server. PaqetFire keeps only the client options it trusts from the file; scripts, plugins, and file paths are removed."
                              FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
                 </StackPanel>
               </StackPanel>
@@ -906,7 +937,7 @@
                 <StackPanel Spacing="5"><TextBlock Text="Xray" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.XrayStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
               </Border>
               <Border Grid.Column="3" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                <StackPanel Spacing="5"><TextBlock Text="Psiphon exit" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.ExitStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel Spacing="5"><TextBlock Text="Exit proxy" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.ExitStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
               </Border>
               <Border Grid.Column="4" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="5"><TextBlock Text="ProxiFyre" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.RoutingStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>

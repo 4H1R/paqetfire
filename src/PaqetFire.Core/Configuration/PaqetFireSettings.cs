@@ -56,6 +56,8 @@ public sealed record PaqetFireSettings
 
     public PsiphonExitOptions Psiphon { get; init; } = new();
 
+    public OpenVpnExitOptions OpenVpn { get; init; } = new();
+
     public bool KillSwitchEnabled { get; init; }
 
     public bool ShareWithLan { get; init; }
@@ -120,6 +122,8 @@ public sealed record PaqetFireSettingsView(
 
     public PsiphonExitOptions Psiphon { get; init; } = new();
 
+    public OpenVpnExitView OpenVpn { get; init; } = new();
+
     public static PaqetFireSettingsView FromSettings(PaqetFireSettings settings) => new(
         settings.ProfileName,
         settings.ServerEndpoint,
@@ -156,6 +160,7 @@ public sealed record PaqetFireSettingsView(
         BlockMalware = settings.BlockMalware,
         ExitProxy = settings.ExitProxy,
         Psiphon = settings.Psiphon ?? new(),
+        OpenVpn = OpenVpnExitView.FromOptions(settings.OpenVpn),
     };
 }
 

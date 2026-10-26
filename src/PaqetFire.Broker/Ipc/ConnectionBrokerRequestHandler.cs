@@ -1,3 +1,4 @@
+using PaqetFire.Broker.Deployment;
 using PaqetFire.Broker.Diagnostics;
 using PaqetFire.Broker.RoutingData;
 using PaqetFire.Broker.Runtime;
@@ -11,10 +12,17 @@ namespace PaqetFire.Broker.Ipc;
 public sealed class ConnectionBrokerRequestHandler(
     IPaqetFireRuntime runtime,
     ILiveStatsService liveStats,
-    RoutingDataService? routingData = null) : IBrokerRequestHandler
+    RoutingDataService? routingData = null,
+    ExitEngineInstaller? exitEngines = null) : IBrokerRequestHandler
 {
+    public ValueTask<BrokerResponse> HandleAsync(
+        BrokerRequest request,
+        CancellationToken cancellationToken) =>
+        HandleAsync(request, BrokerRequester.Unknown, cancellationToken);
+
     public async ValueTask<BrokerResponse> HandleAsync(
         BrokerRequest request,
+        BrokerRequester requester,
         CancellationToken cancellationToken)
     {
         try
@@ -103,6 +111,30 @@ public sealed class ConnectionBrokerRequestHandler(
                     // Update now returns as soon as the download starts; progress and the
                     // result arrive in snapshots.
                     await routingData.ApplyAsync(routingDataAction, cancellationToken).ConfigureAwait(false);
+                    return BrokerResponse.Succeeded(
+                        request.RequestId,
+                        await runtime.GetSnapshotAsync(cancellationToken).ConfigureAwait(false));
+
+                case BrokerCommand.ManageExitEngine:
+                    if (request.ExitEngineAction is not { } exitEngineAction)
+                    {
+                        return BrokerResponse.Failed(
+                            request.RequestId,
+                            BrokerErrorCode.InvalidRequest,
+                            "An exit engine action is required.");
+                    }
+
+                    if (exitEngines is null)
+                    {
+                        return BrokerResponse.Failed(
+                            request.RequestId,
+                            BrokerErrorCode.EngineFailure,
+                            "Exit engines cannot be installed by this broker.");
+                    }
+
+                    // A download returns as soon as it starts; its result arrives in snapshots.
+                    await exitEngines.ApplyAsync(exitEngineAction, requester.OpenFileAsUser, cancellationToken)
+                        .ConfigureAwait(false);
                     return BrokerResponse.Succeeded(
                         request.RequestId,
                         await runtime.GetSnapshotAsync(cancellationToken).ConfigureAwait(false));

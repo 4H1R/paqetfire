@@ -10,6 +10,8 @@ public sealed class MachineSettingsStore(string settingsPath, ProtectedDirectory
 {
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("PaqetFire.Settings.v1");
     private static readonly byte[] LanPasswordEntropy = Encoding.UTF8.GetBytes("PaqetFire.LanSocksPassword.v1");
+    private static readonly byte[] OpenVpnConfigurationEntropy = Encoding.UTF8.GetBytes("PaqetFire.OpenVpnConfiguration.v1");
+    private static readonly byte[] OpenVpnPasswordEntropy = Encoding.UTF8.GetBytes("PaqetFire.OpenVpnPassword.v1");
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -50,10 +52,16 @@ public sealed class MachineSettingsStore(string settingsPath, ProtectedDirectory
             var lanPassword = string.IsNullOrEmpty(stored.ProtectedLanSocksPassword)
                 ? string.Empty
                 : Unprotect(stored.ProtectedLanSocksPassword, LanPasswordEntropy);
+            var openVpn = stored.Settings.OpenVpn ?? new();
             return stored.Settings with
             {
                 TransportKey = key,
                 LanSocksPassword = lanPassword,
+                OpenVpn = openVpn with
+                {
+                    Configuration = UnprotectOptional(stored.ProtectedOpenVpnConfiguration, OpenVpnConfigurationEntropy),
+                    Password = UnprotectOptional(stored.ProtectedOpenVpnPassword, OpenVpnPasswordEntropy),
+                },
             };
         }
         finally
@@ -71,16 +79,22 @@ public sealed class MachineSettingsStore(string settingsPath, ProtectedDirectory
         try
         {
             ProtectedDirectory.EnsureFor(directory, _settingsPath);
+            var openVpn = settings.OpenVpn ?? new();
             var stored = new StoredSettings(
                 settings with
                 {
                     TransportKey = string.Empty,
                     LanSocksPassword = string.Empty,
+                    OpenVpn = openVpn with { Configuration = string.Empty, Password = string.Empty },
                 },
                 Protect(settings.TransportKey, Entropy),
                 string.IsNullOrEmpty(settings.LanSocksPassword)
                     ? null
-                    : Protect(settings.LanSocksPassword, LanPasswordEntropy));
+                    : Protect(settings.LanSocksPassword, LanPasswordEntropy))
+            {
+                ProtectedOpenVpnConfiguration = ProtectOptional(openVpn.Configuration, OpenVpnConfigurationEntropy),
+                ProtectedOpenVpnPassword = ProtectOptional(openVpn.Password, OpenVpnPasswordEntropy),
+            };
             var temporary = _settingsPath + $".{Guid.NewGuid():N}.new";
             try
             {
@@ -151,8 +165,22 @@ public sealed class MachineSettingsStore(string settingsPath, ProtectedDirectory
         }
     }
 
+    private static string? ProtectOptional(string? value, byte[] entropy) =>
+        string.IsNullOrEmpty(value) ? null : Protect(value, entropy);
+
+    private static string UnprotectOptional(string? value, byte[] entropy) =>
+        string.IsNullOrEmpty(value) ? string.Empty : Unprotect(value, entropy);
+
     private sealed record StoredSettings(
         PaqetFireSettings Settings,
         string ProtectedTransportKey,
-        string? ProtectedLanSocksPassword = null);
+        string? ProtectedLanSocksPassword = null)
+    {
+        // An imported .ovpn may embed a private key, so it is protected like the passwords.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ProtectedOpenVpnConfiguration { get; init; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ProtectedOpenVpnPassword { get; init; }
+    }
 }

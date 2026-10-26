@@ -56,7 +56,9 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
                 ".",
                 pipeName,
                 PipeDirection.InOut,
-                PipeOptions.Asynchronous | PipeOptions.WriteThrough);
+                PipeOptions.Asynchronous | PipeOptions.WriteThrough,
+                // Lets the broker open a file the user chose as the user, never as SYSTEM.
+                System.Security.Principal.TokenImpersonationLevel.Impersonation);
             using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
             timeoutCancellation.CancelAfter(timeout);
@@ -163,6 +165,17 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
                 routingDataAction: action)
             .ConfigureAwait(false);
 
+    public async ValueTask<BrokerSnapshot> ManageExitEngineAsync(
+        ExitEngineAction action,
+        TimeSpan timeout,
+        CancellationToken cancellationToken) =>
+        await SendAsync(
+                BrokerCommand.ManageExitEngine,
+                timeout,
+                cancellationToken,
+                exitEngineAction: action)
+            .ConfigureAwait(false);
+
     public async ValueTask<string> ExportProfilesAsync(
         TimeSpan timeout,
         CancellationToken cancellationToken)
@@ -209,7 +222,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
         PaqetFireSettings? settings = null,
         bool connectAfterSave = false,
         ProfileAction? profileAction = null,
-        RoutingDataAction? routingDataAction = null)
+        RoutingDataAction? routingDataAction = null,
+        ExitEngineAction? exitEngineAction = null)
     {
         var response = await SendResponseAsync(
                 command,
@@ -218,7 +232,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
                 settings,
                 connectAfterSave,
                 profileAction,
-                routingDataAction)
+                routingDataAction,
+                exitEngineAction)
             .ConfigureAwait(false);
         return response.Snapshot ??
             throw new InvalidDataException("The broker snapshot response was empty.");
@@ -231,7 +246,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
         PaqetFireSettings? settings = null,
         bool connectAfterSave = false,
         ProfileAction? profileAction = null,
-        RoutingDataAction? routingDataAction = null)
+        RoutingDataAction? routingDataAction = null,
+        ExitEngineAction? exitEngineAction = null)
     {
         ValidateTimeout(timeout);
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -249,7 +265,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
             settings,
             connectAfterSave,
             profileAction,
-            routingDataAction);
+            routingDataAction,
+            exitEngineAction);
         var completion = new TaskCompletionSource<BrokerResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         if (!pendingRequests.TryAdd(request.RequestId, completion))

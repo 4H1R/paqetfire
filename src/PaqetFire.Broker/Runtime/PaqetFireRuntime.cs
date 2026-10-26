@@ -48,7 +48,9 @@ public sealed class PaqetFireRuntime(
     IIpv6CapabilityProbe? ipv6Probe = null,
     TimeProvider? timeProvider = null,
     RoutingDataService? routingData = null,
-    PsiphonProcessAdapter? psiphonAdapter = null) : IPaqetFireRuntime
+    PsiphonProcessAdapter? psiphonAdapter = null,
+    OpenVpnProcessAdapter? openVpnAdapter = null,
+    ExitEngineInstaller? exitEngines = null) : IPaqetFireRuntime
 {
     private const int RecentLogBudgetBytes = 24 * 1024;
     private static readonly TimeSpan SystemResolverTimeout = TimeSpan.FromMilliseconds(1500);
@@ -62,6 +64,7 @@ public sealed class PaqetFireRuntime(
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly RouteRecoveryPolicy recovery = new(RecoveryOptions);
     private readonly PsiphonJsonConfigurationWriter psiphonWriter = new();
+    private readonly OpenVpnConfigurationWriter openVpnWriter = new();
     private readonly Lock stateSync = new();
     private readonly SemaphoreSlim stateWriteGate = new(1, 1);
     private readonly Lock operationSync = new();
@@ -84,10 +87,11 @@ public sealed class PaqetFireRuntime(
         brokerState = stateStore.Load();
         desiredConnected = brokerState.DesiredConnected;
 
-        // Paqet, Xray, and Psiphon are bound to the broker's kill-on-close job, so they
-        // rarely survive it. ProxiFyre is not: it may still be blocking routed applications
-        // for the kill switch or a route the user left connected, and is replaced only when
-        // the broker starts its own instance.
+        // Paqet, Xray, and the exit engines are bound to the broker's kill-on-close job, so
+        // they rarely survive it. ProxiFyre is not: it may still be blocking routed
+        // applications for the kill switch or a route the user left connected, and is
+        // replaced only when the broker starts its own instance. OpenVPN is not matched by
+        // path: that is the user's own installation, which may run their other connections.
         var orphans = await OrphanedEngineCleanup.TerminateAsync(
                 [paths.PaqetExecutablePath, paths.XrayExecutablePath, paths.PsiphonExecutablePath],
                 cancellationToken)
@@ -211,6 +215,7 @@ public sealed class PaqetFireRuntime(
                 settings = settings with { LanSocksPassword = existing.LanSocksPassword };
             }
 
+            settings = RetainOpenVpnSecrets(settings, existing);
             var errors = PaqetFireSettingsValidator.Validate(settings);
             if (errors.Count > 0)
             {
@@ -938,8 +943,7 @@ public sealed class PaqetFireRuntime(
                 .Select(entry => (entry.OccurredAt, Text: $"{entry.OccurredAt:HH:mm:ss}  {(entry.IsError ? "ERR" : "INF")}  Paqet · {entry.Message}"))
                 .Concat(xrayAdapter.GetRecentLogs()
                     .Select(entry => (entry.OccurredAt, Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Xray · {entry.Message}")))
-                .Concat((psiphonAdapter?.GetRecentLogs() ?? [])
-                    .Select(entry => (entry.OccurredAt, Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Psiphon · {entry.Message}")))
+                .Concat(ExitLogs(int.MaxValue))
                 .OrderBy(entry => entry.OccurredAt)
                 .Select(entry => entry.Text)
                 .TakeLast(120)
@@ -964,6 +968,11 @@ public sealed class PaqetFireRuntime(
                 notes.Add($"Running Xray data: {(runningData.IsUpdated ? runningData.Version : "bundled")} · malware blocking {(activeRoute.BlockMalware ? "active" : "inactive")}");
             }
 
+            foreach (var engine in exitEngines?.GetAvailability() ?? [])
+            {
+                notes.Add($"{engine.Kind} exit engine: {(engine.IsInstalled ? $"installed {engine.Version}" : "not installed")}{(engine.Detail is { } why ? $" · {why}" : string.Empty)}");
+            }
+
             return DiagnosticBundle.Build(new DiagnosticBundleInput(
                     settings is null ? null : Normalize(settings),
                     profileCatalog?.Profiles.Count ?? 0,
@@ -974,7 +983,12 @@ public sealed class PaqetFireRuntime(
                     network,
                     latestVerification,
                     logs,
-                    [settings?.TransportKey, settings?.LanSocksPassword, engineCredentials.Password],
+                    [
+                        settings?.TransportKey, settings?.LanSocksPassword, settings?.OpenVpn?.Password,
+                        engineCredentials.Password,
+                        // Like the Paqet server, VPN server names stay out of shared reports.
+                        .. OpenVpnConfiguration.Parse(settings?.OpenVpn?.Configuration).Remotes.Select(remote => remote.Host),
+                    ],
                     notes,
                     routingData?.Status),
                 DateTimeOffset.UtcNow);
@@ -1613,6 +1627,7 @@ public sealed class PaqetFireRuntime(
                 engineCredentials,
                 settings.Psiphon?.EgressRegion ?? string.Empty))
             : null;
+        var openVpn = settings.ExitProxy == ExitProxyKind.OpenVpn ? CreateOpenVpnFiles(settings.OpenVpn ?? new()) : null;
         var xrayText = xrayWriter.Write(new XrayRoutingPolicy(
             settings.RegionalPreset,
             settings.DomainStrategy,
@@ -1637,7 +1652,7 @@ public sealed class PaqetFireRuntime(
                 UseFakeDns: settings.FakeDns),
             engineCredentials,
             blockMalware,
-            psiphonText is null ? null : new ExitProxyOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort)));
+            ExitProxyOutbound.For(settings.ExitProxy)));
         return new EngineConfigurationSet(
             paqetText,
             xrayText,
@@ -1650,6 +1665,49 @@ public sealed class PaqetFireRuntime(
             blockMalware)
         {
             PsiphonText = psiphonText,
+            OpenVpn = openVpn,
+        };
+    }
+
+    /// <summary>
+    /// The OpenVPN configuration and the two credential files it reads: Paqet's loopback
+    /// SOCKS5 login, and the VPN account when the configuration asks for one.
+    /// </summary>
+    private OpenVpnFiles CreateOpenVpnFiles(OpenVpnExitOptions options)
+    {
+        var configuration = OpenVpnConfiguration.Parse(options.Configuration);
+        var text = openVpnWriter.Write(new OpenVpnClientProfile(
+            configuration,
+            XrayJsonConfigurationWriter.PaqetPort,
+            paths.OpenVpnSocksCredentialsPath,
+            configuration.RequiresCredentials ? paths.OpenVpnUserCredentialsPath : null));
+        return new OpenVpnFiles(
+            text,
+            OpenVpnConfigurationWriter.WriteCredentials(engineCredentials.Username, engineCredentials.Password),
+            configuration.RequiresCredentials
+                ? OpenVpnConfigurationWriter.WriteCredentials(options.Username, options.Password)
+                : null);
+    }
+
+    /// <summary>
+    /// The snapshot never carries the imported .ovpn or the VPN password, so a save that
+    /// leaves them empty keeps the stored ones. The password is kept only for the same
+    /// configuration and account: anyone who can reach the broker could otherwise import a
+    /// configuration for their own server and receive the stored password there.
+    /// </summary>
+    private static PaqetFireSettings RetainOpenVpnSecrets(PaqetFireSettings settings, PaqetFireSettings? existing)
+    {
+        var submitted = settings.OpenVpn ?? new();
+        var stored = existing?.OpenVpn ?? new();
+        var sameAccount = string.IsNullOrWhiteSpace(submitted.Configuration) &&
+                          string.Equals(submitted.Username.Trim(), stored.Username, StringComparison.Ordinal);
+        return settings with
+        {
+            OpenVpn = submitted with
+            {
+                Configuration = string.IsNullOrWhiteSpace(submitted.Configuration) ? stored.Configuration : submitted.Configuration,
+                Password = string.IsNullOrEmpty(submitted.Password) && sameAccount ? stored.Password : submitted.Password,
+            },
         };
     }
 
@@ -1670,9 +1728,43 @@ public sealed class PaqetFireRuntime(
                 .ConfigureAwait(false);
         }
 
-        // Xray's configuration above dials the exit only when it is selected.
-        psiphonAdapter?.UseExit(configuration.PsiphonText is not null);
+        if (configuration.OpenVpn is { } openVpn)
+        {
+            await configurationStore.WriteAsync(paths.OpenVpnSocksCredentialsPath, openVpn.SocksCredentials, cancellationToken)
+                .ConfigureAwait(false);
+            if (openVpn.UserCredentials is { } account)
+            {
+                await configurationStore.WriteAsync(paths.OpenVpnUserCredentialsPath, account, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                await configurationStore.DeleteAsync(paths.OpenVpnUserCredentialsPath, cancellationToken).ConfigureAwait(false);
+            }
+
+            await configurationStore.WriteAsync(paths.OpenVpnConfigurationPath, openVpn.ConfigurationText, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            // A route without the OpenVPN exit leaves no VPN account on disk.
+            await configurationStore.DeleteAsync(paths.OpenVpnUserCredentialsPath, cancellationToken).ConfigureAwait(false);
+            await configurationStore.DeleteAsync(paths.OpenVpnSocksCredentialsPath, cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var exit in ExitAdapters)
+        {
+            exit.UseExit(exit.Kind == configuration.ExitEngine);
+        }
     }
+
+    private IEnumerable<ExitEngineProcessAdapter> ExitAdapters =>
+        new ExitEngineProcessAdapter?[] { psiphonAdapter, openVpnAdapter }.OfType<ExitEngineProcessAdapter>();
+
+    private IEnumerable<(DateTimeOffset OccurredAt, string Text)> ExitLogs(int perEngine) =>
+        ExitAdapters.SelectMany(exit => exit.GetRecentLogs()
+            .TakeLast(perEngine)
+            .Select(entry => (entry.OccurredAt, $"{entry.OccurredAt:HH:mm:ss}  INF  {exit.DisplayName} · {entry.Message}")));
 
     private NetworkFingerprint? TryDetectFingerprint(PaqetFireSettings settings)
     {
@@ -1831,8 +1923,15 @@ public sealed class PaqetFireRuntime(
             Username: engineCredentials.Username,
             Password: engineCredentials.Password);
         var brokerExecutablePath = Path.Combine(AppContext.BaseDirectory, "PaqetFire.Broker.exe");
-        // Psiphon's sockets go to Paqet over loopback; capturing any of them would loop.
-        string[] engineExecutables = [paths.XrayExecutablePath, paths.PsiphonExecutablePath, brokerExecutablePath];
+        // The exit engines' sockets go to Paqet over loopback; capturing any of them would
+        // loop. OpenVPN is the user's installation, excluded only while a profile runs it.
+        List<string> engineExecutables = [paths.XrayExecutablePath, paths.PsiphonExecutablePath, brokerExecutablePath];
+        if (settings.ExitProxy == ExitProxyKind.OpenVpn &&
+            openVpnAdapter?.Installation.Installation is { } openVpnInstallation)
+        {
+            engineExecutables.Add(openVpnInstallation.ExecutablePath);
+        }
+
         var lockedExclusions = RoutingPolicyCompiler.CreateLockedExclusions(
             paths.PaqetExecutablePath,
             paths.ProxiFyreExecutablePath,
@@ -1878,20 +1977,20 @@ public sealed class PaqetFireRuntime(
             .Select(entry => (
                 entry.OccurredAt,
                 Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Xray · {entry.Message}"));
-        var psiphonLogs = (psiphonAdapter?.GetRecentLogs() ?? [])
-            .TakeLast(20)
-            .Select(entry => (
-                entry.OccurredAt,
-                Text: $"{entry.OccurredAt:HH:mm:ss}  INF  Psiphon · {entry.Message}"));
         var logs = TakeRecentLogsWithinBudget(paqetLogs
             .Concat(xrayLogs)
-            .Concat(psiphonLogs)
+            .Concat(ExitLogs(20))
             .OrderBy(entry => entry.OccurredAt)
             .Select(entry => entry.Text));
 
-        var exitProxy = status.Exit is { State: EngineState.Running } && psiphonAdapter?.Session is { } session
-            ? new ExitProxyStatus(ExitProxyKind.Psiphon, session.TunnelActive, session.ConnectedRegion, session.AvailableRegions)
-            : null;
+        var exitProxy = status.Exit switch
+        {
+            { State: EngineState.Running, Engine: EngineKind.Psiphon } when psiphonAdapter?.Session is { } session =>
+                new ExitProxyStatus(ExitProxyKind.Psiphon, session.TunnelActive, session.ConnectedRegion, session.AvailableRegions),
+            { State: EngineState.Running, Engine: EngineKind.OpenVpn } when openVpnAdapter is not null =>
+                new ExitProxyStatus(ExitProxyKind.OpenVpn, openVpnAdapter.TunnelActive, null, [], settings?.OpenVpn?.Server),
+            _ => null,
+        };
         return new BrokerSnapshot(
             status.Engines,
             IsRouting: status.State == ConnectionState.Connected,
@@ -1914,6 +2013,7 @@ public sealed class PaqetFireRuntime(
             RoutingData: routingData?.Status)
         {
             ExitProxy = exitProxy,
+            ExitEngines = exitEngines?.GetAvailability() ?? [],
         };
     }
 
@@ -1981,6 +2081,7 @@ public sealed class PaqetFireRuntime(
         LanSocksUsername = settings.LanSocksUsername.Trim(),
         KcpMode = settings.KcpMode.Trim().ToLowerInvariant(),
         Psiphon = new PsiphonExitOptions((settings.Psiphon?.EgressRegion ?? string.Empty).Trim().ToUpperInvariant()),
+        OpenVpn = (settings.OpenVpn ?? new()) with { Username = (settings.OpenVpn?.Username ?? string.Empty).Trim() },
         SelectedApplications = NormalizeList(settings.SelectedApplications),
         UserExclusions = NormalizeList(settings.UserExclusions),
         DirectRouteDestinations = NormalizeList(settings.DirectRouteDestinations),
@@ -2104,7 +2205,16 @@ public sealed class PaqetFireRuntime(
     {
         /// <summary>The exit engine's configuration; null when the profile uses no exit.</summary>
         public string? PsiphonText { get; init; }
+
+        public OpenVpnFiles? OpenVpn { get; init; }
+
+        public EngineKind? ExitEngine => PsiphonText is not null ? EngineKind.Psiphon
+            : OpenVpn is not null ? EngineKind.OpenVpn
+            : null;
     }
+
+    /// <param name="UserCredentials">The VPN account file; null when the server asks for none.</param>
+    private sealed record OpenVpnFiles(string ConfigurationText, string SocksCredentials, string? UserCredentials);
 }
 
 /// <summary>The network details the engines are configured from; any change may need a restart.</summary>
@@ -2137,15 +2247,38 @@ public sealed record RuntimePaths(
     string ProxiFyreConfigurationPath,
     string MachineSettingsPath)
 {
-    public string PsiphonExecutablePath { get; init; } =
-        Path.Combine(PayloadRoot, "engines", "psiphon", "x64", "psiphon-tunnel-core-i686.exe");
+    /// <summary>
+    /// Exit engines the broker downloads on request; they are not part of the installer.
+    /// A broker-only directory beside the machine settings.
+    /// </summary>
+    public string ExitEnginesDirectory { get; init; } =
+        Path.Combine(Path.GetDirectoryName(MachineSettingsPath) ?? PayloadRoot, "engines");
+
+    private readonly string? psiphonExecutablePath;
+
+    public string PsiphonExecutablePath
+    {
+        get => psiphonExecutablePath ?? Path.Combine(ExitEnginesDirectory, ExitEngineOptions.Psiphon.FileName);
+        init => psiphonExecutablePath = value;
+    }
 
     public string PsiphonConfigurationPath { get; init; } =
-        Path.Combine(PayloadRoot, "engines", "psiphon", "x64", "config.json");
+        Path.Combine(PayloadRoot, "engines", "psiphon", "config.json");
 
     /// <summary>Psiphon's server list and data store, beside the machine settings.</summary>
     public string PsiphonDataDirectory { get; init; } =
         Path.Combine(Path.GetDirectoryName(MachineSettingsPath) ?? PayloadRoot, "psiphon");
+
+    public string OpenVpnConfigurationPath { get; init; } =
+        Path.Combine(PayloadRoot, "engines", "openvpn", "client.ovpn");
+
+    /// <summary>Paqet's loopback SOCKS5 credentials, which OpenVPN reads from a file.</summary>
+    public string OpenVpnSocksCredentialsPath { get; init; } =
+        Path.Combine(PayloadRoot, "engines", "openvpn", "socks-auth.txt");
+
+    /// <summary>The VPN account, for configurations that ask for one.</summary>
+    public string OpenVpnUserCredentialsPath { get; init; } =
+        Path.Combine(PayloadRoot, "engines", "openvpn", "credentials.txt");
 }
 
 /// <summary>A request was cancelled, typically by a Disconnect, before it took effect.</summary>

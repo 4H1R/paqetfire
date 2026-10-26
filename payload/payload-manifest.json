@@ -37,18 +37,6 @@
       ]
     },
     {
-      "engine": "Psiphon",
-      "version": "d95d7f9",
-      "entryPoint": "engines/psiphon/x64/psiphon-tunnel-core-i686.exe",
-      "files": [
-        {
-          "path": "engines/psiphon/x64/psiphon-tunnel-core-i686.exe",
-          "size": 27956224,
-          "sha256": "34139a07deca9e9b94e5b55ebdf5e2583ca87f3d838873f105488681d22f4a0e"
-        }
-      ]
-    },
-    {
       "engine": "ProxiFyre",
       "version": "2.6.4",
       "entryPoint": "engines/proxifyre/x64/ProxiFyre.exe",

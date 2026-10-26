@@ -68,20 +68,8 @@ try {
         }
 
         $archiveName = [IO.Path]::GetFileName($assetUri.AbsolutePath)
-        # A bare executable is accepted only for an engine whose single file it is, pinned
-        # to a commit (Psiphon publishes its console client that way, not as a release).
-        $isExecutable = $archiveName.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase)
-        if ($isExecutable) {
-            if (@($engine.files).Count -ne 1 -or
-                [IO.Path]::GetFileName($engine.files[0].path) -ne $archiveName) {
-                throw "Executable asset '$archiveName' must be the only manifest file of $($asset.engine)."
-            }
-            if ($assetUri.AbsolutePath -notmatch '/raw/[0-9a-f]{40}/') {
-                throw "Executable asset URL must be pinned to a full commit: $($asset.url)"
-            }
-        }
-        elseif (-not $archiveName.EndsWith('.zip', [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Only ZIP or commit-pinned executable release assets are supported: $archiveName"
+        if (-not $archiveName.EndsWith('.zip', [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Only ZIP release assets are supported: $archiveName"
         }
 
         $archivePath = Join-Path $downloadsRoot $archiveName
@@ -94,13 +82,7 @@ try {
         }
 
         $engineExtractionRoot = Join-Path $extractionRoot $asset.engine
-        if ($isExecutable) {
-            New-Item -ItemType Directory -Path $engineExtractionRoot -Force | Out-Null
-            Copy-Item -LiteralPath $archivePath -Destination $engineExtractionRoot
-        }
-        else {
-            Expand-Archive -LiteralPath $archivePath -DestinationPath $engineExtractionRoot
-        }
+        Expand-Archive -LiteralPath $archivePath -DestinationPath $engineExtractionRoot
 
         foreach ($file in $engine.files) {
             $relativePath = $file.path -replace '^engines[/\\]', ''

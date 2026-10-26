@@ -32,19 +32,6 @@ internal static class BundledEngineOptions
         ReadinessTimeout = TimeSpan.FromSeconds(15),
     };
 
-    // The console client published in Psiphon-Labs/psiphon-tunnel-core-binaries at
-    // commit d95d7f964c043a5a0ebd25cca801bc2753e14f74; only a 32-bit Windows build exists.
-    public static PsiphonProcessOptions CreatePsiphon(RuntimePaths paths) => new()
-    {
-        ExecutablePath = paths.PsiphonExecutablePath,
-        ConfigurationPath = paths.PsiphonConfigurationPath,
-        DataDirectory = paths.PsiphonDataDirectory,
-        Version = "d95d7f9",
-        ExpectedExecutableSha256 = "34139a07deca9e9b94e5b55ebdf5e2583ca87f3d838873f105488681d22f4a0e",
-        SocksEndpoint = new IPEndPoint(IPAddress.Loopback, PsiphonJsonConfigurationWriter.LocalSocksPort),
-        ReadinessTimeout = TimeSpan.FromSeconds(60),
-    };
-
     public static ProxiFyreProcessOptions CreateProxiFyre(RuntimePaths paths) => new()
     {
         ExecutablePath = paths.ProxiFyreExecutablePath,

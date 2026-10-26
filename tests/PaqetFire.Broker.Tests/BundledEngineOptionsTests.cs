@@ -12,7 +12,6 @@ public sealed class BundledEngineOptionsTests
     [InlineData(EngineKind.Paqet)]
     [InlineData(EngineKind.Xray)]
     [InlineData(EngineKind.ProxiFyre)]
-    [InlineData(EngineKind.Psiphon)]
     public void ProductionStartupPinsMatchReleaseManifest(EngineKind kind)
     {
         var manifest = ProductPayloadManifest.Load(Path.Combine(AppContext.BaseDirectory, "release-payload-manifest.json"));
@@ -25,7 +24,6 @@ public sealed class BundledEngineOptionsTests
             EngineKind.Paqet => Pin(BundledEngineOptions.CreatePaqet(paths)),
             EngineKind.Xray => Pin(BundledEngineOptions.CreateXray(paths)),
             EngineKind.ProxiFyre => Pin(BundledEngineOptions.CreateProxiFyre(paths)),
-            EngineKind.Psiphon => Pin(BundledEngineOptions.CreatePsiphon(paths)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         Assert.Equal(engine.Version, version);
@@ -35,5 +33,25 @@ public sealed class BundledEngineOptionsTests
     private static (string?, string?) Pin(PaqetProcessOptions options) => (options.Version, options.ExpectedExecutableSha256);
     private static (string?, string?) Pin(XrayProcessOptions options) => (options.Version, options.ExpectedExecutableSha256);
     private static (string?, string?) Pin(ProxiFyreProcessOptions options) => (options.Version, options.ExpectedExecutableSha256);
-    private static (string?, string?) Pin(PsiphonProcessOptions options) => (options.Version, options.ExpectedExecutableSha256);
+
+    [Fact]
+    public void ExitEnginesAreNotPartOfTheReleasePayload()
+    {
+        var manifest = ProductPayloadManifest.Load(Path.Combine(AppContext.BaseDirectory, "release-payload-manifest.json"));
+        Assert.DoesNotContain(manifest.Engines, engine => engine.Engine.IsExit());
+    }
+
+    [Fact]
+    public void PsiphonStartupPinsTheDownloadedRelease()
+    {
+        var paths = new RuntimePaths("payload", "paqet.exe", "paqet.yaml", "xray.exe", "xray.json",
+            "geoip.dat", "geosite.dat", "ProxiFyre.exe", "app-config.json", Path.Combine(Path.GetTempPath(), "settings.json"));
+        var options = ExitEngineOptions.CreatePsiphon(paths);
+        Assert.Equal(ExitEngineOptions.Psiphon.Version, options.Version);
+        Assert.Equal(ExitEngineOptions.Psiphon.Sha256, options.ExpectedExecutableSha256);
+        Assert.Equal(paths.PsiphonExecutablePath, options.ExecutablePath);
+        Assert.StartsWith(paths.ExitEnginesDirectory, options.ExecutablePath, StringComparison.OrdinalIgnoreCase);
+        // A URL pinned to a full commit always serves the same bytes.
+        Assert.Matches("/raw/[0-9a-f]{40}/", ExitEngineOptions.Psiphon.Uri.AbsolutePath);
+    }
 }

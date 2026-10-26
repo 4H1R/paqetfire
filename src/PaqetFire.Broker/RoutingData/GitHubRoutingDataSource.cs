@@ -21,7 +21,10 @@ public interface IRoutingDataSource
     /// <summary>The tag of the newest published release.</summary>
     Task<string> GetLatestTagAsync(RoutingDataNetworkPath path, CancellationToken cancellationToken);
 
-    /// <summary>Copies a release asset into <paramref name="destination"/>, failing past <paramref name="maximumBytes"/>.</summary>
+    /// <summary>
+    /// Copies a GitHub asset into <paramref name="destination"/>, failing past <paramref name="maximumBytes"/>.
+    /// Also used for the exit engines the broker downloads on request.
+    /// </summary>
     Task DownloadAsync(
         RoutingDataNetworkPath path,
         Uri uri,
@@ -102,7 +105,7 @@ public sealed class GitHubRoutingDataSource : IRoutingDataSource, IDisposable
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException("The routing data download from GitHub timed out.");
+            throw new TimeoutException("The download from GitHub timed out.");
         }
     }
 
@@ -124,7 +127,7 @@ public sealed class GitHubRoutingDataSource : IRoutingDataSource, IDisposable
     {
         if (response.Content.Headers.ContentLength > maximumBytes)
         {
-            throw new InvalidDataException("The routing data file is larger than PaqetFire accepts.");
+            throw new InvalidDataException("The downloaded file is larger than PaqetFire accepts.");
         }
 
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -143,7 +146,7 @@ public sealed class GitHubRoutingDataSource : IRoutingDataSource, IDisposable
             total += read;
             if (total > maximumBytes)
             {
-                throw new InvalidDataException("The routing data file is larger than PaqetFire accepts.");
+                throw new InvalidDataException("The downloaded file is larger than PaqetFire accepts.");
             }
 
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);

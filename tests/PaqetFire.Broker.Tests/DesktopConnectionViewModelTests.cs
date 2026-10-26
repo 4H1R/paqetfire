@@ -656,6 +656,16 @@ public sealed class DesktopConnectionViewModelTests
             return new(OnManageRoutingData?.Invoke(action) ?? Snapshot);
         }
 
+        public List<ExitEngineAction> ExitEngineRequests { get; } = [];
+
+        public Func<ExitEngineAction, BrokerSnapshot>? OnManageExitEngine { get; set; }
+
+        public ValueTask<BrokerSnapshot> ManageExitEngineAsync(ExitEngineAction action, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            ExitEngineRequests.Add(action);
+            return new(OnManageExitEngine?.Invoke(action) ?? Snapshot);
+        }
+
         public ValueTask<LiveConnectionStats> GetLiveStatsAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref liveStatsCalls);
