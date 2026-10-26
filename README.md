@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/paqetfire-overview.jpg" width="1100" alt="PaqetFire overview showing an active private route">
+  <img src="docs/images/paqetfire-overview.png" width="1100" alt="PaqetFire overview showing an active private route">
 </p>
 
 > [!IMPORTANT]
