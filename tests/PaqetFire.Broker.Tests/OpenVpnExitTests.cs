@@ -121,6 +121,15 @@ public sealed class OpenVpnExitTests
     }
 
     [Fact]
+    public void DnsServersOnTheExitAdapterAreRefused()
+    {
+        // Windows lists the site-local fec0:0:0:ffff::1 placeholders on adapters without DNS.
+        Assert.Null(OpenVpnProcessAdapter.CheckAdapterDns([System.Net.IPAddress.Parse("fec0:0:0:ffff::1")]));
+        Assert.Null(OpenVpnProcessAdapter.CheckAdapterDns([]));
+        Assert.NotNull(OpenVpnProcessAdapter.CheckAdapterDns([System.Net.IPAddress.Parse("10.98.0.1")]));
+    }
+
+    [Fact]
     public async Task OnlyAWholeLogLineReportsTheTunnel()
     {
         await using var adapter = new OpenVpnProcessAdapter(Options(new OpenVpnLookup(null, "missing")));

@@ -254,8 +254,13 @@ public sealed class OpenVpnExitTests
         Assert.Equal("freedom", exit.GetProperty("protocol").GetString());
         Assert.Equal("ForceIPv4", exit.GetProperty("settings").GetProperty("domainStrategy").GetString());
         Assert.Equal("PaqetFire Exit", exit.GetProperty("streamSettings").GetProperty("sockopt").GetProperty("interface").GetString());
-        var last = document.RootElement.GetProperty("routing").GetProperty("rules").EnumerateArray().Last();
+        var rules = document.RootElement.GetProperty("routing").GetProperty("rules").EnumerateArray().ToArray();
+        var last = rules[^1];
         Assert.Equal(("tcp,udp", "exit"), (last.GetProperty("network").GetString(), last.GetProperty("outboundTag").GetString()));
+        // Xray stays the only resolver; its encrypted queries leave through the exit as well.
+        var remoteDns = Assert.Single(rules, rule =>
+            rule.TryGetProperty("inboundTag", out var tags) && tags.EnumerateArray().Any(tag => tag.GetString() == "dns-remote"));
+        Assert.Equal("exit", remoteDns.GetProperty("outboundTag").GetString());
     }
 
     [Fact]

@@ -137,6 +137,19 @@ public sealed partial class OpenVpnProcessAdapter : ExitEngineProcessAdapter
             : null;
     }
 
+    /// <summary>
+    /// Creates the exit adapter if it is missing. Called before Paqet starts: adding a network
+    /// adapter rebinds packet filter drivers, which must not happen under a running capture.
+    /// Does nothing while OpenVPN is not installed; the start then explains why.
+    /// </summary>
+    public async Task PrepareAdapterAsync(CancellationToken cancellationToken)
+    {
+        if (Installation.Installation is { } installation)
+        {
+            await EnsureAdapterAsync(installation, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     protected override string? FindUnavailableReason() =>
         Installation.Installation is null ? Installation.Problem ?? "OpenVPN is not installed." : null;
 
@@ -156,6 +169,7 @@ public sealed partial class OpenVpnProcessAdapter : ExitEngineProcessAdapter
         }
 
         await EnsureAdapterAsync(installation, cancellationToken).ConfigureAwait(false);
+        await RemoveStaleRoutesAsync(cancellationToken).ConfigureAwait(false);
         stopEventName = $"PaqetFire.OpenVpn.{Guid.NewGuid():N}";
         stopEvent = new EventWaitHandle(false, EventResetMode.ManualReset, stopEventName);
         launching = installation;
@@ -208,14 +222,26 @@ public sealed partial class OpenVpnProcessAdapter : ExitEngineProcessAdapter
 
     protected override void ReleaseProcessResources() => Interlocked.Exchange(ref stopEvent, null)?.Dispose();
 
+    /// <summary>
+    /// Pushed DNS options are filtered, so DNS servers on the exit adapter mean a filter did not
+    /// hold; Windows would then send other applications' lookups into the tunnel. The site-local
+    /// fec0:0:0:ffff::1-3 entries are placeholders Windows lists on adapters without DNS.
+    /// </summary>
+    internal static string? CheckAdapterDns(IEnumerable<IPAddress> dnsServers) =>
+        dnsServers.Any(server => !server.IsIPv6SiteLocal)
+            ? "The VPN server set DNS servers on the exit adapter, which would affect the rest of the computer."
+            : null;
+
     private string? CheckAssignedAddress()
     {
         var deadline = Stopwatch.GetTimestamp() + (long)(options.AddressWait.TotalSeconds * Stopwatch.Frequency);
         while (true)
         {
-            var networks = NetworkInterface.GetAllNetworkInterfaces()
+            var adapters = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up &&
                                   adapter.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .ToArray();
+            var networks = adapters
                 .SelectMany(adapter => adapter.GetIPProperties().UnicastAddresses
                     .Where(unicast => unicast.Address.AddressFamily == AddressFamily.InterNetwork)
                     .Select(unicast => (adapter.Name, unicast.Address, unicast.PrefixLength)))
@@ -225,9 +251,10 @@ public sealed partial class OpenVpnProcessAdapter : ExitEngineProcessAdapter
             if (exit.Address is not null)
             {
                 return CheckAdapterAddress(
-                    exit.Address,
-                    exit.PrefixLength,
-                    networks.Where(network => network.Name != exit.Name).Select(network => (network.Address, network.PrefixLength)));
+                           exit.Address,
+                           exit.PrefixLength,
+                           networks.Where(network => network.Name != exit.Name).Select(network => (network.Address, network.PrefixLength))) ??
+                       CheckAdapterDns(adapters.First(adapter => adapter.Name == exit.Name).GetIPProperties().DnsAddresses);
             }
 
             if (Stopwatch.GetTimestamp() > deadline)
@@ -267,6 +294,57 @@ public sealed partial class OpenVpnProcessAdapter : ExitEngineProcessAdapter
         {
             tunnelActive = active;
             UpdateRunningDetail();
+        }
+    }
+
+    /// <summary>
+    /// Deletes a default route a crashed OpenVPN left on the exit adapter, which would make the
+    /// next start fail to add its own. Scoped to this adapter: other routes are never touched.
+    /// </summary>
+    private async Task RemoveStaleRoutesAsync(CancellationToken cancellationToken)
+    {
+        var index = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(adapter => string.Equals(adapter.Name, options.AdapterName, StringComparison.OrdinalIgnoreCase))
+            .Select(adapter => adapter.GetIPProperties().GetIPv4Properties()?.Index)
+            .FirstOrDefault();
+        if (index is not { } interfaceIndex)
+        {
+            return;
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Path.Combine(Environment.SystemDirectory, "netsh.exe"),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in new[]
+                 {
+                     "interface", "ipv4", "delete", "route", "prefix=0.0.0.0/0",
+                     $"interface={interfaceIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)}", "store=active",
+                 })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var netsh = Process.Start(startInfo);
+        if (netsh is null)
+        {
+            return;
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(AdapterToolTimeout);
+        try
+        {
+            // "Element not found" when there is no stale route is the usual outcome.
+            await netsh.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            netsh.Kill(entireProcessTree: true);
         }
     }
 
