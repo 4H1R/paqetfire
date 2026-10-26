@@ -10,6 +10,7 @@ namespace PaqetFire.Broker.Engines;
 public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
 {
     private static readonly TimeSpan ForceKillTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan StoppingTimeout = TimeSpan.FromSeconds(2);
     internal const string AssetLocationVariable = "XRAY_LOCATION_ASSET";
     private readonly XrayProcessOptions options;
     private readonly RoutingDataFileVerifier routingDataVerifier;
@@ -35,6 +36,12 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
 
     /// <summary>Raised when the running process exits without being stopped, so recovery need not wait for a poll.</summary>
     public event EventHandler? UnexpectedExit;
+
+    /// <summary>
+    /// Runs while a running process is about to be stopped, before it is terminated, so its
+    /// in-memory traffic counters can still be read. Failures and timeouts are ignored.
+    /// </summary>
+    public Func<CancellationToken, ValueTask>? Stopping { get; set; }
 
     /// <summary>The GeoIP/GeoSite set the next start loads; a running process keeps the one it started with.</summary>
     public RoutingDataSet RoutingData
@@ -200,6 +207,7 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
         await lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            await NotifyStoppingAsync().ConfigureAwait(false);
             Process? owned;
             lock (stateLock)
             {
@@ -239,6 +247,31 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
         finally
         {
             lifecycleGate.Release();
+        }
+    }
+
+    private async ValueTask NotifyStoppingAsync()
+    {
+        bool running;
+        lock (stateLock)
+        {
+            RefreshState();
+            running = process is not null && state == EngineState.Running;
+        }
+
+        if (!running || Stopping is not { } stopping)
+        {
+            return;
+        }
+
+        try
+        {
+            using var timeout = new CancellationTokenSource(StoppingTimeout);
+            await stopping(timeout.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // Stopping must never depend on an observer.
         }
     }
 

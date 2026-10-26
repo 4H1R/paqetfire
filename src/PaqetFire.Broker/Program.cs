@@ -126,8 +126,25 @@ builder.Services.AddSingleton(services =>
         BundledEngineOptions.CreateXray(paths),
         services.GetRequiredService<RoutingDataFileVerifier>());
     adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
+    // Xray's counters die with its process; record them before every stop.
+    adapter.Stopping = cancellationToken => services.GetRequiredService<DataUsageRecorder>().CheckpointAsync(cancellationToken);
     return adapter;
 });
+builder.Services.AddSingleton(services => new DataUsageRecorder(
+    services.GetRequiredService<IXrayTrafficStats>(),
+    async cancellationToken =>
+    {
+        // Resolved per sample: the runtime itself depends on the Xray adapter.
+        var status = await services.GetRequiredService<XrayProcessAdapter>().GetStatusAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return status is { State: EngineState.Running, ChangedAt: { } startedAt } &&
+               services.GetRequiredService<IPaqetFireRuntime>().ActiveProfileId is { } profileId
+            ? new TrafficSession(startedAt, profileId)
+            : null;
+    },
+    new DataUsageStore(Path.Combine(dataDirectory, "data-usage.json"), services.GetRequiredService<ProtectedDirectory>()),
+    services.GetRequiredService<ILogger<DataUsageRecorder>>()));
+builder.Services.AddSingleton<IDataUsageService>(services => services.GetRequiredService<DataUsageRecorder>());
 builder.Services.AddSingleton(services =>
 {
     var firewall = services.GetRequiredService<EngineFirewallRules>();

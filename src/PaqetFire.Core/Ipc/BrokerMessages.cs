@@ -5,6 +5,7 @@ using PaqetFire.Core.Deployment;
 using PaqetFire.Core.Diagnostics;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.RoutingData;
+using PaqetFire.Core.Usage;
 
 namespace PaqetFire.Core.Ipc;
 
@@ -21,6 +22,8 @@ public enum BrokerCommand
     GetDiagnostics,
     ManageRoutingData,
     ManageExitEngine,
+    GetDataUsage,
+    ResetDataUsage,
 }
 
 public enum BrokerMessageType
@@ -55,7 +58,8 @@ public sealed record BrokerRequest(
     bool ConnectAfterSave = false,
     ProfileAction? ProfileAction = null,
     RoutingDataAction? RoutingDataAction = null,
-    ExitEngineAction? ExitEngineAction = null);
+    ExitEngineAction? ExitEngineAction = null,
+    DataUsageReset? DataUsageReset = null);
 
 public sealed record BrokerResponse(
     Guid RequestId,
@@ -65,7 +69,8 @@ public sealed record BrokerResponse(
     BrokerError? Error = null,
     string? ExportedProfiles = null,
     LiveConnectionStats? LiveStats = null,
-    string? Diagnostics = null)
+    string? Diagnostics = null,
+    DataUsageReport? DataUsage = null)
 {
     public static BrokerResponse Succeeded(Guid requestId, BrokerSnapshot? snapshot = null) =>
         new(requestId, IpcProtocol.Version, true, snapshot);

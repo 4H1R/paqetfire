@@ -348,6 +348,8 @@ public sealed class RuntimeReviewRegressionTests
             return ValueTask.CompletedTask;
         }
 
+        public Guid? ActiveProfileId => null;
+
         public DateTimeOffset? NextSupervisionDue => null;
         public ValueTask<bool> SuperviseAsync(CancellationToken cancellationToken) => ValueTask.FromResult(true);
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

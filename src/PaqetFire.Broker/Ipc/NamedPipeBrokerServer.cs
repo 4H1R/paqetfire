@@ -319,6 +319,14 @@ public sealed class NamedPipeBrokerServer(
                 "A valid routing data action is required for, and only for, a routing data request.");
         }
 
+        if ((request.Command == BrokerCommand.ResetDataUsage) != request.DataUsageReset is not null)
+        {
+            return BrokerResponse.Failed(
+                request.RequestId,
+                BrokerErrorCode.InvalidRequest,
+                "A reset scope is required for, and only for, a data usage reset request.");
+        }
+
         return null;
     }
 

@@ -2,6 +2,7 @@ using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.RoutingData;
+using PaqetFire.Core.Usage;
 
 namespace PaqetFire.Desktop.Ipc;
 
@@ -57,4 +58,11 @@ public interface IBrokerClient
     ValueTask<LiveConnectionStats> GetLiveStatsAsync(TimeSpan timeout, CancellationToken cancellationToken);
 
     ValueTask<string> GetDiagnosticsAsync(TimeSpan timeout, CancellationToken cancellationToken);
+
+    ValueTask<DataUsageReport> GetDataUsageAsync(TimeSpan timeout, CancellationToken cancellationToken);
+
+    ValueTask<DataUsageReport> ResetDataUsageAsync(
+        DataUsageReset reset,
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
 }

@@ -78,6 +78,8 @@ public sealed class PaqetFireRuntime(
     private volatile string? backgroundNotice;
     private long nextSupervisionTicks;
 
+    public Guid? ActiveProfileId => Volatile.Read(ref profileCatalog)?.ActiveProfileId;
+
     public DateTimeOffset? NextSupervisionDue => Interlocked.Read(ref nextSupervisionTicks) is var ticks and > 0
         ? new DateTimeOffset(ticks, TimeSpan.Zero)
         : null;

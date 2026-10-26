@@ -7,6 +7,7 @@ using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.RoutingData;
+using PaqetFire.Core.Usage;
 
 namespace PaqetFire.Desktop.Ipc;
 
@@ -215,6 +216,35 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
             throw new InvalidDataException("The broker diagnostics response was empty.");
     }
 
+    public async ValueTask<DataUsageReport> GetDataUsageAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var response = await SendResponseAsync(
+                BrokerCommand.GetDataUsage,
+                timeout,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return response.DataUsage ??
+            throw new InvalidDataException("The broker data usage response was empty.");
+    }
+
+    public async ValueTask<DataUsageReport> ResetDataUsageAsync(
+        DataUsageReset reset,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reset);
+        var response = await SendResponseAsync(
+                BrokerCommand.ResetDataUsage,
+                timeout,
+                cancellationToken,
+                dataUsageReset: reset)
+            .ConfigureAwait(false);
+        return response.DataUsage ??
+            throw new InvalidDataException("The broker data usage response was empty.");
+    }
+
     private async ValueTask<BrokerSnapshot> SendAsync(
         BrokerCommand command,
         TimeSpan timeout,
@@ -247,7 +277,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
         bool connectAfterSave = false,
         ProfileAction? profileAction = null,
         RoutingDataAction? routingDataAction = null,
-        ExitEngineAction? exitEngineAction = null)
+        ExitEngineAction? exitEngineAction = null,
+        DataUsageReset? dataUsageReset = null)
     {
         ValidateTimeout(timeout);
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -266,7 +297,8 @@ public sealed class NamedPipeBrokerClient : IBrokerClient, IAsyncDisposable
             connectAfterSave,
             profileAction,
             routingDataAction,
-            exitEngineAction);
+            exitEngineAction,
+            dataUsageReset);
         var completion = new TaskCompletionSource<BrokerResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         if (!pendingRequests.TryAdd(request.RequestId, completion))
