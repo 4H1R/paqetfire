@@ -263,7 +263,7 @@ public sealed class RuntimeReviewRegressionTests
     private static Process StartStandIn(string path)
     {
         File.Copy(Path.Combine(Environment.SystemDirectory, "ping.exe"), path, overwrite: true);
-        return Process.Start(new ProcessStartInfo(path, "-t 127.0.0.1") { CreateNoWindow = true })!;
+        return StandInProcess.Start(path);
     }
 
     private static void Stop(Process process)
