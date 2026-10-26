@@ -31,7 +31,7 @@ public static class ConnectionRecoveryPolicy
         var xray = Find(engines, EngineKind.Xray);
         var proxiFyre = Find(engines, EngineKind.ProxiFyre);
         // The exit engine is listed only while the profile uses it.
-        var exit = Find(engines, EngineKind.Psiphon);
+        var exit = FindExit(engines);
         var allHealthy = paqet?.State == EngineState.Running &&
                          xray?.State == EngineState.Running &&
                          proxiFyre?.State == EngineState.Running &&
@@ -66,7 +66,7 @@ public static class ConnectionRecoveryPolicy
     public static bool IsTransportOnlyFault(IReadOnlyList<EngineStatus> engines)
     {
         var paqet = Find(engines, EngineKind.Paqet)?.State;
-        var exit = Find(engines, EngineKind.Psiphon)?.State;
+        var exit = FindExit(engines)?.State;
         var exitSettled = exit is null or EngineState.Running or EngineState.Faulted or EngineState.Stopped;
         var transportDown = paqet is EngineState.Faulted or EngineState.Stopped
             ? exitSettled
@@ -78,4 +78,7 @@ public static class ConnectionRecoveryPolicy
 
     private static EngineStatus? Find(IReadOnlyList<EngineStatus> engines, EngineKind kind) =>
         engines.FirstOrDefault(engine => engine.Engine == kind);
+
+    private static EngineStatus? FindExit(IReadOnlyList<EngineStatus> engines) =>
+        engines.FirstOrDefault(engine => engine.Engine.IsExit());
 }

@@ -219,6 +219,7 @@ public sealed class BrokerWorker(
                previous.DirectBitTorrent == current.DirectBitTorrent &&
                previous.ExitProxy == current.ExitProxy &&
                previous.Psiphon == current.Psiphon &&
+               previous.OpenVpn == current.OpenVpn &&
                previous.KillSwitchEnabled == current.KillSwitchEnabled &&
                previous.ShareWithLan == current.ShareWithLan &&
                previous.LanSocksPort == current.LanSocksPort &&

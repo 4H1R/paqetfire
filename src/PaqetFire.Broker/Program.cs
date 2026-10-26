@@ -10,6 +10,7 @@ using PaqetFire.Broker.RoutingData;
 using PaqetFire.Broker.Runtime;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
+using PaqetFire.Core.Engines;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Profiles;
 
@@ -99,7 +100,11 @@ builder.Services.AddSingleton<IMachineProfileCatalogStore>(services =>
 builder.Services.AddSingleton<IAtomicConfigurationStore>(_ =>
     new AtomicConfigurationStore(
         paths.PayloadRoot,
-        [paths.PaqetConfigurationPath, paths.XrayConfigurationPath, paths.ProxiFyreConfigurationPath, paths.PsiphonConfigurationPath]));
+        [
+            paths.PaqetConfigurationPath, paths.XrayConfigurationPath, paths.ProxiFyreConfigurationPath,
+            paths.PsiphonConfigurationPath, paths.OpenVpnConfigurationPath, paths.OpenVpnSocksCredentialsPath,
+            paths.OpenVpnUserCredentialsPath,
+        ]));
 builder.Services.AddSingleton<BrokerSignal>();
 builder.Services.AddSingleton(services =>
 {
@@ -136,7 +141,13 @@ builder.Services.AddSingleton(services =>
 });
 builder.Services.AddSingleton(services =>
 {
-    var adapter = new PsiphonProcessAdapter(BundledEngineOptions.CreatePsiphon(paths));
+    var adapter = new PsiphonProcessAdapter(ExitEngineOptions.CreatePsiphon(paths));
+    adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
+    return adapter;
+});
+builder.Services.AddSingleton(services =>
+{
+    var adapter = new OpenVpnProcessAdapter(ExitEngineOptions.CreateOpenVpn(paths));
     adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
     return adapter;
 });
@@ -144,14 +155,13 @@ builder.Services.AddSingleton<IConnectionController>(services => new ConnectionC
     services.GetRequiredService<PaqetProcessAdapter>(),
     services.GetRequiredService<XrayProcessAdapter>(),
     services.GetRequiredService<ProxiFyreProcessAdapter>(),
-    services.GetRequiredService<PsiphonProcessAdapter>()));
+    services.GetRequiredService<PsiphonProcessAdapter>(),
+    services.GetRequiredService<OpenVpnProcessAdapter>()));
 builder.Services.AddSingleton<IRoutingDataSource, GitHubRoutingDataSource>();
 builder.Services.AddSingleton<IRoutingDataValidator, XrayRoutingDataValidator>();
 builder.Services.AddSingleton(services =>
 {
     _ = services.GetRequiredService<ProtectedDirectory>();
-    var controller = services.GetRequiredService<IConnectionController>();
-    var progress = services.GetRequiredService<ConnectionProgressTracker>();
     var xray = services.GetRequiredService<XrayProcessAdapter>();
     return new RoutingDataService(
         new RoutingDataServiceOptions { BundledXrayVersion = BundledEngineOptions.XrayVersion },
@@ -160,18 +170,25 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<IRoutingDataValidator>(),
         services.GetRequiredService<RoutingDataFileVerifier>(),
         services.GetRequiredService<ILogger<RoutingDataService>>(),
-        async cancellationToken =>
-        {
-            var status = await controller.GetStatusAsync(cancellationToken).ConfigureAwait(false);
-            // The tunnel probe after a connect is not a transition; the route is already up.
-            var transitioning = progress.Current is { Stage: not ConnectionStage.ProbingTunnel };
-            return new RoutingDataRouteState(
-                status.State == ConnectionState.Connected,
-                transitioning,
-                IsGuarded: status.State == ConnectionState.Guarded);
-        },
+        RouteState(services),
         services.GetRequiredService<BrokerSignal>(),
         inUse: () => [xray.RoutingData.AssetDirectory]);
+});
+builder.Services.AddSingleton(services =>
+{
+    _ = services.GetRequiredService<ProtectedDirectory>();
+    var psiphon = services.GetRequiredService<PsiphonProcessAdapter>();
+    var openVpn = services.GetRequiredService<OpenVpnProcessAdapter>();
+    return new ExitEngineInstaller(
+        ExitEngineOptions.Psiphon,
+        new ProtectedDirectory(paths.ExitEnginesDirectory, ProtectedDirectoryPolicy.BrokerPrivate),
+        services.GetRequiredService<IRoutingDataSource>(),
+        RouteState(services),
+        () => openVpn.Installation,
+        () => psiphon.GetStatusAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult().State is not
+            (EngineState.Stopped or EngineState.NotInstalled or EngineState.Faulted),
+        services.GetRequiredService<ILoggerFactory>().CreateLogger<ExitEngineInstaller>(),
+        services.GetRequiredService<BrokerSignal>());
 });
 builder.Services.AddSingleton<TunnelHealthTracker>();
 builder.Services.AddSingleton<IPaqetFireRuntime, PaqetFireRuntime>();
@@ -182,3 +199,21 @@ builder.Services.AddSingleton<NamedPipeBrokerServer>();
 builder.Services.AddHostedService<BrokerWorker>();
 
 await builder.Build().RunAsync();
+
+// Whether the route is up, changing, or held by the kill switch: downloads go through Paqet
+// only while it is up, and never directly while the kill switch holds traffic.
+static Func<CancellationToken, ValueTask<RoutingDataRouteState>> RouteState(IServiceProvider services)
+{
+    var controller = services.GetRequiredService<IConnectionController>();
+    var progress = services.GetRequiredService<ConnectionProgressTracker>();
+    return async cancellationToken =>
+    {
+        var status = await controller.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        // The tunnel probe after a connect is not a transition; the route is already up.
+        var transitioning = progress.Current is { Stage: not ConnectionStage.ProbingTunnel };
+        return new RoutingDataRouteState(
+            status.State == ConnectionState.Connected,
+            transitioning,
+            IsGuarded: status.State == ConnectionState.Guarded);
+    };
+}

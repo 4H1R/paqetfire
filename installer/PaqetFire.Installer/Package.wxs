@@ -12,7 +12,7 @@
       InstallerVersion="500"
       Compressed="yes">
 
-    <SummaryInformation Description="Installs PaqetFire, its privileged broker, Paqet, Xray, Psiphon, and ProxiFyre." />
+    <SummaryInformation Description="Installs PaqetFire, its privileged broker, Paqet, Xray, and ProxiFyre." />
     <MajorUpgrade
         DowngradeErrorMessage="A newer PaqetFire version is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
@@ -30,9 +30,6 @@
     <util:RestartResource
         Id="PaqetEngineRestartResource"
         Path="[BrokerFolder]payload\engines\paqet\x64\paqet_windows_amd64.exe" />
-    <util:RestartResource
-        Id="PsiphonEngineRestartResource"
-        Path="[BrokerFolder]payload\engines\psiphon\x64\psiphon-tunnel-core-i686.exe" />
     <util:RestartResource
         Id="XrayEngineRestartResource"
         Path="[#PaqetFireXrayExe]" />

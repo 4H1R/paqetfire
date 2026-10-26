@@ -201,7 +201,8 @@ public sealed class NamedPipeBrokerServer(
     {
         try
         {
-            var response = await DispatchSafelyAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await DispatchSafelyAsync(request, CreateRequester(connection.Pipe), cancellationToken)
+                .ConfigureAwait(false);
             await connection.WriteAsync(BrokerServerMessage.FromResponse(response), cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -225,13 +226,27 @@ public sealed class NamedPipeBrokerServer(
         }
     }
 
+    private static BrokerRequester CreateRequester(NamedPipeServerStream pipe) => new(path =>
+    {
+        FileStream? stream = null;
+        pipe.RunAsClient(() => stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            128 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan));
+        return stream!;
+    });
+
     private async ValueTask<BrokerResponse> DispatchSafelyAsync(
         BrokerRequest request,
+        BrokerRequester requester,
         CancellationToken cancellationToken)
     {
         try
         {
-            var response = await requestHandler.HandleAsync(request, cancellationToken)
+            var response = await requestHandler.HandleAsync(request, requester, cancellationToken)
                 .ConfigureAwait(false);
 
             if (response.RequestId != request.RequestId ||

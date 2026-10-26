@@ -39,7 +39,17 @@ public static class ProfileCatalogJson
             ProfileSettingsData.FromSettings(profile.Settings),
             new ProtectedSecrets(
                 ProtectOptional(protector, TransportKeyPurpose(profile.Id), profile.Settings.TransportKey),
-                ProtectOptional(protector, LanPasswordPurpose(profile.Id), profile.Settings.LanSocksPassword))))
+                ProtectOptional(protector, LanPasswordPurpose(profile.Id), profile.Settings.LanSocksPassword))
+            {
+                ProtectedOpenVpnConfiguration = ProtectOptional(
+                    protector,
+                    OpenVpnConfigurationPurpose(profile.Id),
+                    profile.Settings.OpenVpn?.Configuration),
+                ProtectedOpenVpnPassword = ProtectOptional(
+                    protector,
+                    OpenVpnPasswordPurpose(profile.Id),
+                    profile.Settings.OpenVpn?.Password),
+            }))
             .ToArray();
         return Serialize(
             new ProtectedCatalogDocument(
@@ -72,6 +82,20 @@ public static class ProfileCatalogJson
                         protector,
                         LanPasswordPurpose(profile.Id),
                         profile.Secrets.ProtectedLanSocksPassword),
+                };
+                settings = settings with
+                {
+                    OpenVpn = settings.OpenVpn with
+                    {
+                        Configuration = UnprotectOptional(
+                            protector,
+                            OpenVpnConfigurationPurpose(profile.Id),
+                            profile.Secrets.ProtectedOpenVpnConfiguration),
+                        Password = UnprotectOptional(
+                            protector,
+                            OpenVpnPasswordPurpose(profile.Id),
+                            profile.Secrets.ProtectedOpenVpnPassword),
+                    },
                 };
                 return new ConnectionProfile(profile.Id, settings);
             });
@@ -234,6 +258,10 @@ public static class ProfileCatalogJson
 
     private static string LanPasswordPurpose(Guid id) => $"PaqetFire.Profile.{id:N}.LanSocksPassword.v1";
 
+    private static string OpenVpnConfigurationPurpose(Guid id) => $"PaqetFire.Profile.{id:N}.OpenVpnConfiguration.v1";
+
+    private static string OpenVpnPasswordPurpose(Guid id) => $"PaqetFire.Profile.{id:N}.OpenVpnPassword.v1";
+
     private sealed record ProtectedCatalogDocument(
         int SchemaVersion,
         string Kind,
@@ -260,7 +288,15 @@ public static class ProfileCatalogJson
 
     private sealed record ProtectedSecrets(
         string? ProtectedTransportKey,
-        string? ProtectedLanSocksPassword);
+        string? ProtectedLanSocksPassword)
+    {
+        // An imported .ovpn may embed a private key, so it is protected like the password.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ProtectedOpenVpnConfiguration { get; init; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ProtectedOpenVpnPassword { get; init; }
+    }
 
     private sealed record ProfileSettingsData
     {
@@ -312,6 +348,10 @@ public static class ProfileCatalogJson
 
         public PsiphonExitOptions? Psiphon { get; init; } = new();
 
+        // The configuration and password are kept with the protected secrets.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? OpenVpnUsername { get; init; }
+
         public bool KillSwitchEnabled { get; init; }
 
         public bool ShareWithLan { get; init; }
@@ -356,6 +396,7 @@ public static class ProfileCatalogJson
             DirectBitTorrent = settings.DirectBitTorrent,
             ExitProxy = settings.ExitProxy,
             Psiphon = settings.Psiphon ?? new(),
+            OpenVpnUsername = string.IsNullOrEmpty(settings.OpenVpn?.Username) ? null : settings.OpenVpn.Username,
             KillSwitchEnabled = settings.KillSwitchEnabled,
             ShareWithLan = settings.ShareWithLan,
             LanSocksPort = settings.LanSocksPort,
@@ -393,6 +434,7 @@ public static class ProfileCatalogJson
             DirectBitTorrent = DirectBitTorrent,
             ExitProxy = ExitProxy,
             Psiphon = Psiphon ?? new(),
+            OpenVpn = new OpenVpnExitOptions(Username: OpenVpnUsername ?? string.Empty),
             KillSwitchEnabled = KillSwitchEnabled,
             ShareWithLan = ShareWithLan,
             LanSocksPort = LanSocksPort,

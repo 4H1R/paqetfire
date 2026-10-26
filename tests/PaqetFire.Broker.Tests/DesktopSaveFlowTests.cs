@@ -82,6 +82,8 @@ public sealed class DesktopSaveFlowTests
 
         public ValueTask<BrokerSnapshot> ManageRoutingDataAsync(RoutingDataAction action, TimeSpan timeout, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public ValueTask<BrokerSnapshot> ManageExitEngineAsync(ExitEngineAction action, TimeSpan timeout, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public ValueTask<LiveConnectionStats> GetLiveStatsAsync(TimeSpan timeout, CancellationToken cancellationToken) =>
             new(new LiveConnectionStats(DateTimeOffset.UtcNow, IsConnected: false));
         public ValueTask<string> GetDiagnosticsAsync(TimeSpan timeout, CancellationToken cancellationToken) => new("diagnostics");

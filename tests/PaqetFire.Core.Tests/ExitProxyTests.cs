@@ -48,7 +48,7 @@ public sealed class ExitProxyTests
     [Fact]
     public void XrayWithAnExitSendsTcpThroughItAndKeepsUdpOnPaqet()
     {
-        var json = new XrayJsonConfigurationWriter().Write(Policy(new ExitProxyOutbound(1084)));
+        var json = new XrayJsonConfigurationWriter().Write(Policy(new SocksExitOutbound(1084)));
         using var document = JsonDocument.Parse(json);
         var outbounds = document.RootElement.GetProperty("outbounds").EnumerateArray().ToArray();
         var exit = Assert.Single(outbounds, outbound => outbound.GetProperty("tag").GetString() == XrayJsonConfigurationWriter.ExitOutboundTag);
@@ -85,7 +85,7 @@ public sealed class ExitProxyTests
     [InlineData(80)]
     public void XrayRejectsAnExitOnAReservedPort(int port) =>
         Assert.Throws<ConfigurationValidationException>(() =>
-            new XrayJsonConfigurationWriter().Write(Policy(new ExitProxyOutbound(port))));
+            new XrayJsonConfigurationWriter().Write(Policy(new SocksExitOutbound(port))));
 
     [Fact]
     public void ValidatorAcceptsPsiphonWithACountryOrBestAvailable()
@@ -281,6 +281,89 @@ public sealed class ExitProxyTests
         Assert.Equal(ConnectionRecoveryAction.SafeRecovery, ConnectionRecoveryPolicy.Evaluate(ConnectionState.Faulted, false, engines));
     }
 
+    [Fact]
+    public async Task OnlyTheSelectedExitStartsWhenSeveralAreRegistered()
+    {
+        var psiphon = new Engine(EngineKind.Psiphon);
+        var openVpn = new Engine(EngineKind.OpenVpn) { IsEnabled = true };
+        using var controller = new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre), psiphon, openVpn);
+
+        await controller.ConnectAsync(CancellationToken.None);
+
+        var status = await controller.GetStatusAsync(CancellationToken.None);
+        Assert.Equal(ConnectionState.Connected, status.State);
+        Assert.Equal(0, psiphon.StartCount);
+        Assert.Equal(1, openVpn.StartCount);
+        Assert.Equal(EngineKind.OpenVpn, status.Exit?.Engine);
+    }
+
+    [Fact]
+    public async Task AnExitThatIsNotInstalledDoesNotBlockOtherRoutes()
+    {
+        // Psiphon is downloaded only on request; a route without it must connect and disconnect.
+        var psiphon = new Engine(EngineKind.Psiphon) { Installed = false };
+        var openVpn = new Engine(EngineKind.OpenVpn) { Installed = false };
+        using var controller = new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre), psiphon, openVpn);
+
+        await controller.ConnectAsync(CancellationToken.None);
+        Assert.Equal(ConnectionState.Connected, (await controller.GetStatusAsync(CancellationToken.None)).State);
+        await controller.DisconnectAsync(CancellationToken.None);
+        Assert.Equal(ConnectionState.Disconnected, (await controller.GetStatusAsync(CancellationToken.None)).State);
+    }
+
+    [Fact]
+    public async Task ASelectedExitThatIsNotInstalledExplainsHowToGetIt()
+    {
+        var psiphon = new Engine(EngineKind.Psiphon) { IsEnabled = true, Installed = false };
+        using var controller = new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre), psiphon);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await controller.ConnectAsync(CancellationToken.None));
+
+        Assert.Equal("Download it first.", error.Message);
+        Assert.Equal(ConnectionState.NotReady, (await controller.GetStatusAsync(CancellationToken.None)).State);
+    }
+
+    [Fact]
+    public async Task TwoSelectedExitsAreRefused()
+    {
+        using var controller = new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre),
+            new Engine(EngineKind.Psiphon) { IsEnabled = true }, new Engine(EngineKind.OpenVpn) { IsEnabled = true });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await controller.ConnectAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public void OnlyExitEnginesRegisterAsExits()
+    {
+        Assert.Throws<ArgumentException>(() => new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre), new Engine(EngineKind.Xray)));
+        Assert.Throws<ArgumentException>(() => new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre),
+            new Engine(EngineKind.OpenVpn), new Engine(EngineKind.OpenVpn)));
+    }
+
+    [Fact]
+    public async Task AFaultedOpenVpnExitIsNamedAndRepairedByRestartingTheTransport()
+    {
+        var openVpn = new Engine(EngineKind.OpenVpn) { IsEnabled = true };
+        using var controller = new ConnectionController(
+            new Engine(EngineKind.Paqet), new Engine(EngineKind.Xray), new Engine(EngineKind.ProxiFyre), openVpn);
+        await controller.ConnectAsync(CancellationToken.None);
+
+        openVpn.Fault();
+
+        var status = await controller.GetStatusAsync(CancellationToken.None);
+        Assert.Equal(ConnectionState.Faulted, status.State);
+        Assert.Contains("OpenVpn: Faulted", status.Detail, StringComparison.Ordinal);
+        Assert.Equal(ConnectionRecoveryAction.RestartTransport,
+            ConnectionRecoveryPolicy.Evaluate(status.State, false, status.Engines));
+    }
+
     private static XrayRoutingPolicy Policy(ExitProxyOutbound? exit) => new(
         RegionalRoutingPreset.IranDirect,
         XrayDomainStrategy.IPIfNonMatch,
@@ -308,6 +391,8 @@ public sealed class ExitProxyTests
 
         public bool FailOnStart { get; init; }
 
+        public bool Installed { get; init; } = true;
+
         public int StartCount { get; private set; }
 
         public List<string>? Events { get; init; }
@@ -315,7 +400,9 @@ public sealed class ExitProxyTests
         public void Fault() => State = EngineState.Faulted;
 
         public ValueTask<EngineStatus> GetStatusAsync(CancellationToken cancellationToken) =>
-            ValueTask.FromResult(new EngineStatus(Kind, State));
+            ValueTask.FromResult(Installed
+                ? new EngineStatus(Kind, State)
+                : new EngineStatus(Kind, EngineState.NotInstalled, Detail: "Download it first."));
 
         public ValueTask StartAsync(CancellationToken cancellationToken)
         {

@@ -11,11 +11,13 @@ Open work only; shipped changes are recorded in [release notes](releases/).
 
 ## Exit proxy
 
-- Windows Firewall rule that blocks Psiphon from everything but loopback, as
-  defence in depth for its upstream-proxy configuration.
+- Windows Firewall rules that block Psiphon and OpenVPN from everything but
+  loopback, as defence in depth for their upstream-proxy configuration.
 - Dedicated Psiphon network identifiers from Psiphon Inc. instead of the public
   community parameters.
-- Further exit providers (for example a user's own SOCKS5 or WARP endpoint).
+- Further exit providers (for example a user's own SOCKS5 or WARP endpoint, or
+  Xray's own WireGuard outbound, which needs no driver).
+- Remove generated engine configurations and credential files on uninstall.
 
 ## Reliability
 

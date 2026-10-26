@@ -20,6 +20,7 @@ public enum BrokerCommand
     GetLiveStats,
     GetDiagnostics,
     ManageRoutingData,
+    ManageExitEngine,
 }
 
 public enum BrokerMessageType
@@ -53,7 +54,8 @@ public sealed record BrokerRequest(
     PaqetFireSettings? Settings = null,
     bool ConnectAfterSave = false,
     ProfileAction? ProfileAction = null,
-    RoutingDataAction? RoutingDataAction = null);
+    RoutingDataAction? RoutingDataAction = null,
+    ExitEngineAction? ExitEngineAction = null);
 
 public sealed record BrokerResponse(
     Guid RequestId,
@@ -115,15 +117,55 @@ public sealed record BrokerSnapshot(
 {
     /// <summary>The exit engine's own view of its tunnel while it runs.</summary>
     public ExitProxyStatus? ExitProxy { get; init; }
+
+    /// <summary>Whether each optional exit engine is on this computer, and how to get it.</summary>
+    public IReadOnlyList<ExitEngineAvailability> ExitEngines { get; init; } = [];
 }
 
 /// <param name="ConnectedRegion">The country of the exit server in use, when the exit reports it.</param>
 /// <param name="AvailableRegions">The countries the exit can serve right now; empty until it reports them.</param>
+/// <param name="Server">The exit server in use, when the exit reports it.</param>
 public sealed record ExitProxyStatus(
     ExitProxyKind Kind,
     bool TunnelActive,
     string? ConnectedRegion,
-    IReadOnlyList<string> AvailableRegions);
+    IReadOnlyList<string> AvailableRegions,
+    string? Server = null);
+
+/// <summary>
+/// Exit engines are not part of the installer: Psiphon is downloaded on request and
+/// verified against a pinned digest, and OpenVPN is the user's own installation.
+/// </summary>
+/// <param name="Version">The installed version, when known.</param>
+/// <param name="CanDownload">Whether the broker can download and install the engine itself.</param>
+/// <param name="IsDownloading">A download or import is running; the result arrives in a later snapshot.</param>
+/// <param name="Detail">Why the engine is unavailable, or the last download failure.</param>
+/// <param name="DownloadUrl">Where the user can get the engine themselves.</param>
+public sealed record ExitEngineAvailability(
+    ExitProxyKind Kind,
+    bool IsInstalled,
+    string? Version = null,
+    bool CanDownload = false,
+    bool IsDownloading = false,
+    string? Detail = null,
+    string? DownloadUrl = null);
+
+public enum ExitEngineOperation
+{
+    /// <summary>Download the pinned release: through Paqet while connected, directly otherwise.</summary>
+    Download,
+
+    /// <summary>Install a copy the user downloaded; it must match the same pinned digest.</summary>
+    Import,
+
+    Remove,
+}
+
+/// <param name="SourcePath">For <see cref="ExitEngineOperation.Import"/>, the file the user chose.</param>
+public sealed record ExitEngineAction(
+    ExitProxyKind Kind,
+    ExitEngineOperation Operation,
+    string? SourcePath = null);
 
 public sealed record BrokerError(BrokerErrorCode Code, string Message);
 

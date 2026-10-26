@@ -29,6 +29,9 @@ public static class SaveConfirmation
             submitted.DnsResolver == stored.DnsResolver &&
             submitted.ExitProxy == stored.ExitProxy &&
             string.Equals(submitted.Psiphon?.EgressRegion ?? string.Empty, stored.Psiphon?.EgressRegion ?? string.Empty, StringComparison.Ordinal) &&
+            string.Equals(submitted.OpenVpn?.Username ?? string.Empty, stored.OpenVpn?.Username ?? string.Empty, StringComparison.Ordinal) &&
+            (string.IsNullOrEmpty(submitted.OpenVpn?.Configuration) || stored.OpenVpn?.HasConfiguration == true) &&
+            (string.IsNullOrEmpty(submitted.OpenVpn?.Password) || stored.OpenVpn?.HasPassword == true) &&
             (submitted.TransportKey.Length == 0 || stored.HasTransportKey) &&
             (submitted.LanSocksPassword.Length == 0 || stored.HasLanSocksPassword);
     }

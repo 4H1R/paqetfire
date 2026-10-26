@@ -36,9 +36,15 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             throw new ConfigurationValidationException(["The Xray domain strategy is invalid."]);
         }
 
-        if (policy.Exit is { Port: < 1024 or > 65535 or PaqetPort or InboundPort or StatsApiPort })
+        if (policy.Exit is SocksExitOutbound { Port: < 1024 or > 65535 or PaqetPort or InboundPort or StatsApiPort })
         {
             throw new ConfigurationValidationException(["The exit proxy port is invalid."]);
+        }
+
+        if (policy.Exit is InterfaceExitOutbound { InterfaceName: var adapter } &&
+            (string.IsNullOrWhiteSpace(adapter) || adapter.Length > 64 || adapter.Any(char.IsControl)))
+        {
+            throw new ConfigurationValidationException(["The exit proxy adapter name is invalid."]);
         }
 
         var directDestinations = ParseDirectDestinations(policy.DirectRouteDestinations);
@@ -197,20 +203,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             WritePaqetOutbound(writer, policy.EngineCredentials);
             if (policy.Exit is { } exit)
             {
-                // The exit engine's loopback listener; the engine itself reaches its
-                // network only through Paqet.
-                writer.WriteStartObject();
-                writer.WriteString("tag", ExitOutboundTag);
-                writer.WriteString("protocol", "socks");
-                writer.WriteStartObject("settings");
-                writer.WriteStartArray("servers");
-                writer.WriteStartObject();
-                writer.WriteString("address", "127.0.0.1");
-                writer.WriteNumber("port", exit.Port);
-                writer.WriteEndObject();
-                writer.WriteEndArray();
-                writer.WriteEndObject();
-                writer.WriteEndObject();
+                WriteExitOutbound(writer, exit);
             }
 
             if (dns is null)
@@ -308,7 +301,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
                 WriteNetworkRule(writer, "udp", "443", "block");
             }
 
-            if (policy.Exit is not null)
+            if (policy.Exit is { CarriesUdp: false })
             {
                 // The exit relays TCP only, so UDP still leaves from the Paqet server.
                 WriteNetworkRule(writer, "tcp", port: null, ExitOutboundTag);
@@ -316,7 +309,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             }
             else
             {
-                WriteNetworkRule(writer, "tcp,udp", port: null, PaqetOutboundTag);
+                WriteNetworkRule(writer, "tcp,udp", port: null, policy.Exit is null ? PaqetOutboundTag : ExitOutboundTag);
             }
 
             writer.WriteEndArray();
@@ -378,6 +371,48 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
         return bytes[0] == 10 ||
                (bytes[0] == 172 && bytes[1] is >= 16 and <= 31) ||
                (bytes[0] == 192 && bytes[1] == 168);
+    }
+
+    /// <summary>
+    /// The exit engine's own entry point. Either way the engine reaches its network only
+    /// through Paqet, so nothing routed to the exit leaves the computer directly.
+    /// </summary>
+    private static void WriteExitOutbound(Utf8JsonWriter writer, ExitProxyOutbound exit)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("tag", ExitOutboundTag);
+        switch (exit)
+        {
+            case SocksExitOutbound socks:
+                writer.WriteString("protocol", "socks");
+                writer.WriteStartObject("settings");
+                writer.WriteStartArray("servers");
+                writer.WriteStartObject();
+                writer.WriteString("address", "127.0.0.1");
+                writer.WriteNumber("port", socks.Port);
+                writer.WriteEndObject();
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+                break;
+            case InterfaceExitOutbound adapter:
+                // Sockets bound to the engine's adapter fail while its tunnel is down instead
+                // of following the default route. The tunnel is IPv4 only, so names resolve
+                // through Xray's DNS to IPv4, and fail rather than fall back to the system resolver.
+                writer.WriteString("protocol", "freedom");
+                writer.WriteStartObject("settings");
+                writer.WriteString("domainStrategy", "ForceIPv4");
+                writer.WriteEndObject();
+                writer.WriteStartObject("streamSettings");
+                writer.WriteStartObject("sockopt");
+                writer.WriteString("interface", adapter.InterfaceName);
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+                break;
+            default:
+                throw new ConfigurationValidationException(["The exit proxy is invalid."]);
+        }
+
+        writer.WriteEndObject();
     }
 
     private static void WriteNetworkRule(

@@ -19,19 +19,6 @@ The corresponding source for the bundled ProxiFyre release is available at the
 exact-source link above at no charge. PaqetFire does not remove or restrict any
 rights granted by the AGPL-3.0 license.
 
-## Psiphon tunnel core (console client, binaries commit d95d7f9)
-
-- Project: https://github.com/Psiphon-Labs/psiphon-tunnel-core
-- Exact binary: https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/blob/d95d7f964c043a5a0ebd25cca801bc2753e14f74/windows/psiphon-tunnel-core-i686.exe
-- Exact source: https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/c4a09096ab401b57f52e092c8f2f829c8fac7628
-- License: GNU General Public License v3.0
-
-The unmodified upstream console client runs as a separate process only when a
-profile selects the Psiphon exit. The corresponding source is available at the
-exact-source link above at no charge. PaqetFire does not remove or restrict any
-rights granted by the GPL-3.0 license. The client connects to the Psiphon
-network operated by Psiphon Inc., whose terms apply to that service.
-
 ## Xray-core 26.3.27
 
 - Project: https://github.com/XTLS/Xray-core
@@ -49,6 +36,21 @@ When updated routing data is enabled, the broker downloads `geoip.dat` and
 user's machine. Those files are not part of the PaqetFire installer. The
 project is licensed under GPL-3.0, and its upstream sources keep their own
 licenses; see the project page.
+
+## Exit engines
+
+Neither exit engine is part of the PaqetFire installer.
+
+- **Psiphon tunnel core** (console client, binaries commit d95d7f9) is downloaded
+  on the user's machine, when they ask for it, from
+  https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/blob/d95d7f964c043a5a0ebd25cca801bc2753e14f74/windows/psiphon-tunnel-core-i686.exe
+  and accepted only with its pinned SHA-256. It is licensed under GPL-3.0; its
+  source is at https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/c4a09096ab401b57f52e092c8f2f829c8fac7628.
+  The client connects to the Psiphon network operated by Psiphon Inc., whose
+  terms apply to that service.
+- **OpenVPN** is the user's own OpenVPN Community installation from
+  https://openvpn.net/community-downloads/, licensed under GPL-2.0. PaqetFire
+  ships no OpenVPN files or drivers.
 
 ## Packet drivers
 

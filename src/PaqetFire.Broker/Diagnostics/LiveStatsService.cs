@@ -1,3 +1,4 @@
+using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
 using PaqetFire.Core.Ipc;
 
@@ -47,7 +48,7 @@ public sealed class LiveStatsService(
             .Select(engine => engine.ChangedAt)
             .Where(value => value is not null)
             .Max() ?? now;
-        var current = GetOrStartSession(connectedSince, throughExit: status.Exit is not null);
+        var current = GetOrStartSession(connectedSince, status.Exit is { } exit ? ExitProxyOutbound.For(exit.Engine) : null);
 
         XrayTrafficCounters? counters = null;
         try
@@ -76,17 +77,17 @@ public sealed class LiveStatsService(
             PublicAddressCountryCode: current.PublicAddressCountryCode);
     }
 
-    private Session GetOrStartSession(DateTimeOffset connectedSince, bool throughExit)
+    private Session GetOrStartSession(DateTimeOffset connectedSince, ExitProxyOutbound? exit)
     {
         lock (sync)
         {
-            if (session?.ConnectedSince == connectedSince && session.ThroughExit == throughExit)
+            if (session?.ConnectedSince == connectedSince && session.Exit == exit)
             {
                 return session;
             }
 
             session?.Dispose();
-            session = new Session(this, connectedSince, throughExit);
+            session = new Session(this, connectedSince, exit);
             return session;
         }
     }
@@ -100,7 +101,7 @@ public sealed class LiveStatsService(
         }
     }
 
-    private sealed class Session(LiveStatsService owner, DateTimeOffset connectedSince, bool throughExit) : IDisposable
+    private sealed class Session(LiveStatsService owner, DateTimeOffset connectedSince, ExitProxyOutbound? exit) : IDisposable
     {
         private readonly CancellationTokenSource cancellation = new();
         private int probing;
@@ -110,7 +111,7 @@ public sealed class LiveStatsService(
         public DateTimeOffset ConnectedSince { get; } = connectedSince;
 
         /// <summary>Destinations see the exit's address, so that is the one shown.</summary>
-        public bool ThroughExit { get; } = throughExit;
+        public ExitProxyOutbound? Exit { get; } = exit;
 
         public volatile string? PublicAddress;
 
@@ -162,7 +163,7 @@ public sealed class LiveStatsService(
 
                     if (needsAddress)
                     {
-                        var address = await owner.tunnelProbe.GetPublicAddressAsync(ThroughExit, token).ConfigureAwait(false);
+                        var address = await owner.tunnelProbe.GetPublicAddressAsync(Exit, token).ConfigureAwait(false);
                         if (address is not null)
                         {
                             PublicAddressCountryCode = await TryFindCountryAsync(address, token).ConfigureAwait(false);

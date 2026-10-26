@@ -22,7 +22,6 @@ $checks = [ordered]@{
     InUseProcessesAreForcedClosed = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//wix:Property[@Id='MSIRMSHUTDOWN' and @Value='1']").Count -eq 1
     InUseProcessesAreNotRestarted = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//wix:Property[@Id='MSIDISABLERMRESTART' and @Value='1']").Count -eq 1
     PaqetRestartResource = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//util:RestartResource[@Path='[BrokerFolder]payload\engines\paqet\x64\paqet_windows_amd64.exe']").Count -eq 1
-    PsiphonRestartResource = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//util:RestartResource[@Path='[BrokerFolder]payload\engines\psiphon\x64\psiphon-tunnel-core-i686.exe']").Count -eq 1
     XrayRestartResource = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//util:RestartResource[@Path='[#PaqetFireXrayExe]']").Count -eq 1
     ProxiFyreRestartResource = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//util:RestartResource[@Path='[#PaqetFireProxiFyreExe]']").Count -eq 1
     DesktopRelaunchedAfterUpdate = (Select-Xml -Xml $package -Namespace $wixNamespace -XPath "//wix:CustomAction[@Id='RelaunchPaqetFireDesktop' and @Execute='immediate' and @Return='asyncNoWait' and contains(@ExeCommand, 'explorer.exe') and contains(@ExeCommand, '[#PaqetFireDesktopExe]')]").Count -eq 1

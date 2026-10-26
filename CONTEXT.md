@@ -49,8 +49,16 @@ The common authentication username and password used across all inbound share li
 _Avoid_: Master password, account, user credentials
 
 **Exit proxy**:
-An optional second network, currently Psiphon, that routed TCP leaves through after the Paqet server; the exit engine reaches its network only through Paqet transport.
+An optional second network, Psiphon or the user's OpenVPN provider, that routed traffic leaves through after the Paqet server; the exit engine reaches its network only through Paqet transport.
 _Avoid_: Double VPN, chain, second tunnel
+
+**Exit engine**:
+The program behind an exit proxy (psiphon-tunnel-core or openvpn.exe). Exit engines are not part of the installer: Psiphon is downloaded on request against a pinned digest, and OpenVPN is the user's own installation.
+_Avoid_: Bundled engine, plugin
+
+**Exit adapter**:
+The dedicated "PaqetFire Exit" TAP adapter the OpenVPN exit owns; Xray's exit outbound binds its sockets to it, and only a highest-metric default route of its own points at it.
+_Avoid_: VPN adapter, virtual card
 
 **Encrypted DNS**:
 Xray answering captured lookups itself, over DNS-over-HTTPS through Paqet transport, with the network's own resolver kept only for local and direct-routed domains.

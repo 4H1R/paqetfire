@@ -68,6 +68,7 @@ public sealed partial class MainWindow
             DirectBitTorrentSwitch.IsOn = state.DirectBitTorrent;
             SelectExitProxy(state.ExitProxy);
             SelectPsiphonRegion(state.PsiphonRegion);
+            OpenVpnUsernameBox.Text = state.OpenVpnUsername;
             KillSwitchToggle.IsOn = state.KillSwitch;
             ShareWithLanSwitch.IsOn = state.ShareWithLan;
             LanShareOptions.Visibility = state.ShareWithLan ? Visibility.Visible : Visibility.Collapsed;
@@ -134,6 +135,7 @@ public sealed partial class MainWindow
         DirectBitTorrent = DirectBitTorrentSwitch.IsOn,
         ExitProxy = SelectedExitProxy(),
         PsiphonRegion = SelectedPsiphonRegion(),
+        OpenVpnUsername = OpenVpnUsernameBox.Text.Trim(),
         KillSwitch = KillSwitchToggle.IsOn,
         ShareWithLan = ShareWithLanSwitch.IsOn,
         LanSocksPort = double.IsNaN(LanSharePortBox.Value) ? 0 : (int)LanSharePortBox.Value,
@@ -191,6 +193,7 @@ public sealed partial class MainWindow
         var wasPending = hasPendingConfigurationChanges;
         var pending = !ReadForm().IsEquivalentTo(appliedFormState) ||
             TransportKeyBox.Password.Length > 0 ||
+            HasPendingOpenVpnSecrets ||
             (SharePasswordBox.Password.Length > 0 &&
              !string.Equals(SharePasswordBox.Password, sessionSharePassword, StringComparison.Ordinal));
         SetPendingChanges(pending);
@@ -280,7 +283,7 @@ public sealed partial class MainWindow
             UserExclusionsBox, BypassLanSwitch, RegionalPresetBox, DomainStrategyBox, DnsResolverBox, FakeDnsSwitch,
             DirectRouteDestinationsBox,
             BlockAdsSwitch, BlockMalwareSwitch, BlockQuicSwitch, DirectBitTorrentSwitch,
-            ExitProxyBox, PsiphonRegionBox, KillSwitchToggle,
+            ExitProxyBox, PsiphonRegionBox, OpenVpnImportButton, OpenVpnUsernameBox, OpenVpnPasswordBox, KillSwitchToggle,
             ShareWithLanSwitch, LanSharePortBox,
             ShareViaHotspotSwitch, HotspotPortBox,
             ShareUsernameBox, SharePasswordBox,
@@ -320,6 +323,9 @@ public sealed partial class MainWindow
             {
                 var m when m.Contains("profile name") => (Control)ProfilePicker,
                 var m when m.Contains("Psiphon exit country") => PsiphonRegionBox,
+                var m when m.Contains("OpenVPN username") => OpenVpnUsernameBox,
+                var m when m.Contains("OpenVPN password") => OpenVpnPasswordBox,
+                var m when m.Contains("OpenVPN configuration") || m.Contains("OpenVPN exit") => OpenVpnImportButton,
                 var m when m.Contains("exit proxy") || m.Contains("Psiphon exit") => ExitProxyBox,
                 var m when m.Contains("server must") => ServerEndpointBox,
                 var m when m.Contains("transport key") => TransportKeyBox,
@@ -374,7 +380,11 @@ public sealed partial class MainWindow
 
     private bool TryCreateBrokerSettings(out PaqetFireSettings settings, out string error)
     {
-        settings = ReadForm().ToSettings(TransportKeyBox.Password, SharePasswordBox.Password);
+        settings = ReadForm().ToSettings(
+            TransportKeyBox.Password,
+            SharePasswordBox.Password,
+            pendingOpenVpnConfiguration ?? string.Empty,
+            OpenVpnPasswordBox.Password);
 
         if (advancedNumberInputs.Any(control => !double.IsNaN(control.Value) &&
             (!double.IsFinite(control.Value) || control.Value != Math.Truncate(control.Value) || control.Value < int.MinValue || control.Value > int.MaxValue)))
@@ -392,7 +402,9 @@ public sealed partial class MainWindow
         {
             validationCandidate = validationCandidate with { LanSocksPassword = "saved-by-broker" };
         }
-        var errors = PaqetFireSettingsValidator.Validate(validationCandidate);
+        var errors = PaqetFireSettingsValidator.Validate(validationCandidate)
+            .Where(message => !IsSatisfiedBySavedOpenVpn(message, validationCandidate.OpenVpn))
+            .ToList();
         ShowFieldErrors(errors);
         error = string.Join(" ", errors);
         return errors.Count == 0;
@@ -420,6 +432,7 @@ public sealed partial class MainWindow
         SharePasswordBox.Password = string.Empty;
         hasSavedTransportKey = settings.HasTransportKey;
         hasSavedLanSocksPassword = settings.HasLanSocksPassword;
+        ApplySavedOpenVpn(settings.OpenVpn ?? new());
         PopulateForm(ConnectionFormState.FromSettings(settings));
         TransportKeyBox.PlaceholderText = hasSavedTransportKey
             ? "Saved securely · leave blank to keep it"
@@ -459,6 +472,7 @@ public sealed partial class MainWindow
             SharePasswordBox.PlaceholderText = "Saved securely · leave blank to keep it";
         }
 
+        MarkOpenVpnSecretsSaved(settings.OpenVpn);
         appliedFormState = ReadForm();
         UpdateLanShareEndpointText();
         UpdateHotspotUri();

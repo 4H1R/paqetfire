@@ -89,13 +89,22 @@ public sealed class ConfigurationStorageLifecycleTests
         try
         {
             var store = new MachineSettingsStore(path);
-            var settings = new PaqetFireSettings { TransportKey = "test-transport-secret", LanSocksPassword = "test-lan-secret" };
+            var settings = new PaqetFireSettings
+            {
+                TransportKey = "test-transport-secret",
+                LanSocksPassword = "test-lan-secret",
+                OpenVpn = new OpenVpnExitOptions("client\n<key>test-openvpn-private-key</key>", "vpn-user", "test-openvpn-password"),
+            };
             await store.SaveAsync(settings, CancellationToken.None);
             AssertProtected(path);
-            Assert.DoesNotContain(settings.TransportKey, await File.ReadAllTextAsync(path));
+            var text = await File.ReadAllTextAsync(path);
+            Assert.DoesNotContain(settings.TransportKey, text);
+            Assert.DoesNotContain("test-openvpn-private-key", text);
+            Assert.DoesNotContain("test-openvpn-password", text);
             var loaded = await store.LoadAsync(CancellationToken.None);
             Assert.Equal(settings.TransportKey, loaded!.TransportKey);
             Assert.Equal(settings.LanSocksPassword, loaded.LanSocksPassword);
+            Assert.Equal(settings.OpenVpn, loaded.OpenVpn);
             await store.SaveAsync(settings with { TransportKey = "replacement-secret" }, CancellationToken.None);
             Assert.Equal("replacement-secret", (await store.LoadAsync(CancellationToken.None))!.TransportKey);
             AssertProtected(path);

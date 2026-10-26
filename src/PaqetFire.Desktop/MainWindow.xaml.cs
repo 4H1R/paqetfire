@@ -581,7 +581,7 @@ public sealed partial class MainWindow : Window
         SelectedAppsCard.Visibility = selectedOnly ? Visibility.Visible : Visibility.Collapsed;
         RoutingModeHelpText.Text = selectedOnly
             ? "Only the listed executables are proxied. Other applications connect directly."
-            : "All application traffic enters the PaqetFire route. Paqet, Xray, Psiphon, ProxiFyre, and the broker are excluded to prevent a loop.";
+            : "All application traffic enters the PaqetFire route. Paqet, Xray, the exit engine, ProxiFyre, and the broker are excluded to prevent a loop.";
     }
 
     private void ApplicationPicker_Expanding(Expander sender, ExpanderExpandingEventArgs args) =>
