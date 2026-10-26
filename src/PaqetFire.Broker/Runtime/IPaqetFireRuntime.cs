@@ -41,6 +41,9 @@ public interface IPaqetFireRuntime
     /// <returns>False when another operation held the gate and nothing was evaluated.</returns>
     ValueTask<bool> SuperviseAsync(CancellationToken cancellationToken);
 
+    /// <summary>The profile the route uses, or would use when connected; null before any profile exists.</summary>
+    Guid? ActiveProfileId { get; }
+
     /// <summary>When <see cref="SuperviseAsync"/> next has scheduled work, if any.</summary>
     DateTimeOffset? NextSupervisionDue { get; }
 

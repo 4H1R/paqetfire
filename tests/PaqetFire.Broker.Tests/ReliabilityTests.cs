@@ -218,6 +218,8 @@ public sealed class ReliabilityTests
         }
 
         public ValueTask<bool> SuperviseAsync(CancellationToken cancellationToken) => ValueTask.FromResult(true);
+        public Guid? ActiveProfileId => null;
+
         public DateTimeOffset? NextSupervisionDue => null;
         public ValueTask HandleNetworkChangeAsync(bool resumed, CancellationToken cancellationToken) => ValueTask.CompletedTask;
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => throw new NotSupportedException();

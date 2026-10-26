@@ -50,6 +50,9 @@
         <NavigationViewItem Content="Routing" Tag="routing">
           <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
         </NavigationViewItem>
+        <NavigationViewItem Content="Data usage" Tag="usage">
+          <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
         <NavigationViewItem Content="Diagnostics" Tag="diagnostics">
           <NavigationViewItem.Icon><SymbolIcon Symbol="Document" /></NavigationViewItem.Icon>
         </NavigationViewItem>
@@ -900,6 +903,93 @@
               <Button Content="Save and connect" IsEnabled="{x:Bind ViewModel.CanSaveAndConnect, Mode=OneWay}"
                       Click="SaveRoutingAndConnectButton_Click" AccessKey="C" />
             </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <ScrollViewer x:Name="DataUsagePage" Visibility="Collapsed">
+          <StackPanel MaxWidth="960" Padding="36,28,36,48" HorizontalAlignment="Stretch" Spacing="20">
+            <Grid HorizontalAlignment="Stretch" ColumnSpacing="16">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Spacing="6">
+                <TextBlock Text="DATA USAGE" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
+                <TextBlock Text="Traffic through Paqet" FontSize="32" FontWeight="SemiBold" />
+                <TextBlock Text="What applications and shared devices downloaded and uploaded through your Paqet server, including any exit proxy behind it. Traffic routed directly is not counted. Days are kept for 90 days."
+                           FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                <ComboBox x:Name="DataUsageProfileBox" MinWidth="200" ItemsSource="{x:Bind DataUsageProfiles}"
+                          DisplayMemberPath="Name" AutomationProperties.Name="Profile"
+                          SelectionChanged="DataUsageProfileBox_SelectionChanged" />
+                <Button Content="Refresh" Click="RefreshDataUsageButton_Click" />
+                <Button Content="Reset usage" Click="ResetDataUsageButton_Click"
+                        ToolTipService.ToolTip="Clears the recorded usage of the profile shown, or of every profile" />
+              </StackPanel>
+            </Grid>
+
+            <InfoBar x:Name="DataUsageInfoBar" IsOpen="False" IsClosable="True" />
+
+            <Grid ColumnSpacing="14" HorizontalAlignment="Stretch">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Border Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="Today" Opacity="0.65"/>
+                  <TextBlock x:Name="DataUsageTodayText" Text="0 B" FontSize="24" FontWeight="SemiBold"/>
+                  <TextBlock x:Name="DataUsageTodayDetail" Text="↓ 0 B   ↑ 0 B" FontSize="12" Opacity="0.65"/>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="This month" Opacity="0.65"/>
+                  <TextBlock x:Name="DataUsageMonthText" Text="0 B" FontSize="24" FontWeight="SemiBold"/>
+                  <TextBlock x:Name="DataUsageMonthDetail" Text="↓ 0 B   ↑ 0 B" FontSize="12" Opacity="0.65"/>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="2" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="Last 30 days" Opacity="0.65"/>
+                  <TextBlock x:Name="DataUsageRecentText" Text="0 B" FontSize="24" FontWeight="SemiBold"/>
+                  <TextBlock x:Name="DataUsageRecentDetail" Text="↓ 0 B   ↑ 0 B" FontSize="12" Opacity="0.65"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Daily usage" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock x:Name="DataUsageEmptyText" Text="No traffic went through Paqet in the last 30 days."
+                           Opacity="0.68" TextWrapping="Wrap" />
+                <Grid x:Name="DataUsageDaysHeader" Padding="4,0" ColumnSpacing="12" Visibility="Collapsed" Opacity="0.6">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" /><ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="96" /><ColumnDefinition Width="96" /><ColumnDefinition Width="96" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="Day" FontSize="12" />
+                  <TextBlock Grid.Column="2" Text="Download" FontSize="12" HorizontalAlignment="Right" />
+                  <TextBlock Grid.Column="3" Text="Upload" FontSize="12" HorizontalAlignment="Right" />
+                  <TextBlock Grid.Column="4" Text="Total" FontSize="12" HorizontalAlignment="Right" />
+                </Grid>
+                <ItemsControl x:Name="DataUsageDaysList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="presentation:DataUsageDayRow">
+                      <Grid Padding="4,7" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="150" /><ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="96" /><ColumnDefinition Width="96" /><ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind DateText}" />
+                        <ProgressBar Grid.Column="1" Value="{x:Bind Share}" Maximum="100" VerticalAlignment="Center"
+                                     AutomationProperties.AccessibilityView="Raw" />
+                        <TextBlock Grid.Column="2" Text="{x:Bind DownloadText}" Opacity="0.78" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="3" Text="{x:Bind UploadText}" Opacity="0.78" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="4" Text="{x:Bind TotalText}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
 

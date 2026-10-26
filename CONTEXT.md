@@ -72,6 +72,10 @@ _Avoid_: Shared proxy credentials, local password
 The broker loop that probes the Paqet carrier while connected and restarts the transport when it stays unreachable.
 _Avoid_: Health monitor, keepalive
 
+**Data usage**:
+The daily download and upload totals per profile of traffic that went through Paqet transport or the exit proxy behind it, kept by the broker for 90 days.
+_Avoid_: Bandwidth, quota, traffic log
+
 **Diagnostic report**:
 The redacted plain-text summary copied from Diagnostics for bug reports.
 _Avoid_: Log dump, support bundle

@@ -1,5 +1,6 @@
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Ipc;
+using PaqetFire.Core.Usage;
 using PaqetFire.Desktop.Ipc;
 using PaqetFire.Desktop.ViewModels;
 using PaqetFire.Core.Profiles;
@@ -87,6 +88,10 @@ public sealed class DesktopSaveFlowTests
         public ValueTask<LiveConnectionStats> GetLiveStatsAsync(TimeSpan timeout, CancellationToken cancellationToken) =>
             new(new LiveConnectionStats(DateTimeOffset.UtcNow, IsConnected: false));
         public ValueTask<string> GetDiagnosticsAsync(TimeSpan timeout, CancellationToken cancellationToken) => new("diagnostics");
+        public ValueTask<DataUsageReport> GetDataUsageAsync(TimeSpan timeout, CancellationToken cancellationToken) =>
+            new(new DataUsageReport(DateOnly.MinValue, []));
+        public ValueTask<DataUsageReport> ResetDataUsageAsync(DataUsageReset reset, TimeSpan timeout, CancellationToken cancellationToken) =>
+            new(new DataUsageReport(DateOnly.MinValue, []));
         public ValueTask<BrokerSnapshot> SaveSettingsAsync(PaqetFireSettings settings, bool connectAfterSave, TimeSpan timeout, CancellationToken cancellationToken)
         {
             SaveCount++;

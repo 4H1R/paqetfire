@@ -561,6 +561,7 @@ public sealed partial class MainWindow : Window
         OverviewPage.Visibility = destination == "overview" ? Visibility.Visible : Visibility.Collapsed;
         ConnectionPage.Visibility = destination == "connection" ? Visibility.Visible : Visibility.Collapsed;
         RoutingPage.Visibility = destination == "routing" ? Visibility.Visible : Visibility.Collapsed;
+        DataUsagePage.Visibility = destination == "usage" ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsPage.Visibility = destination == "diagnostics" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = destination == "settings" ? Visibility.Visible : Visibility.Collapsed;
         if (V2rayNgGuideView is not null)
@@ -571,6 +572,8 @@ public sealed partial class MainWindow : Window
         {
             HappGuideView.Visibility = destination == "guide-happ" ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        UpdateDataUsagePolling(destination == "usage");
     }
 
     private void RoutingModeButtons_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1314,6 +1317,7 @@ public sealed partial class MainWindow : Window
         networkAutomationCancellation?.Dispose();
         networkChangeDebounce?.Cancel();
         updateCheckTimer?.Stop();
+        dataUsageTimer?.Stop();
         updateCancellation.Cancel();
         updateCancellation.Dispose();
         updateHttpClient.Dispose();

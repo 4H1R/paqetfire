@@ -13,7 +13,8 @@ public sealed class ConnectionBrokerRequestHandler(
     IPaqetFireRuntime runtime,
     ILiveStatsService liveStats,
     RoutingDataService? routingData = null,
-    ExitEngineInstaller? exitEngines = null) : IBrokerRequestHandler
+    ExitEngineInstaller? exitEngines = null,
+    IDataUsageService? dataUsage = null) : IBrokerRequestHandler
 {
     public ValueTask<BrokerResponse> HandleAsync(
         BrokerRequest request,
@@ -138,6 +139,32 @@ public sealed class ConnectionBrokerRequestHandler(
                     return BrokerResponse.Succeeded(
                         request.RequestId,
                         await runtime.GetSnapshotAsync(cancellationToken).ConfigureAwait(false));
+
+                case BrokerCommand.GetDataUsage:
+                case BrokerCommand.ResetDataUsage:
+                    if (dataUsage is null)
+                    {
+                        return BrokerResponse.Failed(
+                            request.RequestId,
+                            BrokerErrorCode.EngineFailure,
+                            "Data usage is not recorded by this broker.");
+                    }
+
+                    if (request.Command == BrokerCommand.ResetDataUsage && request.DataUsageReset is null)
+                    {
+                        return BrokerResponse.Failed(
+                            request.RequestId,
+                            BrokerErrorCode.InvalidRequest,
+                            "A data usage reset scope is required.");
+                    }
+
+                    return new BrokerResponse(
+                        request.RequestId,
+                        IpcProtocol.Version,
+                        true,
+                        DataUsage: request.DataUsageReset is { } reset
+                            ? await dataUsage.ResetAsync(reset, cancellationToken).ConfigureAwait(false)
+                            : await dataUsage.GetReportAsync(cancellationToken).ConfigureAwait(false));
 
                 case BrokerCommand.GetSnapshot:
                     return BrokerResponse.Succeeded(

@@ -60,3 +60,6 @@ public sealed record ConnectionViewModelOptions
 
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 }
+
+/// <summary>Recorded data usage, or why it could not be read.</summary>
+public sealed record DataUsageResult(PaqetFire.Core.Usage.DataUsageReport? Report, string? Error);

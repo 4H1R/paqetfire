@@ -1,6 +1,7 @@
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Engines;
 using PaqetFire.Core.Ipc;
+using PaqetFire.Core.Usage;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.Routing;
 using PaqetFire.Core.RoutingData;
@@ -675,5 +676,9 @@ public sealed class DesktopConnectionViewModelTests
         }
 
         public ValueTask<string> GetDiagnosticsAsync(TimeSpan timeout, CancellationToken cancellationToken) => new("diagnostics");
+        public ValueTask<DataUsageReport> GetDataUsageAsync(TimeSpan timeout, CancellationToken cancellationToken) =>
+            new(new DataUsageReport(DateOnly.MinValue, []));
+        public ValueTask<DataUsageReport> ResetDataUsageAsync(DataUsageReset reset, TimeSpan timeout, CancellationToken cancellationToken) =>
+            new(new DataUsageReport(DateOnly.MinValue, []));
     }
 }

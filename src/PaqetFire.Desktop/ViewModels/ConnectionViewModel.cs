@@ -8,6 +8,7 @@ using PaqetFire.Core.Diagnostics;
 using PaqetFire.Core.Routing;
 using PaqetFire.Core.Profiles;
 using PaqetFire.Core.RoutingData;
+using PaqetFire.Core.Usage;
 using PaqetFire.Desktop.Ipc;
 using PaqetFire.Desktop.Presentation;
 using CoreConnectionState = PaqetFire.Core.Connections.ConnectionState;
@@ -1156,6 +1157,30 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         {
             await UpdateUiAsync(() => ApplyTransportFailure(exception)).ConfigureAwait(false);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads recorded data usage, first clearing it when <paramref name="reset"/> is given.
+    /// Failures are returned for the usage page to show; they are not connection errors.
+    /// </summary>
+    public async Task<DataUsageResult> GetDataUsageAsync(DataUsageReset? reset = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await brokerClient.OpenAsync(ConnectTimeout, cancellationToken).ConfigureAwait(false);
+            var report = reset is null
+                ? await brokerClient.GetDataUsageAsync(StatusRequestTimeout, cancellationToken).ConfigureAwait(false)
+                : await brokerClient.ResetDataUsageAsync(reset, StatusRequestTimeout, cancellationToken).ConfigureAwait(false);
+            return new DataUsageResult(report, null);
+        }
+        catch (BrokerRequestException exception)
+        {
+            return new DataUsageResult(null, exception.Message);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return new DataUsageResult(null, "PaqetFire could not reach its broker service to read data usage.");
         }
     }
 

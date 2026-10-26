@@ -19,7 +19,8 @@ public sealed class BrokerWorker(
     TunnelWatchdog? tunnelWatchdog = null,
     NetworkChangeMonitor? networkMonitor = null,
     BrokerSignal? signal = null,
-    RoutingDataService? routingData = null) : BackgroundService
+    RoutingDataService? routingData = null,
+    DataUsageRecorder? dataUsage = null) : BackgroundService
 {
     private readonly BrokerSignal signal = signal ?? new BrokerSignal();
     private readonly Channel<BrokerEvent> publications = Channel.CreateBounded<BrokerEvent>(
@@ -55,7 +56,8 @@ public sealed class BrokerWorker(
         var watchdogTask = tunnelWatchdog?.RunAsync(stoppingToken) ?? Task.CompletedTask;
         var networkTask = networkMonitor?.RunAsync(stoppingToken) ?? Task.CompletedTask;
         var routingDataTask = routingData?.RunAsync(stoppingToken) ?? Task.CompletedTask;
-        await Task.WhenAll(pipeTask, monitorTask, publicationTask, watchdogTask, networkTask, routingDataTask);
+        var dataUsageTask = dataUsage?.RunAsync(stoppingToken) ?? Task.CompletedTask;
+        await Task.WhenAll(pipeTask, monitorTask, publicationTask, watchdogTask, networkTask, routingDataTask, dataUsageTask);
 
         logger.LogInformation("PaqetFire Broker stopped.");
     }
