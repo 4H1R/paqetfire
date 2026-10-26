@@ -83,8 +83,8 @@ public sealed class ReliabilityTests
         var system = Path.Combine(Environment.SystemDirectory, "ping.exe");
         var installed = Path.Combine(directory, "ping.exe");
         File.Copy(system, installed);
-        using var orphan = Process.Start(new ProcessStartInfo(installed, "-t 127.0.0.1") { CreateNoWindow = true })!;
-        using var unrelated = Process.Start(new ProcessStartInfo(system, "-t 127.0.0.1") { CreateNoWindow = true })!;
+        using var orphan = StandInProcess.Start(installed);
+        using var unrelated = StandInProcess.Start(system);
         try
         {
             var stopped = await OrphanedEngineCleanup.TerminateAsync([installed], CancellationToken.None);
