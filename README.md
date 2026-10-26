@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-0078D4">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.27-FF6B42">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.7.0-FF6B42">
   <img alt="Status" src="https://img.shields.io/badge/status-alpha-F59E0B">
   <a href="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml"><img alt="Windows build" src="https://github.com/4H1R/paqetfire/actions/workflows/windows-build.yml/badge.svg?branch=main"></a>
 </p>
@@ -54,6 +54,7 @@ chain in a safe order.
 - Transfer profiles and transport keys in [portable exports grouped by engine](docs/profile-management.md), while keeping SOCKS credentials local to each PC.
 - Tune advanced Paqet packet/KCP settings and restore application defaults with Factory reset.
 - Follow each connect step on Overview, then watch the live session: connected time, exit IP and country, Paqet traffic rates and totals, and tunnel latency.
+- See how much each profile downloaded and uploaded through Paqet today, this month, and per day on the Data usage page, and reset it when you like.
 - Independently enable TCP, UDP, IPv4, and IPv6 routing.
 - Lock Paqet, Xray, the exit engine, ProxiFyre, and the broker out of catch-all rules to prevent
   recursive proxy loops.
@@ -274,7 +275,7 @@ packages are intentionally excluded from Git.
 
 ## Project status
 
-Version 0.6.27 is a usable development preview. The current source includes the
+Version 0.7.0 is a usable development preview. The current source includes the
 native desktop UI, broker service, engine adapters, regional routing, protocol
 selection, kill switch, LAN SOCKS5 sharing, tray behavior, diagnostics, verified
 GitHub release updates, and the WiX installer.
