@@ -632,8 +632,9 @@
                 <StackPanel x:Name="OpenVpnOptionsPanel" Spacing="10" Visibility="Collapsed">
                   <TextBlock x:Name="OpenVpnEngineText" FontSize="12" TextWrapping="Wrap"
                              AutomationProperties.LiveSetting="Polite" />
-                  <HyperlinkButton x:Name="OpenVpnDownloadLink" Content="Get OpenVPN Community for Windows"
-                                   NavigateUri="https://openvpn.net/community-downloads/" Padding="0" />
+                  <HyperlinkButton x:Name="OpenVpnDownloadLink" Content="Download OpenVPN Community 2.6 for Windows"
+                                   NavigateUri="https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.23-I002-amd64.msi" Padding="0"
+                                   ToolTipService.ToolTip="OpenVPN 2.7 cannot be the exit: it rejects Paqet's SOCKS5 login. openvpn.net offers only 2.7, so this is the 2.6 installer." />
                   <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button x:Name="OpenVpnImportButton" Content="Import .ovpn file…" Click="OpenVpnImportButton_Click" />
                     <TextBlock x:Name="OpenVpnConfigurationText" VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap" />

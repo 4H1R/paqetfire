@@ -98,6 +98,26 @@ public sealed class OpenVpnExitTests
     }
 
     [Theory]
+    [InlineData("2.5.11", "too old")]
+    [InlineData("2.6.0", null)]
+    [InlineData("2.6.23", null)]
+    [InlineData("2.7.0", "SOCKS5 login")]
+    [InlineData("2.7.8", "SOCKS5 login")]
+    public void OnlyOpenVpn26CanBeTheExit(string version, string? problem)
+    {
+        var result = OpenVpnInstallation.CheckVersion(Version.Parse(version));
+
+        if (problem is null)
+        {
+            Assert.Null(result);
+        }
+        else
+        {
+            Assert.Contains(problem, result, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
     [InlineData("10.96.0.2", 16, null)]
     [InlineData("172.20.1.5", 24, null)]
     [InlineData("10.0.0.2", 1, "wide enough")]
@@ -338,7 +358,7 @@ public sealed class OpenVpnExitTests
         var openVpn = Assert.Single(installer.GetAvailability(), engine => engine.Kind == ExitProxyKind.OpenVpn);
         Assert.False(openVpn.CanDownload);
         Assert.Equal("Install OpenVPN.", openVpn.Detail);
-        Assert.Equal(OpenVpnInstallation.DownloadPage.ToString(), openVpn.DownloadUrl);
+        Assert.Equal(OpenVpnInstallation.Download.ToString(), openVpn.DownloadUrl);
     }
 
     private static FileStream OpenAsUser(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.Read);

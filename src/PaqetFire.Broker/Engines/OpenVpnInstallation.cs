@@ -40,7 +40,17 @@ public sealed record OpenVpnInstallation(string ExecutablePath, string AdapterTo
     /// <summary>tapctl and the TAP-Windows6 driver ship with every 2.6 installer.</summary>
     public static Version MinimumVersion { get; } = new(2, 6, 0);
 
-    public static Uri DownloadPage { get; } = new("https://openvpn.net/community-downloads/");
+    /// <summary>
+    /// OpenVPN 2.7 checks the SOCKS5 login reply for version 5 instead of RFC 1929's 1, so
+    /// it reads Paqet's correct acceptance as a refusal and the exit never connects.
+    /// </summary>
+    public static Version FirstBrokenVersion { get; } = new(2, 7, 0);
+
+    /// <summary>
+    /// The newest 2.6 installer. openvpn.net's download page offers only 2.7, so linking it
+    /// would send users to a version that cannot be the exit.
+    /// </summary>
+    public static Uri Download { get; } = new("https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.23-I002-amd64.msi");
 
     /// <summary>Looks where the official installer records itself, then in its default folder.</summary>
     public static OpenVpnLookup Find()
@@ -82,7 +92,7 @@ public sealed record OpenVpnInstallation(string ExecutablePath, string AdapterTo
 
         return rejected ?? new OpenVpnLookup(
             null,
-            $"OpenVPN is not installed. Install OpenVPN Community {MinimumVersion.ToString(2)} or newer from openvpn.net to use the OpenVPN exit.");
+            $"OpenVPN is not installed. Install OpenVPN Community {MinimumVersion.ToString(2)} to use the OpenVPN exit.");
     }
 
     internal static OpenVpnLookup Inspect(string executablePath)
@@ -94,9 +104,9 @@ public sealed record OpenVpnInstallation(string ExecutablePath, string AdapterTo
             var tool = Path.Combine(folder.FullName, "tapctl.exe");
             var info = FileVersionInfo.GetVersionInfo(executable.FullName);
             var version = new Version(Math.Max(info.FileMajorPart, 0), Math.Max(info.FileMinorPart, 0), Math.Max(info.FileBuildPart, 0));
-            if (version < MinimumVersion)
+            if (CheckVersion(version) is { } versionProblem)
             {
-                return new(null, $"OpenVPN {version.ToString(3)} is too old. Install OpenVPN Community {MinimumVersion.ToString(2)} or newer.");
+                return new(null, versionProblem);
             }
 
             if (!File.Exists(tool))
@@ -117,6 +127,22 @@ public sealed record OpenVpnInstallation(string ExecutablePath, string AdapterTo
         {
             return new(null, $"The OpenVPN installation could not be checked: {exception.Message}");
         }
+    }
+
+    /// <summary>Why this OpenVPN version cannot be the exit; null when it can.</summary>
+    internal static string? CheckVersion(Version version)
+    {
+        if (version < MinimumVersion)
+        {
+            return $"OpenVPN {version.ToString(3)} is too old. Install OpenVPN Community {MinimumVersion.ToString(2)}.";
+        }
+
+        if (version >= FirstBrokenVersion)
+        {
+            return $"OpenVPN {version.ToString(3)} cannot be the exit: OpenVPN {FirstBrokenVersion.ToString(2)} rejects Paqet's SOCKS5 login. Uninstall it and install OpenVPN Community {MinimumVersion.ToString(2)}.";
+        }
+
+        return null;
     }
 
     /// <summary>Whether only trusted accounts own or may modify the file or folder.</summary>

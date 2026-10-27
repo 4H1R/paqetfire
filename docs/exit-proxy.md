@@ -27,8 +27,12 @@ no extra kernel drivers to people who never use an exit.
   accepted, and the broker opens the file while impersonating the desktop's
   user, so a link on the drive cannot make it reach a network share as SYSTEM. The file is
   stored in `%ProgramData%\PaqetFire\engines`, a broker-only directory.
-- **OpenVPN** is the user's own installation of OpenVPN Community 2.6 or newer
-  from openvpn.net. Its signed installer brings `openvpn.exe`, the TAP-Windows6
+- **OpenVPN** is the user's own installation of OpenVPN Community 2.6 from
+  openvpn.net. OpenVPN 2.7 is refused: it checks the SOCKS5 login reply for
+  version 5 instead of RFC 1929's 1, so it reads Paqet's acceptance as
+  "server refused the authentication". openvpn.net's download page offers only
+  2.7, so PaqetFire links the newest 2.6 installer (2.6.23) directly
+  (`OpenVpnInstallation.Download`). Its signed installer brings `openvpn.exe`, the TAP-Windows6
   driver, and `tapctl.exe`; PaqetFire installs no driver itself. Because the
   broker runs OpenVPN as SYSTEM, it accepts an installation only when the
   executable, `tapctl.exe`, and their folder can be modified by nobody but

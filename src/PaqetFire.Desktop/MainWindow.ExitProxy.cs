@@ -130,6 +130,10 @@ public sealed partial class MainWindow
                 ? $"Using your OpenVPN {openVpn.Version} installation."
                 : openVpn.Detail ?? "OpenVPN is not installed.";
             OpenVpnDownloadLink.Visibility = openVpn.IsInstalled ? Visibility.Collapsed : Visibility.Visible;
+            if (openVpn.DownloadUrl is { } url && Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                OpenVpnDownloadLink.NavigateUri = uri;
+            }
         }
     }
 

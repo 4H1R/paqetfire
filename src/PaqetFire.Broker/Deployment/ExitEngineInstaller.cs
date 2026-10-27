@@ -101,7 +101,7 @@ public sealed class ExitEngineInstaller
                 openVpnLookup.Installation is not null,
                 openVpnLookup.Installation?.Version.ToString(3),
                 Detail: openVpnLookup.Problem,
-                DownloadUrl: OpenVpnInstallation.DownloadPage.ToString()),
+                DownloadUrl: OpenVpnInstallation.Download.ToString()),
         ];
     }
 
@@ -116,7 +116,7 @@ public sealed class ExitEngineInstaller
         if (action.Kind == ExitProxyKind.OpenVpn)
         {
             throw new InvalidOperationException(
-                $"PaqetFire uses your own OpenVPN. Install OpenVPN Community {OpenVpnInstallation.MinimumVersion.ToString(2)} or newer from openvpn.net.");
+                $"PaqetFire uses your own OpenVPN. Install OpenVPN Community {OpenVpnInstallation.MinimumVersion.ToString(2)}.");
         }
 
         if (action.Kind != ExitProxyKind.Psiphon || !Enum.IsDefined(action.Operation))
