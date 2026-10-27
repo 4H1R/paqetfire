@@ -65,7 +65,17 @@ exclusions so the user cannot remove them:
 1. the full installed path of `paqet.exe`;
 2. the full installed path of `xray.exe`;
 3. the full installed path of `ProxiFyre.exe`; and
-4. the full installed path of `PaqetFire.Broker.exe`.
+4. the full installed path of `PaqetFire.Broker.exe`; and
+5. `SharedAccess`, the Internet Connection Sharing service.
+
+ProxiFyre filters every adapter that is up with an address, the Mobile hotspot
+adapter included, and `bypassLan` does not cover it when local devices are
+routed. Internet Connection Sharing is the hotspot's DHCP server and DNS proxy,
+so a catch-all carried its replies to a joining phone into Xray and the phone
+never got an address. ProxiFyre names a socket owned by a service after the
+service (its service tag), not after the shared `svchost.exe`, so this
+exclusion leaves Windows Update, the Task Scheduler, and the other services in
+that host routed.
 
 Full paths are preferred. ProxiFyre's exclusion matcher is deliberately
 permissive: a name-only exclusion is a substring match and can accidentally

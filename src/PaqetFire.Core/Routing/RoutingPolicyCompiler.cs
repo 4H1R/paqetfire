@@ -4,6 +4,15 @@ namespace PaqetFire.Core.Routing;
 
 public static class RoutingPolicyCompiler
 {
+    /// <summary>
+    /// The Internet Connection Sharing service, which hands Mobile hotspot devices their
+    /// address and answers their DNS. ProxiFyre filters the hotspot adapter too, so a
+    /// catch-all would carry its replies to a phone into Xray and the phone would never
+    /// join. ProxiFyre names a service-owned socket by its service, so this exclusion
+    /// does not reach the other services sharing its svchost.exe.
+    /// </summary>
+    public const string HotspotServiceExclusion = "SharedAccess";
+
     public static ProxiFyreRoutePlan Compile(
         RoutingPolicy policy,
         string paqetExecutablePath,
@@ -64,6 +73,7 @@ public static class RoutingPolicyCompiler
         {
             NormalizeEnginePattern(paqetExecutablePath, nameof(paqetExecutablePath)),
             NormalizeEnginePattern(proxiFyreExecutablePath, nameof(proxiFyreExecutablePath)),
+            HotspotServiceExclusion,
         };
 
         if (additionalLockedExclusions is not null)

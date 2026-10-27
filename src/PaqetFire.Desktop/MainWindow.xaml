@@ -699,7 +699,7 @@
                 <Border Padding="14" CornerRadius="12" Background="#12FF6B42">
                   <StackPanel Spacing="5">
                     <TextBlock Text="Always bypassed · locked" FontWeight="SemiBold" Foreground="{StaticResource PaqetFireAccentBrush}" />
-                    <TextBlock Text="Paqet engine path  ·  Xray engine path  ·  ProxiFyre engine path  ·  PaqetFire broker path"
+                    <TextBlock Text="Paqet engine path  ·  Xray engine path  ·  ProxiFyre engine path  ·  PaqetFire broker path  ·  Mobile hotspot service"
                                TextWrapping="Wrap" Opacity="0.76" />
                   </StackPanel>
                 </Border>

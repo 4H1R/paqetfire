@@ -75,6 +75,9 @@ in the client so DNS queries are also routed through the proxy.
 
 ## What to expect
 
+- Devices join the hotspot and get an address while PaqetFire is connected,
+  whatever the routing mode: the Internet Connection Sharing service that
+  answers them is a locked ProxiFyre exclusion.
 - The same regional/direct‑routing, ad‑blocking, QUIC and BitTorrent policy
   that applies to LAN clients also applies to hotspot clients — the route is
   shared.

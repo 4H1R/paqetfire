@@ -28,6 +28,7 @@ public sealed class ConfigurationTests
         Assert.Contains(proxiFyre, plan.Exclusions, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(broker, plan.Exclusions, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("steam.exe", plan.Exclusions, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(RoutingPolicyCompiler.HotspotServiceExclusion, locked);
 
         var json = new ProxiFyreJsonConfigurationWriter().Write(plan, locked);
         using var document = JsonDocument.Parse(json);
