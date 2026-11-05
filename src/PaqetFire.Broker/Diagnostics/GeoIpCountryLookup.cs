@@ -10,12 +10,22 @@ public interface IGeoIpCountryLookup
 }
 
 /// <summary>
-/// Offline country lookup against the bundled Xray geoip.dat, so the exit address
-/// is never sent to a third-party geolocation service.
+/// Offline country lookup against the geoip.dat Xray loads, so the exit address is never
+/// sent to a third-party geolocation service. Xray's own release bundles a "lite" file whose
+/// only two-letter sets (cn, ir, ru) are routing whitelists rather than geolocation, so a
+/// file with too few countries answers nothing; the downloaded routing data has them all.
 /// </summary>
-public sealed class GeoIpCountryLookup(string geoIpPath) : IGeoIpCountryLookup
+public sealed class GeoIpCountryLookup(Func<string> geoIpPath) : IGeoIpCountryLookup
 {
-    private readonly ConcurrentDictionary<IPAddress, string?> cache = new();
+    // A geolocation list has about 250 countries; Xray's lite list has three aliases.
+    internal const int MinimumCountryCount = 20;
+
+    private readonly ConcurrentDictionary<(string Path, IPAddress Address), string?> cache = new();
+
+    public GeoIpCountryLookup(string geoIpPath)
+        : this(() => geoIpPath)
+    {
+    }
 
     public async ValueTask<string?> FindCountryCodeAsync(IPAddress address, CancellationToken cancellationToken)
     {
@@ -25,15 +35,16 @@ public sealed class GeoIpCountryLookup(string geoIpPath) : IGeoIpCountryLookup
             address = address.MapToIPv4();
         }
 
-        if (cache.TryGetValue(address, out var cached))
+        var path = geoIpPath();
+        if (cache.TryGetValue((path, address), out var cached))
         {
             return cached;
         }
 
-        // The file is ~20 MB; it is read only once per new exit address and not retained.
-        var data = await File.ReadAllBytesAsync(geoIpPath, cancellationToken).ConfigureAwait(false);
+        // The file is up to ~20 MB; it is read only once per new exit address and not retained.
+        var data = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
         var country = FindCountryCode(data, address.GetAddressBytes());
-        cache[address] = country;
+        cache[(path, address)] = country;
         return country;
     }
 
@@ -43,6 +54,8 @@ public sealed class GeoIpCountryLookup(string geoIpPath) : IGeoIpCountryLookup
     internal static string? FindCountryCode(ReadOnlySpan<byte> geoIpList, ReadOnlySpan<byte> address)
     {
         var list = new ProtoReader(geoIpList);
+        string? found = null;
+        var countries = 0;
         while (list.TryReadField(out var field, out var wireType))
         {
             if (field != 1 || wireType != 2)
@@ -64,6 +77,13 @@ public sealed class GeoIpCountryLookup(string geoIpPath) : IGeoIpCountryLookup
                         // Skip non-country sets such as "private" or provider lists.
                         break;
                     }
+
+                    countries++;
+                    if (found is not null)
+                    {
+                        // Already matched; only the remaining countries are counted.
+                        break;
+                    }
                 }
                 else if (entryField == 2 && entryWireType == 2)
                 {
@@ -82,13 +102,13 @@ public sealed class GeoIpCountryLookup(string geoIpPath) : IGeoIpCountryLookup
                 }
             }
 
-            if (matched && code is { Length: 2 })
+            if (found is null && matched && code is { Length: 2 })
             {
-                return code.ToUpperInvariant();
+                found = code.ToUpperInvariant();
             }
         }
 
-        return null;
+        return countries >= MinimumCountryCount ? found : null;
     }
 
     private static bool CidrContains(ReadOnlySpan<byte> cidr, ReadOnlySpan<byte> address)

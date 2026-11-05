@@ -33,7 +33,7 @@ public static partial class PaqetConfigurationValidator
         var errors = new List<string>();
         ValidateEndpoint(profile.ServerEndpoint, "Server endpoint", loopbackOnly: false, errors);
         ValidateEndpoint(profile.LocalSocksEndpoint, "Local SOCKS endpoint", loopbackOnly: true, errors);
-        // Paqet v1.0.0-alpha.21 enforces the pcap/IFNAMSIZ limit on all platforms.
+        // Paqet v1.0.0-alpha.21-a1 enforces the pcap/IFNAMSIZ limit on all platforms.
         ValidateText(profile.InterfaceName, "Network interface", 15, errors);
 
         if (!TryParseInterfaceGuid(profile.InterfaceGuid, out _))

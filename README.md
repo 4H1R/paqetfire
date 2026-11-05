@@ -31,7 +31,9 @@
 PaqetFire brings three complementary networking tools into one desktop app:
 
 - **[Paqet](https://github.com/hanselime/paqet)** provides the raw-packet/KCP
-  transport and a local SOCKS5 endpoint.
+  transport and a local SOCKS5 endpoint. PaqetFire bundles the
+  [4H1R/paqet](https://github.com/4H1R/paqet) fork, which speaks the same wire
+  protocol as upstream servers.
 - **[Xray-core](https://github.com/XTLS/Xray-core)** applies destination rules,
   including regional direct-routing presets and domain blocking.
 - **[ProxiFyre](https://github.com/wiresock/proxifyre)** transparently captures
@@ -295,8 +297,8 @@ PaqetFire distributes independently maintained components as an aggregate:
 
 | Component | Pinned version | License |
 | --- | ---: | --- |
-| [Paqet](https://github.com/hanselime/paqet) | `v1.0.0-alpha.21` | MIT |
-| [Xray-core](https://github.com/XTLS/Xray-core) | `26.3.27` | MPL-2.0 |
+| [Paqet](https://github.com/4H1R/paqet) (fork of [hanselime/paqet](https://github.com/hanselime/paqet)) | `v1.0.0-alpha.21-a1` | MIT |
+| [Xray-core](https://github.com/XTLS/Xray-core) | `26.10.31` | MPL-2.0 |
 | [ProxiFyre](https://github.com/wiresock/proxifyre) | `2.6.4` | AGPL-3.0 |
 
 The repository contains the corresponding notices and upstream license texts.

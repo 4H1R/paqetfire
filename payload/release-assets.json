@@ -3,15 +3,15 @@
   "assets": [
     {
       "engine": "Paqet",
-      "version": "v1.0.0-alpha.21",
-      "url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-windows-amd64-v1.0.0-alpha.21.zip",
-      "sha256": "5d21b097dc56c3cdc48db95133e74c804d8df6c771838b440285bd1e27109620"
+      "version": "v1.0.0-alpha.21-a1",
+      "url": "https://github.com/4H1R/paqet/releases/download/v1.0.0-alpha.21-a1/paqet-windows-amd64-v1.0.0-alpha.21-a1.zip",
+      "sha256": "d6334ae397e337731b556a5e6d8e68c67b62432048e2bc8987b1de163674321a"
     },
     {
       "engine": "Xray",
-      "version": "26.3.27",
-      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-windows-64.zip",
-      "sha256": "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad"
+      "version": "26.10.31",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-windows-64.zip",
+      "sha256": "2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a"
     },
     {
       "engine": "ProxiFyre",

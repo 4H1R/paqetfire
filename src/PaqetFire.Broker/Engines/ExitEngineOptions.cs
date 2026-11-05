@@ -21,14 +21,14 @@ public sealed record DownloadableEngine(
 internal static class ExitEngineOptions
 {
     // The console client published in Psiphon-Labs/psiphon-tunnel-core-binaries at
-    // commit d95d7f964c043a5a0ebd25cca801bc2753e14f74; only a 32-bit Windows build exists.
+    // commit b710e31e2f3a69ff5fdecfa44f0b3be146b2d0c9; only a 32-bit Windows build exists.
     // A URL pinned to a full commit always serves these bytes.
     public static DownloadableEngine Psiphon { get; } = new(
         ExitProxyKind.Psiphon,
-        "d95d7f9",
-        new Uri("https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/raw/d95d7f964c043a5a0ebd25cca801bc2753e14f74/windows/psiphon-tunnel-core-i686.exe"),
-        "34139a07deca9e9b94e5b55ebdf5e2583ca87f3d838873f105488681d22f4a0e",
-        27956224,
+        "b710e31",
+        new Uri("https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/raw/b710e31e2f3a69ff5fdecfa44f0b3be146b2d0c9/windows/psiphon-tunnel-core-i686.exe"),
+        "d1427683d11d2d68bbaeeaff8d5071fe38cb5f6b823a487df13562c1491a27c7",
+        28003840,
         "psiphon-tunnel-core.exe");
 
     public static PsiphonProcessOptions CreatePsiphon(RuntimePaths paths) => new()

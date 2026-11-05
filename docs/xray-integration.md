@@ -1,6 +1,6 @@
 # Xray regional policy routing
 
-PaqetFire bundles Xray-core 26.3.27 as a local destination-policy engine.
+PaqetFire bundles Xray-core 26.10.31 as a local destination-policy engine.
 Xray is not a second VPN and does not replace Paqet.
 
 ## Data path
@@ -121,7 +121,11 @@ by Xray rules.
 ## Routing data
 
 Xray matches `geosite:` and `geoip:` rules against two data files. The installer
-ships the files from the pinned Xray release. The broker can replace them with
+ships the files from the pinned Xray release: since Xray 26.10, the "GeoIP Lite"
+and "GeoSite Standard" builds of
+[XTLS/Xray-rules-dat](https://github.com/XTLS/Xray-rules-dat). In GeoIP Lite,
+`geoip:ir` is an alias for `in-ir`, the addresses suited to direct connections
+from Iran, rather than strict geolocation, and the file has no other countries. The broker can replace them with
 the daily releases of the
 [Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules) project, a
 superset of v2fly's domain list with a larger `category-ir` (Iranian sites on any
@@ -176,7 +180,7 @@ protected installation payload directory. It is not accepted from the UI.
 
 ## Live session statistics
 
-Generated configurations enable Xray's `StatsService` on `127.0.0.1:10085` (loopback only; `HandlerService` is not exposed) with outbound uplink/downlink counters. The broker reads the `outbound>>>paqet>>>traffic>>>*` and `outbound>>>exit>>>traffic>>>*` counters over gRPC for the Overview session card, so totals and rates include only traffic routed through Paqet or the exit that rides on it, never direct or blocked traffic. Latency is probed directly against the Paqet SOCKS5 listener, bypassing Xray so probe bytes are not counted; the exit address is probed the same way, through Psiphon's listener when the profile uses the Psiphon exit, or for the OpenVPN exit with a socket bound to its adapter that asks `https://1.1.1.1/cdn-cgi/trace`, which needs no DNS lookup. The exit country is resolved offline from the bundled `geoip.dat`; no address is sent to a geolocation service.
+Generated configurations enable Xray's `StatsService` on `127.0.0.1:10085` (loopback only; `HandlerService` is not exposed) with outbound uplink/downlink counters. The broker reads the `outbound>>>paqet>>>traffic>>>*` and `outbound>>>exit>>>traffic>>>*` counters over gRPC for the Overview session card, so totals and rates include only traffic routed through Paqet or the exit that rides on it, never direct or blocked traffic. Latency is probed directly against the Paqet SOCKS5 listener, bypassing Xray so probe bytes are not counted; the exit address is probed the same way, through Psiphon's listener when the profile uses the Psiphon exit, or for the OpenVPN exit with a socket bound to its adapter that asks `https://1.1.1.1/cdn-cgi/trace`, which needs no DNS lookup. The exit country is resolved offline from the `geoip.dat` Xray loads; no address is sent to a geolocation service. Only the downloaded routing data has per-country sets: the GeoIP Lite file bundled with Xray has none, so with bundled data the card shows the exit address without a country.
 
 ## Data usage
 

@@ -3,10 +3,10 @@
 PaqetFire distributes the following independently maintained engine payloads as
 an aggregate. Each engine remains under its upstream license.
 
-## Paqet v1.0.0-alpha.21
+## Paqet v1.0.0-alpha.21-a1
 
-- Project: https://github.com/hanselime/paqet
-- Exact source: https://github.com/hanselime/paqet/tree/v1.0.0-alpha.21
+- Project: https://github.com/4H1R/paqet, a fork of https://github.com/hanselime/paqet
+- Exact source: https://github.com/4H1R/paqet/tree/v1.0.0-alpha.21-a1
 - License: MIT
 
 ## ProxiFyre 2.6.4
@@ -19,15 +19,17 @@ The corresponding source for the bundled ProxiFyre release is available at the
 exact-source link above at no charge. PaqetFire does not remove or restrict any
 rights granted by the AGPL-3.0 license.
 
-## Xray-core 26.3.27
+## Xray-core 26.10.31
 
 - Project: https://github.com/XTLS/Xray-core
-- Exact source: https://github.com/XTLS/Xray-core/tree/v26.3.27
+- Exact source: https://github.com/XTLS/Xray-core/tree/v26.10.31
 - License: Mozilla Public License 2.0
 
 PaqetFire uses Xray only as a local routing-policy engine. The bundled
 `geoip.dat` and `geosite.dat` files are the unmodified files from the official
-Xray Windows release.
+Xray Windows release, built by https://github.com/XTLS/Xray-rules-dat from
+IPinfo Lite and v2fly/domain-list-community data; see that project for their
+sources and licenses.
 
 ## Downloaded routing data
 
@@ -41,11 +43,11 @@ licenses; see the project page.
 
 Neither exit engine is part of the PaqetFire installer.
 
-- **Psiphon tunnel core** (console client, binaries commit d95d7f9) is downloaded
+- **Psiphon tunnel core** (console client, binaries commit b710e31) is downloaded
   on the user's machine, when they ask for it, from
-  https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/blob/d95d7f964c043a5a0ebd25cca801bc2753e14f74/windows/psiphon-tunnel-core-i686.exe
+  https://github.com/Psiphon-Labs/psiphon-tunnel-core-binaries/blob/b710e31e2f3a69ff5fdecfa44f0b3be146b2d0c9/windows/psiphon-tunnel-core-i686.exe
   and accepted only with its pinned SHA-256. It is licensed under GPL-3.0; its
-  source is at https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/c4a09096ab401b57f52e092c8f2f829c8fac7628.
+  source is at https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/4e4b4725e25ac6879a42b1d715fd34a0fb32a7e9.
   The client connects to the Psiphon network operated by Psiphon Inc., whose
   terms apply to that service.
 - **OpenVPN** is the user's own OpenVPN Community installation from

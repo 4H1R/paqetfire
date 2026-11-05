@@ -13,6 +13,7 @@ using PaqetFire.Core.Connections;
 using PaqetFire.Core.Engines;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Core.Profiles;
+using PaqetFire.Core.RoutingData;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -84,7 +85,15 @@ builder.Services.AddSingleton<IXrayTrafficStats, XrayStatsClient>();
 builder.Services.AddSingleton<ITunnelProbe, PaqetTunnelProbe>();
 builder.Services.AddSingleton<IIpv6CapabilityProbe, Ipv6CapabilityProbe>();
 builder.Services.AddSingleton<TunnelActivity>();
-builder.Services.AddSingleton<IGeoIpCountryLookup>(_ => new GeoIpCountryLookup(paths.XrayGeoIpPath));
+// Reads the GeoIP data Xray loads: the downloaded routing data has every country, while
+// the file bundled with Xray has none.
+builder.Services.AddSingleton<IGeoIpCountryLookup>(services =>
+{
+    var xray = services.GetRequiredService<XrayProcessAdapter>();
+    return new GeoIpCountryLookup(() => xray.RoutingData.AssetDirectory is { } directory
+        ? Path.Combine(directory, RoutingDataRelease.GeoIpFileName)
+        : paths.XrayGeoIpPath);
+});
 builder.Services.AddSingleton<ILiveStatsService, LiveStatsService>();
 builder.Services.AddSingleton<IPaqetConfigurationWriter, PaqetYamlConfigurationWriter>();
 builder.Services.AddSingleton<IXrayConfigurationWriter, XrayJsonConfigurationWriter>();

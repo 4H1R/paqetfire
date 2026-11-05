@@ -2,14 +2,21 @@
 
 ## Pinned runtime
 
-PaqetFire pins the Windows x64 Paqet payload to `v1.0.0-alpha.21`
-(`4b81ce0ab56b7cc9aec7501c87c4804676cdb1b4`). The release binary is 9,562,112
-bytes with SHA-256:
+PaqetFire pins the Windows x64 Paqet payload to `v1.0.0-alpha.21-a1` of the
+[4H1R/paqet](https://github.com/4H1R/paqet) fork
+(`07a6009967da589219a8210d59a370cc8aa4db34`), which is upstream
+`hanselime/paqet` `v1.0.0-alpha.21` plus transport performance work, client
+pool and configuration-loading fixes. The release binary is 9,722,368 bytes
+with SHA-256:
 
-`7D73F5130757B538C26C3ED76439A150978C3E06289C724DE37D916789AAF5DC`
+`5B87FE8F9E28DE33233FC1D0BAC933669630F7315C1582030FF5FC5ABAFAADA8`
 
-The release artifact must be downloaded from the upstream release, not copied
-from an existing machine. Release automation independently verifies the
+Fork tags follow `v<upstream-version>-a<N>`. The wire protocol is unchanged, so
+the fork interoperates with upstream servers and clients in every combination;
+the server still needs the same key, KCP mode, MTU, and FEC shards.
+
+The release artifact must be downloaded from the fork's GitHub release, not
+copied from an existing machine. Release automation independently verifies the
 published archive digest and the extracted executable's size and digest in
 `payload/payload-manifest.json`.
 
@@ -32,7 +39,7 @@ UDP-associate; the on-demand connection verification report does.
 ## Configuration support
 
 `PaqetProfile`, `PaqetConfigurationValidator`, and `PaqetYamlConfigurationWriter`
-cover the client options of Paqet v1.0.0-alpha.21:
+cover the client options of Paqet v1.0.0-alpha.21-a1:
 
 - SOCKS5 listen endpoint and optional username/password authentication;
 - TCP/UDP port forwards;
@@ -58,6 +65,13 @@ defaults instead of upstream's zero sentinel. Optional low-level port-forward
 rules remain a writer capability, separate from packet tuning. The `transport.tcpbuf` and `transport.udpbuf` fields that appear
 in older upstream examples do not exist in alpha.21 and are not written.
 
+The fork logs unknown or misplaced configuration keys as a warning instead of
+ignoring them silently, and warns when manual KCP controls are set with a
+preset mode; the writer emits neither. Its optional `log.stats_interval` and
+`network.dscp` (default 46) keys are not written, so the engine defaults apply.
+PaqetFire does not parse Paqet's log output, so the fork's per-second
+`retrans=`/`lost=` statistics format does not affect it.
+
 SOCKS listener wiring remains owned by the application. The listener requires
 the broker's engine credentials, generated once and stored DPAPI-protected in
 `%ProgramData%\PaqetFire\engine-credentials.json`; Xray's Paqet outbound, the
@@ -74,8 +88,8 @@ survives a service restart. Paqet resolves a host name once at
 startup through Windows, whose lookups ProxiFyre may be capturing into a route
 that is not up yet, as during a transport restart or a kill-switch guard.
 
-When updating the pinned release, re-audit the client schema in upstream
-[`internal/conf`](https://github.com/hanselime/paqet/tree/4b81ce0ab56b7cc9aec7501c87c4804676cdb1b4/internal/conf)
+When updating the pinned release, re-audit the client schema in the fork's
+[`internal/conf`](https://github.com/4H1R/paqet/tree/07a6009967da589219a8210d59a370cc8aa4db34/internal/conf)
 rather than cached web examples, and align the validator's ranges with it.
 
 ## Tunnel watchdog

@@ -48,15 +48,65 @@ public sealed class LiveStatsTests
     public void GeoIpLookupMatchesCountryCidrAndSkipsNonCountrySets()
     {
         var list = Concat(
-            Field(1, Concat(Field(1, Encoding.ASCII.GetBytes("private")), Field(2, Cidr([10, 0, 0, 0], 8)))),
-            Field(1, Concat(Field(1, Encoding.ASCII.GetBytes("ir")), Field(2, Cidr([5, 160, 0, 0], 14)))),
-            Field(1, Concat(Field(1, Encoding.ASCII.GetBytes("us")), Field(2, Cidr([8, 8, 8, 0], 24)))));
+            GeoIpEntry("private", [10, 0, 0, 0], 8),
+            GeoIpEntry("ir", [5, 160, 0, 0], 14),
+            GeoIpEntry("us", [8, 8, 8, 0], 24),
+            OtherCountries());
 
         Assert.Equal("IR", GeoIpCountryLookup.FindCountryCode(list, IPAddress.Parse("5.163.255.1").GetAddressBytes()));
         Assert.Equal("US", GeoIpCountryLookup.FindCountryCode(list, IPAddress.Parse("8.8.8.8").GetAddressBytes()));
         Assert.Null(GeoIpCountryLookup.FindCountryCode(list, IPAddress.Parse("5.164.0.1").GetAddressBytes()));
         Assert.Null(GeoIpCountryLookup.FindCountryCode(list, IPAddress.Parse("10.1.2.3").GetAddressBytes()));
     }
+
+    [Fact]
+    public void GeoIpLookupAnswersNothingFromXrayLiteDataWhoseCountrySetsAreRoutingAliases()
+    {
+        // Xray's bundled geoip.dat: cn, ir and ru are whitelists for direct routing, not geolocation.
+        var lite = Concat(
+            GeoIpEntry("private", [10, 0, 0, 0], 8),
+            GeoIpEntry("in-ir", [5, 160, 0, 0], 14),
+            GeoIpEntry("ir", [5, 160, 0, 0], 14),
+            GeoIpEntry("cn", [1, 0, 1, 0], 24),
+            GeoIpEntry("ru", [2, 56, 0, 0], 16),
+            GeoIpEntry("cloudflare", [104, 16, 0, 0], 13));
+
+        Assert.Null(GeoIpCountryLookup.FindCountryCode(lite, IPAddress.Parse("5.163.255.1").GetAddressBytes()));
+    }
+
+    [Fact]
+    public async Task GeoIpLookupReadsTheFileItIsPointedAtNow()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pf-geoip-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var lite = Path.Combine(root, "lite.dat");
+            var full = Path.Combine(root, "full.dat");
+            File.WriteAllBytes(lite, GeoIpEntry("ir", [5, 160, 0, 0], 14));
+            File.WriteAllBytes(full, Concat(GeoIpEntry("ir", [5, 160, 0, 0], 14), OtherCountries()));
+            var current = lite;
+            var lookup = new GeoIpCountryLookup(() => current);
+            var address = IPAddress.Parse("5.163.255.1");
+
+            Assert.Null(await lookup.FindCountryCodeAsync(address, CancellationToken.None));
+            current = full;
+            Assert.Equal("IR", await lookup.FindCountryCodeAsync(address, CancellationToken.None));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static byte[] GeoIpEntry(string code, byte[] network, int prefix) =>
+        Field(1, Concat(Field(1, Encoding.ASCII.GetBytes(code)), Field(2, Cidr(network, prefix))));
+
+    // Enough further countries, in documentation space, for the list to count as geolocation data.
+    private static byte[] OtherCountries() =>
+        Concat(Enumerable.Range(0, GeoIpCountryLookup.MinimumCountryCount)
+            .Select(index => GeoIpEntry($"x{(char)('a' + index)}", [192, 0, 2, (byte)index], 32))
+            .ToArray());
 
     [Fact]
     public void XrayConfigurationEnablesLoopbackStatsForPaqetOutbound()

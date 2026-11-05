@@ -4,35 +4,35 @@
   "engines": [
     {
       "engine": "Paqet",
-      "version": "v1.0.0-alpha.21",
+      "version": "v1.0.0-alpha.21-a1",
       "entryPoint": "engines/paqet/x64/paqet_windows_amd64.exe",
       "files": [
         {
           "path": "engines/paqet/x64/paqet_windows_amd64.exe",
-          "size": 9562112,
-          "sha256": "7d73f5130757b538c26c3ed76439a150978c3e06289c724de37d916789aaf5dc"
+          "size": 9722368,
+          "sha256": "5b87fe8f9e28de33233fc1d0bac933669630f7315c1582030ff5fc5abafaada8"
         }
       ]
     },
     {
       "engine": "Xray",
-      "version": "26.3.27",
+      "version": "26.10.31",
       "entryPoint": "engines/xray/x64/xray.exe",
       "files": [
         {
           "path": "engines/xray/x64/xray.exe",
-          "size": 35613696,
-          "sha256": "15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1"
+          "size": 34555392,
+          "sha256": "d5b558191cccb1e92a5772b68b8cab67717b26f634b0f15153215f65ae982a7e"
         },
         {
           "path": "engines/xray/x64/geoip.dat",
-          "size": 19768301,
-          "sha256": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354"
+          "size": 3312784,
+          "sha256": "ce90dc02a81528109c99d769e1f8fe3071ded6b02a574f31e62d8f4eee312563"
         },
         {
           "path": "engines/xray/x64/geosite.dat",
-          "size": 10491954,
-          "sha256": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+          "size": 7554929,
+          "sha256": "9ee94acb06e2f795831fb1589c0dc7af9242b0fb8d9196afd981b915b1097ed3"
         }
       ]
     },
