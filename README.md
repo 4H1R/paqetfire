@@ -297,7 +297,7 @@ PaqetFire distributes independently maintained components as an aggregate:
 
 | Component | Pinned version | License |
 | --- | ---: | --- |
-| [Paqet](https://github.com/4H1R/paqet) (fork of [hanselime/paqet](https://github.com/hanselime/paqet)) | `v1.0.0-alpha.21-a1` | MIT |
+| [Paqet](https://github.com/4H1R/paqet) (fork of [hanselime/paqet](https://github.com/hanselime/paqet)) | `v1.0.0-alpha.21-a2` | MIT |
 | [Xray-core](https://github.com/XTLS/Xray-core) | `26.10.31` | MPL-2.0 |
 | [ProxiFyre](https://github.com/wiresock/proxifyre) | `2.6.4` | AGPL-3.0 |
 

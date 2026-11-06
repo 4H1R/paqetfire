@@ -15,8 +15,8 @@ internal static class BundledEngineOptions
         TrustedExecutableRoot = paths.PayloadRoot,
         TrustedConfigurationRoot = paths.PayloadRoot,
         SocksEndpoint = new IPEndPoint(IPAddress.Loopback, 1080),
-        Version = "v1.0.0-alpha.21-a1",
-        ExpectedExecutableSha256 = "5b87fe8f9e28de33233fc1d0bac933669630f7315c1582030ff5fc5abafaada8",
+        Version = "v1.0.0-alpha.21-a2",
+        ExpectedExecutableSha256 = "8939e1d8ac79e67075d6e6a4ded0ff8bb69141a9c1c3ef5aa955cec37cc3dfb5",
         ReadinessTimeout = TimeSpan.FromSeconds(30),
     };
 

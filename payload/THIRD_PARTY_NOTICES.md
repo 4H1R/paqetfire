@@ -3,10 +3,10 @@
 PaqetFire distributes the following independently maintained engine payloads as
 an aggregate. Each engine remains under its upstream license.
 
-## Paqet v1.0.0-alpha.21-a1
+## Paqet v1.0.0-alpha.21-a2
 
 - Project: https://github.com/4H1R/paqet, a fork of https://github.com/hanselime/paqet
-- Exact source: https://github.com/4H1R/paqet/tree/v1.0.0-alpha.21-a1
+- Exact source: https://github.com/4H1R/paqet/tree/v1.0.0-alpha.21-a2
 - License: MIT
 
 ## ProxiFyre 2.6.4

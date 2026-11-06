@@ -4,13 +4,13 @@
   "engines": [
     {
       "engine": "Paqet",
-      "version": "v1.0.0-alpha.21-a1",
+      "version": "v1.0.0-alpha.21-a2",
       "entryPoint": "engines/paqet/x64/paqet_windows_amd64.exe",
       "files": [
         {
           "path": "engines/paqet/x64/paqet_windows_amd64.exe",
-          "size": 9722368,
-          "sha256": "5b87fe8f9e28de33233fc1d0bac933669630f7315c1582030ff5fc5abafaada8"
+          "size": 9529344,
+          "sha256": "8939e1d8ac79e67075d6e6a4ded0ff8bb69141a9c1c3ef5aa955cec37cc3dfb5"
         }
       ]
     },

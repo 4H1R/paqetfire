@@ -8,7 +8,7 @@ registers the installed engine paths with Windows Restart Manager, and waits for
 the broker to stop its owned engine processes before replacing files.
 The setup wizard shows an explicit completion screen and installs both Start Menu
 and Desktop shortcuts so users can immediately tell that installation succeeded.
-It also installs the pinned Paqet alpha.21-a1 payload (4H1R fork), Xray 26.10.31,
+It also installs the pinned Paqet alpha.21-a2 payload (4H1R fork), Xray 26.10.31,
 and ProxiFyre 2.6.4, removes any obsolete standalone `ProxiFyreService` (the broker supervises
 ProxiFyre as a child process), and creates its program-scoped Windows Firewall
 exceptions. The broker restores those four rules by name before every connect if

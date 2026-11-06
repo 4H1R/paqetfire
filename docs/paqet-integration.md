@@ -2,14 +2,17 @@
 
 ## Pinned runtime
 
-PaqetFire pins the Windows x64 Paqet payload to `v1.0.0-alpha.21-a1` of the
+PaqetFire pins the Windows x64 Paqet payload to `v1.0.0-alpha.21-a2` of the
 [4H1R/paqet](https://github.com/4H1R/paqet) fork
-(`07a6009967da589219a8210d59a370cc8aa4db34`), which is upstream
+(`3f9014f0986384357256efe9da093006162eac54`), which is upstream
 `hanselime/paqet` `v1.0.0-alpha.21` plus transport performance work, client
-pool and configuration-loading fixes. The release binary is 9,722,368 bytes
-with SHA-256:
+pool and configuration-loading fixes, and a leaner packet path: a hand-written
+packet encoder and decoder, payloads handed to KCP straight from the capture
+buffer, one goroutine per relayed connection, idle sockets releasing their copy
+buffers, allocation-free SOCKS5 UDP, and freed memory returned to the OS when
+traffic goes quiet. The release binary is 9,529,344 bytes with SHA-256:
 
-`5B87FE8F9E28DE33233FC1D0BAC933669630F7315C1582030FF5FC5ABAFAADA8`
+`8939E1D8AC79E67075D6E6A4DED0FF8BB69141A9C1C3EF5AA955CEC37CC3DFB5`
 
 Fork tags follow `v<upstream-version>-a<N>`. The wire protocol is unchanged, so
 the fork interoperates with upstream servers and clients in every combination;
@@ -39,7 +42,7 @@ UDP-associate; the on-demand connection verification report does.
 ## Configuration support
 
 `PaqetProfile`, `PaqetConfigurationValidator`, and `PaqetYamlConfigurationWriter`
-cover the client options of Paqet v1.0.0-alpha.21-a1:
+cover the client options of Paqet v1.0.0-alpha.21-a2:
 
 - SOCKS5 listen endpoint and optional username/password authentication;
 - TCP/UDP port forwards;
@@ -70,7 +73,15 @@ ignoring them silently, and warns when manual KCP controls are set with a
 preset mode; the writer emits neither. Its optional `log.stats_interval` and
 `network.dscp` (default 46) keys are not written, so the engine defaults apply.
 PaqetFire does not parse Paqet's log output, so the fork's per-second
-`retrans=`/`lost=` statistics format does not affect it.
+`retrans=`/`lost=` statistics format, and the `capture_drops=` field a2 adds to
+it, do not affect it.
+
+a2 adds `network.pcap.backend` (`auto`, `afpacket`, `libpcap`). `auto` selects
+AF_PACKET on Linux and Npcap elsewhere, and `afpacket` is rejected on Windows,
+so the writer omits the key. a2 also logs a warning when `transport.kcp.mtu`
+plus 60 bytes of IPv4/TCP headers (80 with IPv6) exceeds the interface MTU,
+because such packets are dropped and the tunnel stalls once data flows. The
+app's MTU field still accepts up to 1500 and does not check the interface.
 
 SOCKS listener wiring remains owned by the application. The listener requires
 the broker's engine credentials, generated once and stored DPAPI-protected in
@@ -89,7 +100,7 @@ startup through Windows, whose lookups ProxiFyre may be capturing into a route
 that is not up yet, as during a transport restart or a kill-switch guard.
 
 When updating the pinned release, re-audit the client schema in the fork's
-[`internal/conf`](https://github.com/4H1R/paqet/tree/07a6009967da589219a8210d59a370cc8aa4db34/internal/conf)
+[`internal/conf`](https://github.com/4H1R/paqet/tree/3f9014f0986384357256efe9da093006162eac54/internal/conf)
 rather than cached web examples, and align the validator's ranges with it.
 
 ## Tunnel watchdog

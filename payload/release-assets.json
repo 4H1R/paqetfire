@@ -3,9 +3,9 @@
   "assets": [
     {
       "engine": "Paqet",
-      "version": "v1.0.0-alpha.21-a1",
-      "url": "https://github.com/4H1R/paqet/releases/download/v1.0.0-alpha.21-a1/paqet-windows-amd64-v1.0.0-alpha.21-a1.zip",
-      "sha256": "d6334ae397e337731b556a5e6d8e68c67b62432048e2bc8987b1de163674321a"
+      "version": "v1.0.0-alpha.21-a2",
+      "url": "https://github.com/4H1R/paqet/releases/download/v1.0.0-alpha.21-a2/paqet-windows-amd64-v1.0.0-alpha.21-a2.zip",
+      "sha256": "60d7d2b641f3a485d2de8a310dd3ca95592c44419c95f6937c3e1d075f968055"
     },
     {
       "engine": "Xray",

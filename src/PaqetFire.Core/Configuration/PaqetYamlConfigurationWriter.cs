@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace PaqetFire.Core.Configuration;
 
-/// <summary>Writes deterministic YAML accepted by Paqet v1.0.0-alpha.21-a1 (4H1R fork).</summary>
+/// <summary>Writes deterministic YAML accepted by Paqet v1.0.0-alpha.21-a2 (4H1R fork).</summary>
 public sealed class PaqetYamlConfigurationWriter : IPaqetConfigurationWriter
 {
     public string Write(PaqetProfile profile, string transportKey)
