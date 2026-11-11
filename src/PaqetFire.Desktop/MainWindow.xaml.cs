@@ -596,6 +596,27 @@ public sealed partial class MainWindow : Window
     private void ApplicationSearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
         ScheduleApplicationDiscovery();
 
+    private void ApplicationFilterBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // The box selects its first entry while the page is still being built.
+        if (ApplicationDiscoveryProgress is null) return;
+        ScheduleApplicationDiscovery(immediate: true);
+    }
+
+    private ApplicationPickerFilter SelectedApplicationFilter() =>
+        Enum.TryParse<ApplicationPickerFilter>((ApplicationFilterBox?.SelectedItem as ComboBoxItem)?.Tag as string, out var filter)
+            ? filter
+            : ApplicationPickerFilter.All;
+
+    // Clicking a row, or Space or Enter on it, toggles its check box like a click on the box.
+    private void ApplicationPicker_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is ApplicationPickerItem item)
+        {
+            item.IsSelected = !item.IsSelected;
+        }
+    }
+
     private void ScheduleApplicationDiscovery(bool immediate = false)
     {
         applicationDiscoveryCancellation?.Cancel();
@@ -613,21 +634,27 @@ public sealed partial class MainWindow : Window
             ApplicationDiscoveryProgress.IsActive = true;
             var applications = await applicationDiscovery.DiscoverAsync(ApplicationSearchBox.Text, cancellationToken);
             var selected = SplitLines(SelectedApplicationsBox.Text).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var filter = SelectedApplicationFilter();
             updatingApplicationPicker = true;
             ApplicationEntries.Clear();
             foreach (var application in applications)
             {
-                ApplicationEntries.Add(new ApplicationPickerItem
+                var entry = new ApplicationPickerItem
                 {
                     DisplayName = application.DisplayName,
                     ExecutablePath = application.ExecutablePath,
                     StateText = application.IsRunning ? "Running" : application.IsInstalled ? "Installed" : string.Empty,
+                    IsRunning = application.IsRunning,
                     IsSelected = selected.Contains(application.ExecutablePath) ||
                                  selected.Contains(Path.GetFileName(application.ExecutablePath)),
-                });
+                };
+                if (filter.Matches(entry))
+                {
+                    ApplicationEntries.Add(entry);
+                }
             }
 
-            foreach (var selectedPath in selected.Where(selectedEntry =>
+            foreach (var selectedPath in selected.Where(selectedEntry => filter != ApplicationPickerFilter.Running &&
                          !applications.Any(application =>
                              string.Equals(application.ExecutablePath, selectedEntry, StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(Path.GetFileName(application.ExecutablePath), selectedEntry, StringComparison.OrdinalIgnoreCase))))

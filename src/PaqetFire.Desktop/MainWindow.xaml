@@ -552,19 +552,27 @@
                           Expanding="ApplicationPicker_Expanding">
                   <StackPanel Spacing="10" Padding="0,10,0,0">
                     <Grid ColumnSpacing="8">
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                       <TextBox x:Name="ApplicationSearchBox" PlaceholderText="Search applications or paths"
                                TextChanged="ApplicationSearchBox_TextChanged" />
-                      <Button Grid.Column="1" Content="Refresh" Click="RefreshApplicationsButton_Click" />
-                      <Button Grid.Column="2" Content="Browse…" Click="BrowseApplicationButton_Click" />
+                      <ComboBox x:Name="ApplicationFilterBox" Grid.Column="1" SelectedIndex="0" MinWidth="120"
+                                AutomationProperties.Name="Show applications" SelectionChanged="ApplicationFilterBox_SelectionChanged">
+                        <ComboBoxItem Content="All" Tag="All" />
+                        <ComboBoxItem Content="Running" Tag="Running" />
+                        <ComboBoxItem Content="Selected" Tag="Selected" />
+                      </ComboBox>
+                      <Button Grid.Column="2" Content="Refresh" Click="RefreshApplicationsButton_Click" />
+                      <Button Grid.Column="3" Content="Browse…" Click="BrowseApplicationButton_Click" />
                     </Grid>
                     <ProgressRing x:Name="ApplicationDiscoveryProgress" IsActive="False" Width="22" Height="22" HorizontalAlignment="Left" />
-                    <ListView ItemsSource="{x:Bind ApplicationEntries}" SelectionMode="None" MaxHeight="310">
+                    <ListView ItemsSource="{x:Bind ApplicationEntries}" SelectionMode="None" MaxHeight="310"
+                              IsItemClickEnabled="True" ItemClick="ApplicationPicker_ItemClick"
+                              AutomationProperties.Name="Discovered applications">
                       <ListView.ItemTemplate>
                         <DataTemplate>
                           <Grid Padding="3,7" ColumnSpacing="10">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" AutomationProperties.Name="{Binding DisplayName}"
                                       Checked="ApplicationPickerCheckBox_Changed" Unchecked="ApplicationPickerCheckBox_Changed" />
                             <StackPanel Grid.Column="1" Spacing="2">
                               <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
