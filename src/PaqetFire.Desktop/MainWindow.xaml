@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:PaqetFire.Desktop.Controls"
     xmlns:vm="using:PaqetFire.Desktop.ViewModels"
-    xmlns:presentation="using:PaqetFire.Desktop.Presentation">
+    xmlns:presentation="using:PaqetFire.Desktop.Presentation"
+    xmlns:local="using:PaqetFire.Desktop">
 
   <Grid x:Name="RootGrid" Loaded="RootGrid_Loaded">
     <Grid.KeyboardAccelerators>
@@ -1117,10 +1118,10 @@
                              FontSize="12" Opacity="0.58" TextWrapping="Wrap" />
                 </StackPanel>
                 <InfoBar x:Name="VerificationInfoBar" IsOpen="False" IsClosable="True" />
-                <TextBlock Text="Each result is labelled Passed, Warning, Failed, or Skipped." FontSize="12" Opacity="0.58" />
+                <TextBlock Text="Problems are listed first. Each result is labelled Failed, Warning, Passed, Note, or Skipped." FontSize="12" Opacity="0.58" TextWrapping="Wrap" />
                 <ListView ItemsSource="{x:Bind VerificationEntries}" SelectionMode="None" MaxHeight="420">
                   <ListView.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="vm:VerificationDisplayItem">
                       <Grid Padding="4,8" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="30" />
@@ -1129,11 +1130,17 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="70" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding Glyph}" FontSize="16" />
-                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <TextBlock Grid.Column="2" Text="{Binding Status}" Foreground="{StaticResource PaqetFireAccentBrush}" />
-                        <TextBlock Grid.Column="3" Text="{Binding Detail}" Opacity="0.72" TextWrapping="Wrap" />
-                        <TextBlock Grid.Column="4" Text="{Binding Duration}" Opacity="0.55" HorizontalAlignment="Right" />
+                        <TextBlock Text="{x:Bind Glyph}" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{x:Bind local:MainWindow.ToneBrush(Tone)}" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Grid.Column="2" Text="{x:Bind Status}" Foreground="{x:Bind local:MainWindow.ToneBrush(Tone)}" />
+                        <StackPanel Grid.Column="3" Spacing="4">
+                          <TextBlock Text="{x:Bind Detail}" Opacity="0.72" TextWrapping="Wrap" />
+                          <TextBlock Text="{x:Bind Remedy}" Visibility="{x:Bind HasRemedy}" TextWrapping="Wrap" />
+                          <HyperlinkButton Content="{x:Bind ActionText}" Tag="{x:Bind ActionDestination}"
+                                           Visibility="{x:Bind HasAction}" Padding="0" Click="NavigateLink_Click" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="4" Text="{x:Bind Duration}" Opacity="0.55" HorizontalAlignment="Right" />
                       </Grid>
                     </DataTemplate>
                   </ListView.ItemTemplate>

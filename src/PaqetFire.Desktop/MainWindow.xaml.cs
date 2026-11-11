@@ -1232,25 +1232,9 @@ public sealed partial class MainWindow : Window
     private void ApplyVerification(ConnectionVerificationReport report)
     {
         VerificationEntries.Clear();
-        foreach (var check in report.Checks)
+        foreach (var item in VerificationDisplayItem.FromReport(report))
         {
-            var (glyph, status) = check.Status switch
-            {
-                VerificationCheckStatus.Passed => ("✓", "Passed"),
-                VerificationCheckStatus.Warning => ("!", "Warning"),
-                VerificationCheckStatus.Failed => ("×", "Failed"),
-                VerificationCheckStatus.Info => ("i", "Note"),
-                _ => ("–", "Skipped"),
-            };
-            var detail = string.IsNullOrWhiteSpace(check.ObservedValue)
-                ? check.Detail
-                : $"{check.Detail} Observed: {check.ObservedValue}";
-            VerificationEntries.Add(new VerificationDisplayItem(
-                glyph,
-                check.Name,
-                status,
-                detail,
-                check.DurationMilliseconds > 0 ? $"{check.DurationMilliseconds} ms" : string.Empty));
+            VerificationEntries.Add(item);
         }
 
         VerificationSummaryText.Text = $"{report.Summary}. Completed {report.CompletedAt.ToLocalTime():g}.";
