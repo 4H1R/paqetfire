@@ -247,7 +247,9 @@ public sealed partial class MainWindow
             }
             else if (ViewModel.CanConnect)
             {
-                await ViewModel.ConnectAsync();
+                // Like Overview's Connect, ask about unsaved edits instead of connecting with old settings.
+                if (hasPendingConfigurationChanges) RestoreFromTray();
+                await ConnectFromOverviewAsync();
             }
 
             UpdateTrayState();
@@ -413,7 +415,13 @@ public sealed partial class MainWindow
         }
     }
 
-    private void OnSessionEnding(object? sender, Microsoft.Win32.SessionEndingEventArgs args) => sessionEnding = true;
+    private void OnSessionEnding(object? sender, Microsoft.Win32.SessionEndingEventArgs args)
+    {
+        sessionEnding = true;
+        // Another app can cancel the shutdown; if PaqetFire is still running a while later,
+        // exits ask about unsaved edits again.
+        _ = Task.Delay(TimeSpan.FromSeconds(60)).ContinueWith(_ => sessionEnding = false, TaskScheduler.Default);
+    }
 
     private void DisposeTrayIcon()
     {

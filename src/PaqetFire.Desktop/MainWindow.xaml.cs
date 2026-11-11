@@ -441,7 +441,8 @@ public sealed partial class MainWindow : Window
         }
 
         // Windows Installer stops the broker, so an active route drops until PaqetFire reopens.
-        if (ViewModel.ConnectionState is BrokerConnectionState.Connected or BrokerConnectionState.Degraded or BrokerConnectionState.Connecting)
+        // Guarded counts too: the kill switch's blocking ends while the broker is stopped.
+        if (ProfileSwitch.RestartsRoute(ViewModel.ConnectionState))
         {
             updateActionInProgress = true;
             var confirmed = await ConfirmUpdateDisconnectAsync();
@@ -450,6 +451,15 @@ public sealed partial class MainWindow : Window
             {
                 return;
             }
+        }
+
+        // The installer closes PaqetFire, so settle unsaved edits before anything is downloaded.
+        updateActionInProgress = true;
+        var mayExit = await ConfirmExitWithPendingChangesAsync();
+        updateActionInProgress = false;
+        if (!mayExit || availableUpdate is null)
+        {
+            return;
         }
 
         updateActionInProgress = true;
