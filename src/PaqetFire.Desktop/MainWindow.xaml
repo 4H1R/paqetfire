@@ -505,9 +505,9 @@
             </Expander>
 
             <StackPanel x:Name="ConnectionSaveActions" Orientation="Horizontal" Spacing="10">
-              <Button Content="Save profile" Style="{StaticResource AccentButtonStyle}" Click="SaveProfileButton_Click"
+              <Button x:Name="SaveProfileButton" Content="Save profile" Style="{StaticResource AccentButtonStyle}" Click="SaveProfileButton_Click"
                       ToolTipService.ToolTip="Save (Ctrl+S)" />
-              <Button Content="Save and connect" IsEnabled="{x:Bind ViewModel.CanSaveAndConnect, Mode=OneWay}"
+              <Button x:Name="SaveAndConnectButton" Content="Save and connect" IsEnabled="{x:Bind ViewModel.CanSaveAndConnect, Mode=OneWay}"
                       Click="SaveAndConnectButton_Click" AccessKey="C" />
             </StackPanel>
           </StackPanel>

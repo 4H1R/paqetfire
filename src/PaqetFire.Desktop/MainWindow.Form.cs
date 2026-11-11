@@ -304,6 +304,18 @@ public sealed partial class MainWindow
             button.IsEnabled = enabled;
     }
 
+    /// <summary>
+    /// A save while connected restarts the route, so the Connection page's Save says so and
+    /// the redundant Save and connect is hidden.
+    /// </summary>
+    private void UpdateConnectionSaveActions()
+    {
+        if (SaveProfileButton is null || SaveAndConnectButton is null) return;
+        var connected = ViewModel.IsConnected;
+        SaveProfileButton.Content = connected ? "Save and reconnect" : "Save profile";
+        SaveAndConnectButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     private void SetConfigurationEditingEnabled(bool enabled)
     {
         configurationEditingEnabled = enabled;

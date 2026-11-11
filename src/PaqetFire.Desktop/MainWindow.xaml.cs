@@ -1325,6 +1325,7 @@ public sealed partial class MainWindow : Window
             nameof(ConnectionViewModel.IsTunnelStalled))
         {
             SetSaveActionsEnabled(!configurationSaveInProgress && !ViewModel.IsBusy);
+            UpdateConnectionSaveActions();
             UpdateTrayState();
             UpdateConnectionVisuals();
             if (lastSnapshot is not null && args.PropertyName == nameof(ConnectionViewModel.ConnectionState))
