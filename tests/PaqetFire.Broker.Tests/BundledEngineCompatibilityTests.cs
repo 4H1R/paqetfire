@@ -115,7 +115,9 @@ public sealed class BundledEngineCompatibilityTests
                 validation.StartInfo.ArgumentList.Add(argument);
             }
             validation.StartInfo.Environment["XRAY_LOCATION_ASSET"] = Path.GetDirectoryName(executable)!;
-            await XrayProcessAdapter.RunValidationAsync(validation, TimeSpan.FromSeconds(30), CancellationToken.None);
+            var output = await XrayProcessAdapter.RunValidationAsync(validation, TimeSpan.FromSeconds(30), CancellationToken.None);
+            // Settings Xray calls deprecated are removed in a later release; catch them while it still migrates them.
+            Assert.DoesNotContain("deprecated", output, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

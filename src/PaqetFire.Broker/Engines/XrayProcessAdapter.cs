@@ -142,6 +142,7 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
             }
 
             SetState(EngineState.Starting, "Waiting for Xray's local policy endpoint.");
+            var launchedAt = DateTimeOffset.Now;
             var started = CreateProcess(options.ConfigurationPath, testOnly: false, data.AssetDirectory);
             if (!started.Start())
             {
@@ -165,7 +166,7 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
                 EngineProcessJob.Assign(started);
                 try
                 {
-                    await WaitUntilReadyAsync(started, endpoint, TimeoutFor(data, options.ReadinessTimeout), cancellationToken)
+                    await WaitUntilReadyAsync(started, endpoint, launchedAt, TimeoutFor(data, options.ReadinessTimeout), cancellationToken)
                         .ConfigureAwait(false);
                 }
                 catch (TimeoutException exception) when (data.IsUpdated)
@@ -230,7 +231,12 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
                 expectedExit = true;
                 if (owned is null)
                 {
-                    SetStateUnsafe(EngineState.Stopped, "Xray is stopped.");
+                    // A rollback stops an engine whose start just failed; keep why it failed.
+                    SetStateUnsafe(
+                        EngineState.Stopped,
+                        state == EngineState.Faulted && detail is { Length: > 0 } failure
+                            ? $"Xray is stopped. Its last start failed: {failure}"
+                            : "Xray is stopped.");
                     return;
                 }
 
@@ -412,7 +418,8 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
         }
     }
 
-    internal static async Task RunValidationAsync(
+    /// <returns>What Xray printed, such as deprecation warnings for an accepted configuration.</returns>
+    internal static async Task<string> RunValidationAsync(
         Process validation,
         TimeSpan timeout,
         CancellationToken cancellationToken,
@@ -445,6 +452,8 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
             {
                 throw new InvalidDataException($"{rejection}: {output}");
             }
+
+            return output;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -518,26 +527,33 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
     private async Task WaitUntilReadyAsync(
         Process started,
         System.Net.IPEndPoint endpoint,
+        DateTimeOffset launchedAt,
         TimeSpan readinessTimeout,
         CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(readinessTimeout);
+        string? connectFailure = null;
         try
         {
             while (true)
             {
                 if (started.HasExited)
                 {
-                    throw new InvalidOperationException($"Xray exited during startup with code {started.ExitCode}.");
+                    var exited = new StringBuilder($"Xray exited during startup with code {started.ExitCode}. ");
+                    ReadinessReport.AppendOutput(exited, "Xray", StartupOutput(launchedAt), silentHint: null);
+                    throw new InvalidOperationException(exited.ToString());
                 }
 
                 // The listener table shows the socket as soon as Xray binds it; one connect
                 // then confirms that it accepts.
-                if (LoopbackListeners.IsListening(endpoint) &&
-                    await CanConnectAsync(endpoint, timeout.Token).ConfigureAwait(false))
+                if (LoopbackListeners.IsListening(endpoint))
                 {
-                    return;
+                    connectFailure = await TryConnectAsync(endpoint, timeout.Token).ConfigureAwait(false);
+                    if (connectFailure is null)
+                    {
+                        return;
+                    }
                 }
 
                 await Task.Delay(LoopbackListeners.PollInterval, timeout.Token).ConfigureAwait(false);
@@ -545,30 +561,51 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException("Xray did not open its local policy endpoint in time.");
+            throw new TimeoutException(ReadinessReport.Describe(
+                "Xray",
+                started,
+                endpoint,
+                readinessTimeout,
+                connectFailure,
+                StartupOutput(launchedAt),
+                "Xray opens its listeners once it has loaded its configuration and routing data."));
         }
     }
 
-    private static async Task<bool> CanConnectAsync(System.Net.IPEndPoint endpoint, CancellationToken cancellationToken)
+    /// <returns>Null when the port accepted a connection; otherwise why it did not.</returns>
+    private static async Task<string?> TryConnectAsync(System.Net.IPEndPoint endpoint, CancellationToken cancellationToken)
     {
         try
         {
-            using var client = new TcpClient();
+            // The same address family as the listener: a dual-mode socket would reach it
+            // through an IPv4-mapped address, which some network filters treat differently.
+            using var client = new TcpClient(endpoint.AddressFamily);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromMilliseconds(500));
             await client.ConnectAsync(
                 endpoint.Address,
                 endpoint.Port,
                 timeout.Token).ConfigureAwait(false);
-            return true;
+            return null;
         }
-        catch (SocketException)
+        catch (SocketException error)
         {
-            return false;
+            return ReadinessReport.DescribeConnectFailure(error);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            return false;
+            return ReadinessReport.DescribeConnectFailure(error);
+        }
+    }
+
+    /// <summary>What this start printed, without the per-connection access log.</summary>
+    private IReadOnlyList<string> StartupOutput(DateTimeOffset since)
+    {
+        lock (stateLock)
+        {
+            return [.. logs
+                .Where(entry => entry.OccurredAt >= since && !entry.Message.Contains(" accepted ", StringComparison.Ordinal))
+                .Select(entry => entry.Message)];
         }
     }
 

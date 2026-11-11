@@ -252,7 +252,7 @@ public sealed class OpenVpnExitTests
         var exit = Assert.Single(document.RootElement.GetProperty("outbounds").EnumerateArray(),
             outbound => outbound.GetProperty("tag").GetString() == XrayJsonConfigurationWriter.ExitOutboundTag);
         Assert.Equal("freedom", exit.GetProperty("protocol").GetString());
-        Assert.Equal("ForceIPv4", exit.GetProperty("settings").GetProperty("domainStrategy").GetString());
+        Assert.Equal("ForceIPv4", exit.GetProperty("streamSettings").GetProperty("sockopt").GetProperty("domainStrategy").GetString());
         Assert.Equal("PaqetFire Exit", exit.GetProperty("streamSettings").GetProperty("sockopt").GetProperty("interface").GetString());
         var rules = document.RootElement.GetProperty("routing").GetProperty("rules").EnumerateArray().ToArray();
         var last = rules[^1];

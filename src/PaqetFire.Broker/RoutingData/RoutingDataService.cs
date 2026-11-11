@@ -118,7 +118,8 @@ public sealed class RoutingDataService : IDisposable
                     state.LastCheckedAt,
                     state.AutomaticUpdates,
                     isUpdating,
-                    SupportsMalwareCategories: installed,
+                    // Malware rules need the downloaded data, which a skipped release does not provide.
+                    SupportsMalwareCategories: installed && !state.IsSkippedForLaunch,
                     state.LastError);
             }
         }
@@ -142,7 +143,7 @@ public sealed class RoutingDataService : IDisposable
     public async ValueTask<RoutingDataSet> ResolveForLaunchAsync(CancellationToken cancellationToken)
     {
         var current = State;
-        if (!current.IsInstalled)
+        if (!current.IsInstalled || current.IsSkippedForLaunch)
         {
             RememberResolved(null);
             return RoutingDataSet.Bundled;
@@ -205,7 +206,8 @@ public sealed class RoutingDataService : IDisposable
 
         await MutateAsync(stored => stored with
             {
-                LastError = "Xray did not start in time with the downloaded routing data, so that connection used the bundled data.",
+                LaunchTimedOutTag = set.Version,
+                LastError = $"Xray did not start in time with the downloaded routing data {set.Version}, so PaqetFire uses the bundled data until the next routing data check.",
             })
             .ConfigureAwait(false);
     }
@@ -370,7 +372,8 @@ public sealed class RoutingDataService : IDisposable
             // newer release was withdrawn upstream.
             if (string.Equals(tag, State.InstalledTag, StringComparison.Ordinal))
             {
-                await MutateAsync(stored => stored with { LastCheckedAt = clock.GetUtcNow(), LastError = null })
+                // A check is also the retry for a release Xray once started too slowly with.
+                await MutateAsync(stored => stored with { LastCheckedAt = clock.GetUtcNow(), LastError = null, LaunchTimedOutTag = null })
                     .ConfigureAwait(false);
                 ClearRetry();
                 logger.LogInformation("Routing data {Tag} is current.", tag);
@@ -411,6 +414,7 @@ public sealed class RoutingDataService : IDisposable
                     Files = files,
                     LastCheckedAt = now,
                     LastError = null,
+                    LaunchTimedOutTag = null,
                 })
                 .ConfigureAwait(false);
             ClearRetry();

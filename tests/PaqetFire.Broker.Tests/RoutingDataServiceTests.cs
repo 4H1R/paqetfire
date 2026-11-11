@@ -501,6 +501,46 @@ public sealed class RoutingDataServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ATimedOutReleaseIsSkippedUntilTheNextCheck()
+    {
+        using var service = CreateService();
+        await service.StartUpdate();
+        var set = await service.ResolveForLaunchAsync(CancellationToken.None);
+
+        await service.ReportLaunchFailureAsync(set, new RoutingDataUnavailableException("slow", new TimeoutException()));
+
+        // Later connects do not wait for the same slow start again.
+        Assert.Same(RoutingDataSet.Bundled, await service.ResolveForLaunchAsync(CancellationToken.None));
+        Assert.False(service.Status.SupportsMalwareCategories);
+        Assert.Contains("until the next routing data check", service.Status.LastError, StringComparison.Ordinal);
+
+        Assert.Equal(RoutingDataUpdateOutcome.UpToDate, await service.StartUpdate());
+        Assert.Equal(set.Version, (await service.ResolveForLaunchAsync(CancellationToken.None)).Version);
+        Assert.True(service.Status.SupportsMalwareCategories);
+    }
+
+    [Fact]
+    public async Task TheBundledRetryChoosesItsPortsAgain()
+    {
+        using var service = CreateService();
+        await service.StartUpdate();
+        var paqetPortChecks = 0;
+        // Free when the connect plans its ports; held, like by a Paqet still exiting, for the retry.
+        await using var fixture = await RuntimeFixture.StartAsync(
+            routingData: service,
+            portIsFree: (_, port) => port != Core.Configuration.XrayJsonConfigurationWriter.PaqetPort || paqetPortChecks++ == 0);
+        fixture.Controller.ConnectFailures.Enqueue(new ConnectionTransitionException(
+            "connect", EngineKind.Xray, new RoutingDataUnavailableException("slow", new TimeoutException())));
+
+        await fixture.Runtime.ConnectAsync(CancellationToken.None);
+
+        Assert.Equal(["connect", "connect"], fixture.Controller.Calls);
+        Assert.NotEqual(Core.Configuration.XrayJsonConfigurationWriter.PaqetPort, fixture.Xray.Last!.Ports!.Paqet);
+        Assert.Contains("retried with the bundled data", await fixture.Runtime.GetDiagnosticsAsync(CancellationToken.None),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OtherXrayFailuresAreNotRetried()
     {
         using var service = CreateService();

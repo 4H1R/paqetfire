@@ -70,6 +70,9 @@ public sealed class PaqetFireRuntime(
     private readonly LocalPortPlan ports = localPorts ?? new LocalPortPlan();
     private readonly Func<IPAddress, int, bool> isPortFree = portIsFree ?? LocalPortAllocator.IsFree;
     private IReadOnlyList<SocksShareListener> writtenShareListeners = [];
+    private const int RecentEventLimit = 8;
+    private readonly Lock eventSync = new();
+    private readonly Queue<string> recentEvents = new();
     private readonly Lock stateSync = new();
     private readonly SemaphoreSlim stateWriteGate = new(1, 1);
     private readonly Lock operationSync = new();
@@ -315,9 +318,12 @@ public sealed class PaqetFireRuntime(
             }
 
             var operationWarning = activationError is null ? null
-                : $"The profile was saved, but the route could not be activated. {activationError.Message}";
+                : $"The profile was saved, but the route could not be activated. {FailureText.Describe(activationError)}";
             if (activationError is not null)
+            {
                 logger.LogWarning(activationError, "The saved profile could not be activated.");
+                RecordEvent("Saving the profile could not start the route", activationError);
+            }
 
             logger.LogInformation(
                 "Applied PaqetFire profile {ProfileName} on adapter {InterfaceName}.",
@@ -654,7 +660,12 @@ public sealed class PaqetFireRuntime(
                     throw;
                 }
 
-                activationError = error?.Message;
+                activationError = error is null ? null : FailureText.Describe(error);
+                if (error is not null)
+                {
+                    RecordEvent("Switching the profile could not start the route", error);
+                }
+
                 activeRoute = null;
                 FlushDnsCache();
                 await CompleteRouteChangeAsync(selected, configuration, error is null).ConfigureAwait(false);
@@ -729,6 +740,11 @@ public sealed class PaqetFireRuntime(
         catch (OperationCanceledException) when (operation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             // A user Disconnect superseded the restart; it releases the route itself.
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            RecordEvent("Restarting the Paqet transport failed", error);
+            throw;
         }
         finally
         {
@@ -987,6 +1003,12 @@ public sealed class PaqetFireRuntime(
                 notes.Add($"{engine.Kind} exit engine: {(engine.IsInstalled ? $"installed {engine.Version}" : "not installed")}{(engine.Detail is { } why ? $" · {why}" : string.Empty)}");
             }
 
+            lock (eventSync)
+            {
+                // Oldest first; each failure keeps its full cause, which the snapshot does not.
+                notes.AddRange(recentEvents.Select(entry => $"Recent: {entry}"));
+            }
+
             return DiagnosticBundle.Build(new DiagnosticBundleInput(
                     settings is null ? null : Normalize(settings),
                     profileCatalog?.Profiles.Count ?? 0,
@@ -1142,6 +1164,12 @@ public sealed class PaqetFireRuntime(
             StartIpv6Probe(settings);
             return settings;
         }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            RecordEvent(explicitRequest ? "Connect failed" : $"Restoring the route failed (attempt {attempt})", error);
+            progress.Clear();
+            throw;
+        }
         catch
         {
             progress.Clear();
@@ -1270,6 +1298,7 @@ public sealed class PaqetFireRuntime(
         }
 
         logger.LogWarning(cause, "Xray could not start with the downloaded routing data; retrying with the bundled data.");
+        RecordEvent($"Xray could not start with downloaded routing data {configuration.RoutingData.Version}, so it was retried with the bundled data", error);
         // The retry follows straight after the rollback stopped the engines, and a stopped
         // engine's port can stay held for a moment, so the ports are chosen again. Xray's
         // stays put while ProxiFyre runs for the kill switch: capture is not restarted here.
@@ -1730,10 +1759,20 @@ public sealed class PaqetFireRuntime(
         };
     }
 
-    /// <summary>
-    /// The OpenVPN configuration and the two credential files it reads: Paqet's loopback
-    /// SOCKS5 login, and the VPN account when the configuration asks for one.
-    /// </summary>
+    /// <summary>Keeps a short history for diagnostics, where a failure's full cause survives.</summary>
+    private void RecordEvent(string what, Exception? error = null)
+    {
+        var text = error is null ? what : $"{what}: {FailureText.Describe(error)}";
+        lock (eventSync)
+        {
+            recentEvents.Enqueue($"{clock.GetUtcNow():HH:mm:ss}Z {text}");
+            while (recentEvents.Count > RecentEventLimit)
+            {
+                recentEvents.Dequeue();
+            }
+        }
+    }
+
     /// <summary>
     /// Chooses the engines' loopback ports for a start of every engine. Each keeps its port
     /// while the port is free or held by that engine's own running process, and moves when a
@@ -1783,15 +1822,22 @@ public sealed class PaqetFireRuntime(
             keepCapturePort ? new HashSet<LocalPortRole> { LocalPortRole.XrayInbound } : null);
         foreach (var ((role, before), (_, after)) in LocalPortAllocator.Roles(current).Zip(LocalPortAllocator.Roles(planned)))
         {
-            if (before != after)
+            if (before == after)
             {
-                logger.LogWarning(
-                    "Moved {Listener} from port {OldPort} to {NewPort}: another program or a share uses port {OldPort}.",
-                    LocalPortAllocator.Describe(role),
-                    before,
-                    after,
-                    before);
+                continue;
             }
+
+            var reason = settings.ShareWithLan && settings.LanSocksPort == before ? "the LAN share uses it"
+                : settings.ShareViaHotspot && settings.HotspotSocksPort == before ? "the hotspot share uses it"
+                : PortOwners.Describe(before) is { } holders ? $"{holders} holds it"
+                : "Windows reserves it, or it could not be bound";
+            logger.LogWarning(
+                "Moved {Listener} from port {OldPort} to {NewPort}: {Reason}.",
+                LocalPortAllocator.Describe(role),
+                before,
+                after,
+                reason);
+            RecordEvent($"{LocalPortAllocator.Describe(role)} moved from port {before} to {after}: {reason}.");
         }
 
         return planned;
@@ -1849,6 +1895,10 @@ public sealed class PaqetFireRuntime(
         await SaveStateAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The OpenVPN configuration and the two credential files it reads: Paqet's loopback
+    /// SOCKS5 login, and the VPN account when the configuration asks for one.
+    /// </summary>
     private OpenVpnFiles CreateOpenVpnFiles(OpenVpnExitOptions options, int paqetPort)
     {
         var configuration = OpenVpnConfiguration.Parse(options.Configuration);

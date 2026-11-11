@@ -156,8 +156,11 @@ top-level domain), Persian advertising and tracking domains in
   active files and holds them open against writes until Xray is ready. Any
   mismatch falls back to the bundled files and is reported; if updated data
   cannot be verified or loaded at launch, the broker rewrites the configuration
-  for the bundled files and retries once. Transient file errors use the bundled
-  files for that launch only.
+  for the bundled files and retries once. When Xray did not start in time with
+  the updated data, later connects use the bundled files too, until the next
+  routing data check finds that release current or installs another, so every
+  connect does not wait for the same slow start. Transient file errors use the
+  bundled files for that launch only.
 - New data takes effect at the next Xray start. A running Xray is never
   restarted for it.
 - The files are downloaded on the user's machine and are not redistributed in

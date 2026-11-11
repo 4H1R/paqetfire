@@ -33,8 +33,13 @@ The broker owns that child process, captures bounded stdout/stderr logs, hashes
 the executable through a handle that blocks writes and deletes until the process
 has started, refuses a SOCKS endpoint that is already occupied, and terminates
 the whole process tree on disconnect. Readiness polls the Windows TCP listener
-table every 50 ms, then requires a real SOCKS5 greeting on `127.0.0.1:1080`
-within 500 ms per attempt. Paqet and Xray start at the same time; ProxiFyre
+table every 50 ms, then requires a real SOCKS5 greeting on its loopback port
+(`127.0.0.1:1080` unless it moved, see
+[Local engine ports](architecture.md#local-engine-ports)) within 500 ms per
+attempt. Paqet opens that port only after it has opened its packet capture and
+its connections to the server. When it is not ready in time, the error says
+whether the process was still running, whether the port was listening and who
+held it, and what Paqet last printed; Xray's readiness timeout reports the same. Paqet and Xray start at the same time; ProxiFyre
 starts only after both are ready. Paqet runs in a kill-on-close
 job object, so it also ends if the broker crashes. Startup does not probe
 UDP-associate; the on-demand connection verification report does.

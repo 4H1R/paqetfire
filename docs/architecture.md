@@ -103,7 +103,9 @@ out as some connection's source port. The chosen ports are saved in
 `broker-state.json` and reused after a broker restart, because a ProxiFyre kept
 for the kill switch still sends to the same Xray port. When a port moves while
 engines run, the broker restarts them, ProxiFyre included. Diagnostics list the
-ports in use.
+ports in use and the program on each, name the program now holding a default an
+engine moved off, and keep the reason for each move and the full cause of
+recent connect failures.
 
 The only ports other devices use are the LAN share and hotspot share ports,
 which are set under Sharing. A share port another program already holds stops

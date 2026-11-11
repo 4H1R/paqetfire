@@ -222,11 +222,14 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             {
                 // Resolve direct destinations with Xray's DNS policy; the Windows resolver
                 // would send the lookup back through capture or out in plaintext.
+                // Xray 26 moved freedom's domainStrategy to the socket options.
                 writer.WriteStartObject();
                 writer.WriteString("tag", "direct");
                 writer.WriteString("protocol", "freedom");
-                writer.WriteStartObject("settings");
+                writer.WriteStartObject("streamSettings");
+                writer.WriteStartObject("sockopt");
                 writer.WriteString("domainStrategy", "UseIP");
+                writer.WriteEndObject();
                 writer.WriteEndObject();
                 writer.WriteEndObject();
             }
@@ -241,9 +244,19 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
                 writer.WriteString("tag", DnsOutboundTag);
                 writer.WriteString("protocol", "dns");
                 writer.WriteStartObject("settings");
-                writer.WriteString("nonIPQuery", "skip");
                 writer.WriteString("address", PlainDnsAddress(dns.Resolver));
                 writer.WriteNumber("port", 53);
+                // What the deprecated nonIPQuery "skip" did: the DNS module answers A and
+                // AAAA, and every other query type goes on to the provider unchanged.
+                writer.WriteStartArray("rules");
+                writer.WriteStartObject();
+                writer.WriteString("action", "hijack");
+                writer.WriteString("qType", "1,28");
+                writer.WriteEndObject();
+                writer.WriteStartObject();
+                writer.WriteString("action", "direct");
+                writer.WriteEndObject();
+                writer.WriteEndArray();
                 writer.WriteEndObject();
                 writer.WriteStartObject("streamSettings");
                 writer.WriteStartObject("sockopt");
@@ -412,11 +425,9 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
                 // of following the default route. The tunnel is IPv4 only, so names resolve
                 // through Xray's DNS to IPv4, and fail rather than fall back to the system resolver.
                 writer.WriteString("protocol", "freedom");
-                writer.WriteStartObject("settings");
-                writer.WriteString("domainStrategy", "ForceIPv4");
-                writer.WriteEndObject();
                 writer.WriteStartObject("streamSettings");
                 writer.WriteStartObject("sockopt");
+                writer.WriteString("domainStrategy", "ForceIPv4");
                 writer.WriteString("interface", adapter.InterfaceName);
                 writer.WriteEndObject();
                 writer.WriteEndObject();

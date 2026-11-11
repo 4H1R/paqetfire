@@ -1802,7 +1802,10 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         IsBrokerReachable = true;
         BrokerStatusText = "Running";
         SetError(GetBrokerErrorMessage(exception.Error), ErrorKind.Operation, GetFailureAction(exception.Error.Code));
-        ActivityOccurred?.Invoke($"The broker refused the request: {exception.Error.Code}.");
+        // The broker's message goes into the activity log, which diagnostics copy.
+        ActivityOccurred?.Invoke(string.IsNullOrWhiteSpace(exception.Error.Message)
+            ? $"The broker refused the request: {exception.Error.Code}."
+            : $"The broker refused the request: {exception.Error.Code}. {exception.Error.Message}");
     }
 
     private void ApplyTransportFailure(Exception exception)

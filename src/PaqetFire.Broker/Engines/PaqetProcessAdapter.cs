@@ -103,6 +103,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
 
             SetState(EngineState.Starting, "Waiting for the local SOCKS5 listener.");
 
+            var launchedAt = DateTimeOffset.UtcNow;
             var process = CreateProcess();
             try
             {
@@ -131,7 +132,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 _standardOutputPump = PumpLogAsync(process.StandardOutput, isError: false);
                 _standardErrorPump = PumpLogAsync(process.StandardError, isError: true);
 
-                await WaitForSocksReadinessAsync(process, endpoint, cancellationToken).ConfigureAwait(false);
+                await WaitForSocksReadinessAsync(process, endpoint, launchedAt, cancellationToken).ConfigureAwait(false);
                 SetState(EngineState.Running, "Paqet is accepting SOCKS5 connections.");
             }
             catch (Exception error)
@@ -175,7 +176,12 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 process = _process;
                 if (process is null)
                 {
-                    SetStateUnsafe(EngineState.Stopped, "Paqet is stopped.");
+                    // A rollback stops an engine whose start just failed; keep why it failed.
+                    SetStateUnsafe(
+                        EngineState.Stopped,
+                        _state == EngineState.Faulted && _detail is { Length: > 0 } failure
+                            ? $"Paqet is stopped. Its last start failed: {failure}"
+                            : "Paqet is stopped.");
                     return;
                 }
 
@@ -316,6 +322,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
     private async Task WaitForSocksReadinessAsync(
         Process process,
         IPEndPoint endpoint,
+        DateTimeOffset launchedAt,
         CancellationToken cancellationToken)
     {
         using var readinessTimeout = new CancellationTokenSource(_options.ReadinessTimeout);
@@ -323,43 +330,45 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
             cancellationToken,
             readinessTimeout.Token);
 
+        string? probeFailure = null;
         while (true)
         {
             if (process.HasExited)
             {
-                throw new InvalidOperationException(
-                    $"Paqet exited with code {process.ExitCode} before its SOCKS5 listener became ready.");
+                var exited = new System.Text.StringBuilder(
+                    $"Paqet exited with code {process.ExitCode} before its SOCKS5 listener became ready. ");
+                ReadinessReport.AppendOutput(exited, "Paqet", RecentOutput(launchedAt), SilentHint);
+                throw new InvalidOperationException(exited.ToString());
             }
 
             // Only greet once the listener exists; until then the cheap table poll runs.
             var listening = LoopbackListeners.IsListening(endpoint);
             try
             {
-                if (listening &&
-                    await ProbeSocks5Async(endpoint, readinessCancellation.Token)
-                        .ConfigureAwait(false))
+                if (listening)
                 {
-                    return;
+                    if (await ProbeSocks5Async(endpoint, readinessCancellation.Token).ConfigureAwait(false))
+                    {
+                        return;
+                    }
+
+                    probeFailure = "it answered with something other than a SOCKS5 greeting";
                 }
             }
             catch (OperationCanceledException) when (
                 readinessTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                throw new TimeoutException(
-                    $"Paqet did not expose a SOCKS5 listener at {FormatEndpoint(endpoint)} " +
-                    $"within {_options.ReadinessTimeout}.");
+                throw ReadinessTimeout(process, endpoint, launchedAt, probeFailure);
             }
-            catch (OperationCanceledException) when (!readinessCancellation.IsCancellationRequested)
+            catch (OperationCanceledException error) when (!readinessCancellation.IsCancellationRequested)
             {
                 // One greeting timed out; the overall readiness budget continues.
+                probeFailure = ReadinessReport.DescribeConnectFailure(error);
             }
-            catch (SocketException)
+            catch (Exception error) when (error is SocketException or IOException)
             {
-                // The listener is expected to refuse connections during startup.
-            }
-            catch (IOException)
-            {
-                // A listener that does not complete a SOCKS greeting is not ready yet.
+                // The listener may refuse connections or drop the greeting during startup.
+                probeFailure = ReadinessReport.DescribeConnectFailure(error);
             }
 
             try
@@ -372,10 +381,36 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
             catch (OperationCanceledException) when (
                 readinessTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                throw new TimeoutException(
-                    $"Paqet did not expose a SOCKS5 listener at {FormatEndpoint(endpoint)} " +
-                    $"within {_options.ReadinessTimeout}.");
+                throw ReadinessTimeout(process, endpoint, launchedAt, probeFailure);
             }
+        }
+    }
+
+    private const string SilentHint =
+        "If Log level under Advanced transport is warn or error, set it to info and connect again to see how far Paqet gets.";
+
+    private TimeoutException ReadinessTimeout(
+        Process process,
+        IPEndPoint endpoint,
+        DateTimeOffset launchedAt,
+        string? probeFailure) => new(
+        ReadinessReport.Describe(
+            "Paqet",
+            process,
+            endpoint,
+            _options.ReadinessTimeout,
+            probeFailure,
+            RecentOutput(launchedAt),
+            "Paqet opens it only after it has set up packet capture on the network adapter and its connections " +
+            "to the server, so that setup had not finished. A stuck Npcap or network adapter driver can cause this.",
+            SilentHint));
+
+    /// <summary>What this start printed; the log also keeps earlier runs.</summary>
+    private IReadOnlyList<string> RecentOutput(DateTimeOffset since)
+    {
+        lock (_stateLock)
+        {
+            return [.. _logs.Where(entry => entry.Timestamp >= since).Select(entry => entry.Message)];
         }
     }
 

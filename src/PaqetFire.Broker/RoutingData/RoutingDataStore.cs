@@ -25,11 +25,21 @@ public sealed record RoutingDataState
 
     public string? LastError { get; init; }
 
+    /// <summary>
+    /// The installed release Xray could not start with in time. Connects use the bundled data
+    /// instead until the next check finds that release current or installs another, so a
+    /// slow start does not cost every connect the same wait before it falls back.
+    /// </summary>
+    public string? LaunchTimedOutTag { get; init; }
+
+    [JsonIgnore]
+    public bool IsSkippedForLaunch => IsInstalled && string.Equals(LaunchTimedOutTag, InstalledTag, StringComparison.Ordinal);
+
     [JsonIgnore]
     public bool IsInstalled => InstalledTag is not null && InstalledDirectory is not null;
 
     public RoutingDataState WithoutInstallation() =>
-        this with { InstalledTag = null, InstalledDirectory = null, InstalledAt = null, Files = [] };
+        this with { InstalledTag = null, InstalledDirectory = null, InstalledAt = null, Files = [], LaunchTimedOutTag = null };
 }
 
 /// <summary>

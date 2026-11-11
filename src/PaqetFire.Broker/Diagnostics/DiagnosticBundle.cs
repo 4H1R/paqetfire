@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using PaqetFire.Broker.Engines;
 using PaqetFire.Core.Configuration;
 using PaqetFire.Core.Connections;
 using PaqetFire.Core.Deployment;
@@ -174,18 +175,23 @@ public static class DiagnosticBundle
     private static void AppendListeners(StringBuilder text, PaqetFireSettings? settings, LocalEnginePorts localPorts)
     {
         Section(text, "Local listeners");
-        if (localPorts != LocalEnginePorts.Default)
+        var defaults = LocalEnginePorts.Default;
+        if (localPorts != defaults)
         {
-            text.AppendLine("Engine ports moved from their defaults because other programs held them.");
+            text.AppendLine(
+                "Engine ports differ from their defaults: when they were chosen, a default was held by another program, " +
+                "reserved by Windows, or used by a share. Notes name the reason for moves since the broker started.");
         }
 
-        var ports = new List<(string Name, int Port)>
+        var usesPsiphon = settings?.ExitProxy == ExitProxyKind.Psiphon;
+        var engines = new List<(string Name, int Port, int Default)>
         {
-            ("Paqet SOCKS5", localPorts.Paqet),
-            ("Xray SOCKS5", localPorts.XrayInbound),
-            ("Xray statistics", localPorts.XrayStats),
+            ("Paqet SOCKS5", localPorts.Paqet, defaults.Paqet),
+            ("Xray SOCKS5", localPorts.XrayInbound, defaults.XrayInbound),
+            ("Xray statistics", localPorts.XrayStats, defaults.XrayStats),
         };
-        if (settings?.ExitProxy == ExitProxyKind.Psiphon) ports.Add(("Psiphon SOCKS5", localPorts.PsiphonSocks));
+        if (usesPsiphon) engines.Add(("Psiphon SOCKS5", localPorts.PsiphonSocks, defaults.PsiphonSocks));
+        var ports = engines.Select(engine => (engine.Name, engine.Port)).ToList();
         if (settings?.ShareWithLan == true) ports.Add(("LAN share", settings.LanSocksPort));
         if (settings?.ShareViaHotspot == true) ports.Add(("Hotspot share", settings.HotspotSocksPort));
         if (settings?.ExitProxy == ExitProxyKind.OpenVpn)
@@ -196,22 +202,41 @@ public static class DiagnosticBundle
                 $"{OpenVpnConfigurationWriter.AdapterName} adapter: {DescribeExitAdapter(adapter)}");
         }
 
-        IPEndPoint[] listeners;
+        foreach (var (name, port) in ports)
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"{name} ({port}): {DescribeListeners(port)}");
+        }
+
+        // Who holds a default an engine moved away from now, which is usually the program in the way.
+        foreach (var (name, port, defaultPort) in engines.Where(engine => engine.Port != engine.Default))
+        {
+            var holders = PortOwners.Describe(defaultPort);
+            text.AppendLine(CultureInfo.InvariantCulture,
+                $"{name} default ({defaultPort}): {(holders is null ? "free now" : "held by " + holders)}");
+        }
+    }
+
+    private static string DescribeListeners(int port)
+    {
+        var listeners = PortOwners.Find(port).Where(owner => owner.Protocol == System.Net.Sockets.ProtocolType.Tcp).ToArray();
+        if (listeners.Length > 0)
+        {
+            return string.Join(", ", listeners.Select(owner =>
+                $"{owner.LocalEndpoint} by {owner.ProcessName} (PID {owner.ProcessId})"));
+        }
+
         try
         {
-            listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
+            // The owner table was unavailable or the port is free; the plain table still answers which.
+            var bound = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
+                .Where(listener => listener.Port == port)
+                .Select(listener => listener.ToString())
+                .ToArray();
+            return bound.Length == 0 ? "not listening" : string.Join(", ", bound);
         }
         catch (NetworkInformationException exception)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"Unavailable: {exception.Message}");
-            return;
-        }
-
-        foreach (var (name, port) in ports)
-        {
-            var bound = listeners.Where(listener => listener.Port == port).Select(listener => listener.ToString()).ToArray();
-            text.AppendLine(CultureInfo.InvariantCulture,
-                $"{name} ({port}): {(bound.Length == 0 ? "not listening" : string.Join(", ", bound))}");
+            return $"unavailable: {exception.Message}";
         }
     }
 

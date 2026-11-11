@@ -46,10 +46,16 @@ public sealed class EncryptedDnsTests
         var outbounds = root.GetProperty("outbounds").EnumerateArray().ToDictionary(
             outbound => outbound.GetProperty("tag").GetString()!);
         var dnsOut = outbounds["dns-out"];
-        Assert.Equal("skip", dnsOut.GetProperty("settings").GetProperty("nonIPQuery").GetString());
+        // Xray 26 deprecated nonIPQuery; its "skip" is written as rules.
+        Assert.False(dnsOut.GetProperty("settings").TryGetProperty("nonIPQuery", out _));
+        var dnsRules = dnsOut.GetProperty("settings").GetProperty("rules").EnumerateArray().ToArray();
+        Assert.Equal(("hijack", "1,28"), (dnsRules[0].GetProperty("action").GetString(), dnsRules[0].GetProperty("qType").GetString()));
+        Assert.Equal("direct", dnsRules[1].GetProperty("action").GetString());
+        Assert.False(dnsRules[1].TryGetProperty("qType", out _));
         Assert.Equal("1.1.1.1", dnsOut.GetProperty("settings").GetProperty("address").GetString());
         Assert.Equal("paqet", dnsOut.GetProperty("streamSettings").GetProperty("sockopt").GetProperty("dialerProxy").GetString());
-        Assert.Equal("UseIP", outbounds["direct"].GetProperty("settings").GetProperty("domainStrategy").GetString());
+        Assert.False(outbounds["direct"].TryGetProperty("settings", out _));
+        Assert.Equal("UseIP", outbounds["direct"].GetProperty("streamSettings").GetProperty("sockopt").GetProperty("domainStrategy").GetString());
     }
 
     [Theory]
