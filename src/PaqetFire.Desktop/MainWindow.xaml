@@ -591,11 +591,17 @@
                            Opacity="0.65" TextWrapping="Wrap" />
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <CheckBox x:Name="RouteTcpCheckBox" Content="TCP" IsChecked="True" />
-                  <CheckBox x:Name="RouteUdpCheckBox" Grid.Column="1" Content="UDP" IsChecked="True" />
-                  <CheckBox x:Name="RouteIpv4CheckBox" Grid.Column="2" Content="IPv4" IsChecked="True" />
-                  <CheckBox x:Name="RouteIpv6CheckBox" Grid.Column="3" Content="IPv6" IsChecked="True" />
+                  <CheckBox x:Name="RouteTcpCheckBox" Content="TCP" IsChecked="True"
+                            AutomationProperties.HelpText="When unchecked, routed applications send TCP, such as web pages, over your normal connection, outside PaqetFire and the kill switch." />
+                  <CheckBox x:Name="RouteUdpCheckBox" Grid.Column="1" Content="UDP" IsChecked="True"
+                            AutomationProperties.HelpText="When unchecked, routed applications send UDP, such as calls and games, over your normal connection, outside PaqetFire and the kill switch." />
+                  <CheckBox x:Name="RouteIpv4CheckBox" Grid.Column="2" Content="IPv4" IsChecked="True"
+                            AutomationProperties.HelpText="When unchecked, routed applications reach IPv4 addresses over your normal connection, outside PaqetFire and the kill switch. FakeDNS needs IPv4." />
+                  <CheckBox x:Name="RouteIpv6CheckBox" Grid.Column="3" Content="IPv6" IsChecked="True"
+                            AutomationProperties.HelpText="When unchecked, routed applications reach IPv6 addresses over your normal connection, outside PaqetFire and the kill switch." />
                 </Grid>
+                <TextBlock Text="Anything you uncheck is not captured: routed applications send that traffic over your normal connection, outside PaqetFire and the kill switch, with your real IP address."
+                           FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
 
@@ -621,9 +627,14 @@
                 <TextBlock Text="Kill switch" FontSize="18" FontWeight="SemiBold" />
                 <ToggleSwitch x:Name="KillSwitchToggle" Header="Routing kill switch"
                               OnContent="Routed applications fail closed"
-                              OffContent="Off — applications may reconnect directly" />
-                <TextBlock Text="Keeps ProxiFyre active if Paqet or Xray stops, so applications covered by the routing policy cannot fall back to a direct connection. This is not a machine-wide firewall."
-                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+                              OffContent="Off — applications may reconnect directly"
+                              AutomationProperties.HelpText="Routed applications have no internet whenever PaqetFire is not connected, also after you Disconnect, until you reconnect or turn the kill switch off." />
+                <TextBlock Text="Routed applications have no internet whenever PaqetFire is not connected, also after you Disconnect, until you reconnect or turn the kill switch off."
+                           FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
+                <Expander Header="How the kill switch works" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <TextBlock Text="ProxiFyre stays active when Paqet or Xray stops or you disconnect, so applications covered by the routing policy cannot fall back to a direct connection. It covers only traffic ProxiFyre can attribute to routed applications; it is not a machine-wide firewall."
+                             FontSize="12" TextWrapping="Wrap" />
+                </Expander>
               </StackPanel>
             </Border>
 
@@ -633,7 +644,8 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
                 <TextBlock Text="Regional preset" FontSize="18" FontWeight="SemiBold" />
-                <ComboBox x:Name="RegionalPresetBox" Header="Destination policy" SelectedIndex="0" HorizontalAlignment="Stretch">
+                <ComboBox x:Name="RegionalPresetBox" Header="Destination policy" SelectedIndex="0" HorizontalAlignment="Stretch"
+                          AutomationProperties.HelpText="The Iran preset connects Iranian domains and addresses directly; everything else follows your application routing mode.">
                   <ComboBoxItem Content="Iran — Direct (recommended)" />
                   <ComboBoxItem Content="None — Route all destinations through Paqet" />
                 </ComboBox>
@@ -644,18 +656,24 @@
                 </ComboBox>
                 <TextBlock Text="The Iran preset uses Xray GeoSite and GeoIP rules. Iranian domains and addresses connect directly; everything else follows your application routing mode."
                            FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
-                <ComboBox x:Name="DnsResolverBox" Header="DNS resolver" SelectedIndex="0" HorizontalAlignment="Stretch">
+                <ComboBox x:Name="DnsResolverBox" Header="DNS resolver" SelectedIndex="0" HorizontalAlignment="Stretch"
+                          AutomationProperties.HelpText="Captured DNS lookups are answered by Xray over encrypted DNS through Paqet. The system resolver sends them outside PaqetFire.">
                   <ComboBoxItem Content="Cloudflare — Encrypted DNS through Paqet (recommended)" />
                   <ComboBoxItem Content="Google — Encrypted DNS through Paqet" />
                   <ComboBoxItem Content="Quad9 — Encrypted DNS through Paqet" />
                   <ComboBoxItem Content="System resolver — Lookups bypass PaqetFire" />
                 </ComboBox>
                 <ToggleSwitch x:Name="FakeDnsSwitch" Header="FakeDNS (faster first connections)" IsOn="True"
-                              OnContent="On · placeholder addresses, real lookups happen on the Paqet server" OffContent="Off" />
+                              OnContent="On · placeholder addresses, real lookups happen on the Paqet server" OffContent="Off"
+                              AutomationProperties.HelpText="FakeDNS answers instantly with placeholder addresses and skips a tunnel round trip per new domain. It needs IPv4 routing." />
                 <TextBlock x:Name="FakeDnsHintText" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold"
                            TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-                <TextBlock Text="Captured DNS lookups are answered by Xray over DNS-over-HTTPS through Paqet. Local, Iranian, and custom direct domains use this network's resolver. Lookups by applications outside the route, or to LAN resolvers while local network bypass is on, are not captured. FakeDNS answers instantly with addresses from 198.18.0.0/15 and skips a tunnel round trip per new domain; it needs IPv4 routing and cannot be combined with application exclusions in all-applications mode. Applications that cache DNS themselves may need a restart after disconnecting."
+                <TextBlock Text="Captured DNS lookups are answered by Xray over DNS-over-HTTPS through Paqet."
                            FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                <Expander Header="More about DNS and FakeDNS" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <TextBlock Text="Local, Iranian, and custom direct domains use this network's resolver. Lookups by applications outside the route, or to LAN resolvers while local network bypass is on, are not captured. FakeDNS answers instantly with addresses from 198.18.0.0/15 and skips a tunnel round trip per new domain; it needs IPv4 routing and cannot be combined with application exclusions in all-applications mode. Applications that cache DNS themselves may need a restart after disconnecting."
+                             FontSize="12" TextWrapping="Wrap" />
+                </Expander>
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <ToggleSwitch x:Name="BlockAdsSwitch" Header="Block advertising domains" IsOn="True"
@@ -678,15 +696,21 @@
                 <ToggleSwitch x:Name="BypassLanSwitch" Header="Local network devices"
                               OnContent="Direct access — bypass PaqetFire"
                               OffContent="Route through PaqetFire" IsOn="True"
-                              Toggled="BypassLanSwitch_Toggled" />
+                              Toggled="BypassLanSwitch_Toggled"
+                              AutomationProperties.HelpText="Keep direct access on for printers, your router, NAS, and other devices on your home or office network." />
                 <TextBlock Text="Keep direct access on for printers, your router, NAS, and other devices on your home or office network."
                            FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
                 <TextBox x:Name="DirectRouteDestinationsBox"
                          Header="Domains and IPs routed directly (one per line)"
                          PlaceholderText="example.com&#x0a;*.another-example.com&#x0a;203.0.113.10&#x0a;2001:db8::/32"
-                         AcceptsReturn="True" MinHeight="116" />
-                <TextBlock Text="A domain also covers its subdomains; *.domain is accepted too. IP addresses and CIDR ranges support IPv4 and IPv6. These entries take priority over the optional blocking rules and use your normal connection, outside Paqet. For protocols where no hostname is visible, add the IP or CIDR."
-                           TextWrapping="Wrap" Opacity="0.68" />
+                         AcceptsReturn="True" MinHeight="116"
+                         AutomationProperties.HelpText="These destinations use your normal connection, outside Paqet, and take priority over the blocking rules." />
+                <TextBlock Text="These destinations use your normal connection, outside Paqet, and take priority over the blocking rules."
+                           FontSize="12" TextWrapping="Wrap" Opacity="0.68" />
+                <Expander Header="What you can enter" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <TextBlock Text="A domain also covers its subdomains; *.domain is accepted too. IP addresses and CIDR ranges support IPv4 and IPv6. For protocols where no hostname is visible, add the IP or CIDR."
+                             FontSize="12" TextWrapping="Wrap" />
+                </Expander>
               </StackPanel>
             </Border>
 
@@ -720,8 +744,12 @@
                   <ComboBox x:Name="PsiphonRegionBox" Header="Psiphon exit country" HorizontalAlignment="Stretch" />
                   <TextBlock x:Name="PsiphonStatusText" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold"
                              TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-                  <TextBlock Text="Psiphon reaches its servers only through Paqet, and destinations see a Psiphon server in the chosen country. It carries TCP only: UDP, such as calls and games, still leaves from the Paqet server. Connecting takes longer, most of all the first time while Psiphon downloads its server list through Paqet; a country Psiphon cannot serve right now fails to connect. PaqetFire uses Psiphon's public network configuration, which Psiphon Inc. may change or limit."
+                  <TextBlock Text="Psiphon carries TCP only: UDP, such as calls and games, still leaves from the Paqet server."
                              FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                  <Expander Header="More about the Psiphon exit" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <TextBlock Text="Psiphon reaches its servers only through Paqet, and destinations see a Psiphon server in the chosen country. Connecting takes longer, most of all the first time while Psiphon downloads its server list through Paqet; a country Psiphon cannot serve right now fails to connect. PaqetFire uses Psiphon's public network configuration, which Psiphon Inc. may change or limit."
+                               FontSize="12" TextWrapping="Wrap" />
+                  </Expander>
                 </StackPanel>
                 <StackPanel x:Name="OpenVpnOptionsPanel" Spacing="10" Visibility="Collapsed">
                   <TextBlock x:Name="OpenVpnEngineText" FontSize="12" TextWrapping="Wrap"
@@ -738,10 +766,16 @@
                   <PasswordBox x:Name="OpenVpnPasswordBox" Header="OpenVPN password" HorizontalAlignment="Stretch" MaxLength="256" />
                   <TextBlock x:Name="OpenVpnStatusText" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold"
                              TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-                  <TextBlock Text="Download the Windows TCP configuration from your provider. For Proton VPN, sign in at account.protonvpn.com, open Downloads, choose OpenVPN configuration files for Windows with the TCP protocol, and use the OpenVPN / IKEv2 username and password from Account → OpenVPN / IKEv2 username, not your Proton login."
+                  <TextBlock Text="Import your provider's Windows configuration for the TCP protocol."
                              FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
-                  <TextBlock Text="OpenVPN reaches its server only through Paqet and changes no system routes or DNS settings: only traffic PaqetFire routes leaves through it, TCP and UDP, while the rest of the computer is unaffected. If its tunnel drops, routed traffic fails instead of leaving through the Paqet server. PaqetFire keeps only the client options it trusts from the file; scripts, plugins, and file paths are removed."
-                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                  <Expander Header="Getting a Proton VPN configuration" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <TextBlock Text="Sign in at account.protonvpn.com, open Downloads, choose OpenVPN configuration files for Windows with the TCP protocol, and use the OpenVPN / IKEv2 username and password from Account → OpenVPN / IKEv2 username, not your Proton login."
+                               FontSize="12" TextWrapping="Wrap" />
+                  </Expander>
+                  <Expander Header="More about the OpenVPN exit" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <TextBlock Text="OpenVPN reaches its server only through Paqet and changes no system routes or DNS settings: only traffic PaqetFire routes leaves through it, TCP and UDP, while the rest of the computer is unaffected. If its tunnel drops, routed traffic fails instead of leaving through the Paqet server. PaqetFire keeps only the client options it trusts from the file; scripts, plugins, and file paths are removed."
+                               FontSize="12" TextWrapping="Wrap" />
+                  </Expander>
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -754,7 +788,8 @@
                 <TextBlock Text="Share with your network" FontSize="18" FontWeight="SemiBold" />
                 <ToggleSwitch x:Name="ShareWithLanSwitch" Header="LAN SOCKS5 proxy"
                               OnContent="On — save to apply"
-                              OffContent="Off — local access only" Toggled="ShareWithLanSwitch_Toggled" />
+                              OffContent="Off — local access only" Toggled="ShareWithLanSwitch_Toggled"
+                              AutomationProperties.HelpText="Creates a separate password-protected SOCKS5 listener on this computer's active LAN IPv4 address, limited to the local subnet." />
                 <TextBlock Text="Creates a separate password-protected SOCKS5 listener on this computer's active LAN IPv4 address. The installer limits incoming connections to the local subnet."
                            FontSize="12" Opacity="0.68" TextWrapping="Wrap" />
                 <StackPanel x:Name="LanShareOptions" Spacing="12" Visibility="Collapsed">
@@ -805,7 +840,8 @@
                 <TextBlock Text="Hotspot sharing" FontSize="18" FontWeight="SemiBold" />
                 <ToggleSwitch x:Name="ShareViaHotspotSwitch" Header="Hotspot SOCKS proxy"
                               OnContent="Available to devices on the laptop hotspot"
-                              OffContent="Off" Toggled="ShareViaHotspotSwitch_Toggled" />
+                              OffContent="Off" Toggled="ShareViaHotspotSwitch_Toggled"
+                              AutomationProperties.HelpText="Shares the route with devices on this laptop's Windows mobile hotspot. Turn on Mobile hotspot in Windows Settings first; phones need a SOCKS app." />
                 <TextBlock Text="Turn on Mobile hotspot in Windows Settings first. PaqetFire detects the hotspot address (usually 192.168.137.1) and shares the same route as LAN clients. SOCKS-only — phones need a SOCKS app."
                           FontSize="12" Opacity="0.68" TextWrapping="Wrap" />
                 <StackPanel x:Name="HotspotOptions" Spacing="12" Visibility="Collapsed">
