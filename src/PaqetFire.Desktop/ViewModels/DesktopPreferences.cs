@@ -186,4 +186,11 @@ public sealed class ActivityLogEntry
     public string Message { get; set; } = string.Empty;
 
     public string Level { get; set; } = "INFO";
+
+    public Presentation.StatusTone Tone => Presentation.StatusToneText.ForActivityLevel(Level);
+
+    /// <summary>What a screen reader says for the row.</summary>
+    public string AutomationName => $"{Time}, {Level}: {Message}";
+
+    public override string ToString() => AutomationName;
 }

@@ -1122,7 +1122,7 @@
                 <ListView ItemsSource="{x:Bind VerificationEntries}" SelectionMode="None" MaxHeight="420">
                   <ListView.ItemTemplate>
                     <DataTemplate x:DataType="vm:VerificationDisplayItem">
-                      <Grid Padding="4,8" ColumnSpacing="12">
+                      <Grid Padding="4,8" ColumnSpacing="12" AutomationProperties.Name="{x:Bind AutomationName}">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="30" />
                           <ColumnDefinition Width="180" />
@@ -1234,14 +1234,14 @@
                     <Button Content="Clear" Click="ClearLogsButton_Click" />
                   </StackPanel>
                 </Grid>
-                <ListView x:Name="ActivityList" ItemsSource="{x:Bind ActivityEntries}" MinHeight="250" MaxHeight="380">
+                <ListView x:Name="ActivityList" ItemsSource="{x:Bind ActivityEntries}" SelectionMode="None" MinHeight="250" MaxHeight="380">
                   <ListView.ItemTemplate>
-                    <DataTemplate>
-                      <Grid Padding="4,7" ColumnSpacing="14">
+                    <DataTemplate x:DataType="vm:ActivityLogEntry">
+                      <Grid Padding="4,7" ColumnSpacing="14" AutomationProperties.Name="{x:Bind AutomationName}">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="76"/><ColumnDefinition Width="58"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding Time}" Opacity="0.55" FontFamily="Consolas" />
-                        <TextBlock Grid.Column="1" Text="{Binding Level}" Foreground="{StaticResource PaqetFireAccentBrush}" FontSize="12" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind Time}" Opacity="0.55" FontFamily="Consolas" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind Level}" Foreground="{x:Bind local:MainWindow.ToneBrush(Tone)}" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="{x:Bind Message}" TextWrapping="Wrap" />
                       </Grid>
                     </DataTemplate>
                   </ListView.ItemTemplate>

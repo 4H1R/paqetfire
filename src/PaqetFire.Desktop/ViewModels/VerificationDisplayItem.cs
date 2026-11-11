@@ -32,6 +32,13 @@ public sealed class VerificationDisplayItem
 
     public bool HasAction => ActionDestination.Length > 0;
 
+    /// <summary>What a screen reader says for the row.</summary>
+    public string AutomationName => HasRemedy
+        ? $"{Name}: {Status}. {Detail} {Remedy}"
+        : $"{Name}: {Status}. {Detail}";
+
+    public override string ToString() => AutomationName;
+
     /// <summary>Rows for a report, problems first, each with what to do about it.</summary>
     public static IReadOnlyList<VerificationDisplayItem> FromReport(ConnectionVerificationReport report)
     {

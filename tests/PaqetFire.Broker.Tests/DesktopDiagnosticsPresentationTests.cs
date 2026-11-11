@@ -86,6 +86,18 @@ public sealed class DesktopDiagnosticsPresentationTests
     public void ActivityLevelsHaveASeverityTone(string level, StatusTone expected) =>
         Assert.Equal(expected, StatusToneText.ForActivityLevel(level));
 
+    [Fact]
+    public void RowsReadAsTheirContentNotTheirClassName()
+    {
+        var row = VerificationDisplayItem.FromCheck(Check(VerificationCheckKind.DnsLeak, VerificationCheckStatus.Failed, "DNS leak"));
+        var entry = new ActivityLogEntry("12:00:00", "Route connected.", "WARN");
+
+        Assert.Equal($"DNS leak: Failed. Detail. {row.Remedy}", row.ToString());
+        Assert.Equal(row.AutomationName, row.ToString());
+        Assert.Equal("12:00:00, WARN: Route connected.", entry.ToString());
+        Assert.Equal(StatusTone.Caution, entry.Tone);
+    }
+
     private static ConnectionVerificationCheck Check(VerificationCheckKind kind, VerificationCheckStatus status, string name) =>
         new(kind, status, name, "Detail.");
 
