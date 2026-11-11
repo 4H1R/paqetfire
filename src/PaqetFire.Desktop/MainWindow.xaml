@@ -526,6 +526,8 @@
             <TextBlock x:Name="RoutingPendingText" Text="No pending changes." TextWrapping="Wrap" />
             <TextBlock Text="Either Save button applies the connection profile and routing policy together, including edits on the other page. Applying changes restarts an active connection." FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
 
+            <TextBlock Text="Applications" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="16">
@@ -540,6 +542,93 @@
               </StackPanel>
             </Border>
 
+            <Border x:Name="SelectedAppsCard" Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Visibility="Collapsed">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Selected applications" FontSize="18" FontWeight="SemiBold" />
+                <TextBox x:Name="SelectedApplicationsBox" Header="Executable names or full paths"
+                         PlaceholderText="chrome.exe&#x0a;C:\Apps\Game\game.exe"
+                         AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="112" />
+                <Expander Header="Choose installed or running applications"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Expanding="ApplicationPicker_Expanding">
+                  <StackPanel Spacing="10" Padding="0,10,0,0">
+                    <Grid ColumnSpacing="8">
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <TextBox x:Name="ApplicationSearchBox" PlaceholderText="Search applications or paths"
+                               TextChanged="ApplicationSearchBox_TextChanged" />
+                      <Button Grid.Column="1" Content="Refresh" Click="RefreshApplicationsButton_Click" />
+                      <Button Grid.Column="2" Content="Browse…" Click="BrowseApplicationButton_Click" />
+                    </Grid>
+                    <ProgressRing x:Name="ApplicationDiscoveryProgress" IsActive="False" Width="22" Height="22" HorizontalAlignment="Left" />
+                    <ListView ItemsSource="{x:Bind ApplicationEntries}" SelectionMode="None" MaxHeight="310">
+                      <ListView.ItemTemplate>
+                        <DataTemplate>
+                          <Grid Padding="3,7" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      Checked="ApplicationPickerCheckBox_Changed" Unchecked="ApplicationPickerCheckBox_Changed" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                              <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                              <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Opacity="0.62" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding StateText}" Opacity="0.68" VerticalAlignment="Center" />
+                          </Grid>
+                        </DataTemplate>
+                      </ListView.ItemTemplate>
+                    </ListView>
+                  </StackPanel>
+                </Expander>
+                <TextBlock Text="Choose from discovered apps or keep manually entered executable names. Full paths avoid ambiguity." FontSize="12" Opacity="0.62" />
+              </StackPanel>
+            </Border>
+
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="14">
+                <TextBlock Text="Protocols" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Choose at least one protocol and address family for applications routed through ProxiFyre. LAN SOCKS5 clients use Xray's routing rules independently."
+                           Opacity="0.65" TextWrapping="Wrap" />
+                <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <CheckBox x:Name="RouteTcpCheckBox" Content="TCP" IsChecked="True" />
+                  <CheckBox x:Name="RouteUdpCheckBox" Grid.Column="1" Content="UDP" IsChecked="True" />
+                  <CheckBox x:Name="RouteIpv4CheckBox" Grid.Column="2" Content="IPv4" IsChecked="True" />
+                  <CheckBox x:Name="RouteIpv6CheckBox" Grid.Column="3" Content="IPv6" IsChecked="True" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="14">
+                <TextBlock Text="Excluded applications" FontSize="18" FontWeight="SemiBold" />
+                <Border Padding="14" CornerRadius="12" Background="#12FF6B42">
+                  <StackPanel Spacing="5">
+                    <TextBlock Text="Always bypassed · locked" FontWeight="SemiBold" Foreground="{StaticResource PaqetFireAccentBrush}" />
+                    <TextBlock Text="Paqet engine path  ·  Xray engine path  ·  ProxiFyre engine path  ·  PaqetFire broker path  ·  Mobile hotspot service"
+                               TextWrapping="Wrap" Opacity="0.76" />
+                  </StackPanel>
+                </Border>
+                <TextBox x:Name="UserExclusionsBox" Header="Additional exclusions (one executable per line)"
+                         PlaceholderText="steam.exe&#x0a;updater.exe" AcceptsReturn="True" MinHeight="92" />
+              </StackPanel>
+            </Border>
+
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="14">
+                <TextBlock Text="Kill switch" FontSize="18" FontWeight="SemiBold" />
+                <ToggleSwitch x:Name="KillSwitchToggle" Header="Routing kill switch"
+                              OnContent="Routed applications fail closed"
+                              OffContent="Off — applications may reconnect directly" />
+                <TextBlock Text="Keeps ProxiFyre active if Paqet or Xray stops, so applications covered by the routing policy cannot fall back to a direct connection. This is not a machine-wide firewall."
+                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="Destinations &amp; DNS" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
@@ -586,6 +675,12 @@
                   <ToggleSwitch x:Name="DirectBitTorrentSwitch" Grid.Column="1" Header="Send BitTorrent directly" IsOn="True"
                                 OnContent="Direct by default — exposes your normal IP" OffContent="Off — route through Paqet" />
                 </Grid>
+                <ToggleSwitch x:Name="BypassLanSwitch" Header="Local network devices"
+                              OnContent="Direct access — bypass PaqetFire"
+                              OffContent="Route through PaqetFire" IsOn="True"
+                              Toggled="BypassLanSwitch_Toggled" />
+                <TextBlock Text="Keep direct access on for printers, your router, NAS, and other devices on your home or office network."
+                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
                 <TextBox x:Name="DirectRouteDestinationsBox"
                          Header="Domains and IPs routed directly (one per line)"
                          PlaceholderText="example.com&#x0a;*.another-example.com&#x0a;203.0.113.10&#x0a;2001:db8::/32"
@@ -595,6 +690,8 @@
               </StackPanel>
             </Border>
 
+            <TextBlock Text="Exit proxy" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
@@ -648,74 +745,8 @@
               </StackPanel>
             </Border>
 
-            <Border x:Name="SelectedAppsCard" Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Visibility="Collapsed">
-              <StackPanel Spacing="12">
-                <TextBlock Text="Selected applications" FontSize="18" FontWeight="SemiBold" />
-                <TextBox x:Name="SelectedApplicationsBox" Header="Executable names or full paths"
-                         PlaceholderText="chrome.exe&#x0a;C:\Apps\Game\game.exe"
-                         AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="112" />
-                <Expander Header="Choose installed or running applications"
-                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                          Expanding="ApplicationPicker_Expanding">
-                  <StackPanel Spacing="10" Padding="0,10,0,0">
-                    <Grid ColumnSpacing="8">
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                      <TextBox x:Name="ApplicationSearchBox" PlaceholderText="Search applications or paths"
-                               TextChanged="ApplicationSearchBox_TextChanged" />
-                      <Button Grid.Column="1" Content="Refresh" Click="RefreshApplicationsButton_Click" />
-                      <Button Grid.Column="2" Content="Browse…" Click="BrowseApplicationButton_Click" />
-                    </Grid>
-                    <ProgressRing x:Name="ApplicationDiscoveryProgress" IsActive="False" Width="22" Height="22" HorizontalAlignment="Left" />
-                    <ListView ItemsSource="{x:Bind ApplicationEntries}" SelectionMode="None" MaxHeight="310">
-                      <ListView.ItemTemplate>
-                        <DataTemplate>
-                          <Grid Padding="3,7" ColumnSpacing="10">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                      Checked="ApplicationPickerCheckBox_Changed" Unchecked="ApplicationPickerCheckBox_Changed" />
-                            <StackPanel Grid.Column="1" Spacing="2">
-                              <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                              <TextBlock Text="{Binding ExecutablePath}" FontSize="11" Opacity="0.62" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding StateText}" Opacity="0.68" VerticalAlignment="Center" />
-                          </Grid>
-                        </DataTemplate>
-                      </ListView.ItemTemplate>
-                    </ListView>
-                  </StackPanel>
-                </Expander>
-                <TextBlock Text="Choose from discovered apps or keep manually entered executable names. Full paths avoid ambiguity." FontSize="12" Opacity="0.62" />
-              </StackPanel>
-            </Border>
-
-            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-              <StackPanel Spacing="14">
-                <TextBlock Text="Safety exclusions" FontSize="18" FontWeight="SemiBold" />
-                <Border Padding="14" CornerRadius="12" Background="#12FF6B42">
-                  <StackPanel Spacing="5">
-                    <TextBlock Text="Always bypassed · locked" FontWeight="SemiBold" Foreground="{StaticResource PaqetFireAccentBrush}" />
-                    <TextBlock Text="Paqet engine path  ·  Xray engine path  ·  ProxiFyre engine path  ·  PaqetFire broker path  ·  Mobile hotspot service"
-                               TextWrapping="Wrap" Opacity="0.76" />
-                  </StackPanel>
-                </Border>
-                <TextBox x:Name="UserExclusionsBox" Header="Additional exclusions (one executable per line)"
-                         PlaceholderText="steam.exe&#x0a;updater.exe" AcceptsReturn="True" MinHeight="92" />
-                <ToggleSwitch x:Name="BypassLanSwitch" Header="Local network devices"
-                              OnContent="Direct access — bypass PaqetFire"
-                              OffContent="Route through PaqetFire" IsOn="True"
-                              Toggled="BypassLanSwitch_Toggled" />
-                <TextBlock Text="Keep direct access on for printers, your router, NAS, and other devices on your home or office network."
-                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
-                <ToggleSwitch x:Name="KillSwitchToggle" Header="Routing kill switch"
-                              OnContent="Routed applications fail closed"
-                              OffContent="Off — applications may reconnect directly" />
-                <TextBlock Text="Keeps ProxiFyre active if Paqet or Xray stops, so applications covered by the routing policy cannot fall back to a direct connection. This is not a machine-wide firewall."
-                           FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
-              </StackPanel>
-            </Border>
-
+            <TextBlock Text="Sharing" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
@@ -875,22 +906,6 @@
                     <TextBlock Text="Same warning as LAN: SOCKS does not encrypt phone→laptop traffic. Keep hotspot WPA2 password strong and never forward this port." FontSize="12" TextWrapping="Wrap" />
                   </Border>
                 </StackPanel>
-              </StackPanel>
-            </Border>
-
-            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-              <StackPanel Spacing="14">
-                <TextBlock Text="Protocols" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="Choose at least one protocol and address family for applications routed through ProxiFyre. LAN SOCKS5 clients use Xray's routing rules independently."
-                           Opacity="0.65" TextWrapping="Wrap" />
-                <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <CheckBox x:Name="RouteTcpCheckBox" Content="TCP" IsChecked="True" />
-                  <CheckBox x:Name="RouteUdpCheckBox" Grid.Column="1" Content="UDP" IsChecked="True" />
-                  <CheckBox x:Name="RouteIpv4CheckBox" Grid.Column="2" Content="IPv4" IsChecked="True" />
-                  <CheckBox x:Name="RouteIpv6CheckBox" Grid.Column="3" Content="IPv6" IsChecked="True" />
-                </Grid>
               </StackPanel>
             </Border>
 
