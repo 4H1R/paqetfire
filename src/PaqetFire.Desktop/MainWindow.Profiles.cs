@@ -39,29 +39,22 @@ public sealed partial class MainWindow
             return;
         }
 
-        if (hasPendingConfigurationChanges)
+        var restartsRoute = ProfileSwitch.RestartsRoute(ViewModel.ConnectionState);
+        if (hasPendingConfigurationChanges || restartsRoute)
         {
             if (!AppWindow.IsVisible)
             {
                 RestoreFromTray();
             }
 
-            if (Content?.XamlRoot is not null)
+            if (!await ConfirmProfileActionAsync(
+                    ProfileSwitch.SwitchTitle(selected.Name),
+                    ProfileSwitch.SwitchMessage(restartsRoute, hasPendingConfigurationChanges),
+                    ProfileSwitch.SwitchAction(restartsRoute, hasPendingConfigurationChanges),
+                    hasPendingConfigurationChanges ? "Keep editing" : "Cancel"))
             {
-                var dialog = new ContentDialog
-                {
-                    Title = "Discard pending changes?",
-                    Content = "Switching profiles replaces the unsaved fields currently shown.",
-                    PrimaryButtonText = "Discard and switch",
-                    CloseButtonText = "Keep editing",
-                    DefaultButton = ContentDialogButton.Close,
-                    XamlRoot = Content.XamlRoot,
-                };
-                if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary)
-                {
-                    SelectActiveProfile();
-                    return;
-                }
+                SelectActiveProfile();
+                return;
             }
         }
 
@@ -150,6 +143,18 @@ public sealed partial class MainWindow
     private async void DuplicateProfileButton_Click(object sender, RoutedEventArgs e)
     {
         if (ProfilePicker.SelectedItem is not ProfileDisplayItem selected) return;
+        // The copy becomes the active profile, which restarts a live route.
+        var restartsRoute = ProfileSwitch.RestartsRoute(ViewModel.ConnectionState);
+        if ((restartsRoute || hasPendingConfigurationChanges) &&
+            !await ConfirmProfileActionAsync(
+                ProfileSwitch.DuplicateTitle(selected.Name),
+                ProfileSwitch.DuplicateMessage(restartsRoute, hasPendingConfigurationChanges),
+                ProfileSwitch.DuplicateAction(restartsRoute, hasPendingConfigurationChanges),
+                hasPendingConfigurationChanges ? "Keep editing" : "Cancel"))
+        {
+            return;
+        }
+
         await RunProfileActionAsync(
             new ProfileAction(ProfileActionKind.Duplicate, selected.Id),
             reloadSettings: true,
@@ -207,11 +212,19 @@ public sealed partial class MainWindow
     private async void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
     {
         if (ProfilePicker.SelectedItem is not ProfileDisplayItem selected || Content?.XamlRoot is null) return;
+        // Deleting the active profile activates another one, which restarts a live route.
+        var restartsRoute = ProfileSwitch.RestartsRoute(ViewModel.ConnectionState);
+        var next = ProfileSwitch.ActiveAfterDelete(ProfileEntries, selected.Id);
         var dialog = new ContentDialog
         {
             Title = $"Delete '{selected.Name}'?",
-            Content = "This removes the profile and its transport key. If it is the last profile, a fresh empty profile will appear. Your SOCKS username and password are kept.",
-            PrimaryButtonText = "Delete profile",
+            Content = new TextBlock
+            {
+                Text = ProfileSwitch.DeleteMessage(selected.IsActive, restartsRoute, next),
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = selected.IsActive && restartsRoute && next is not null ? "Delete and reconnect" : "Delete profile",
+            IsPrimaryButtonEnabled = ProfileSwitch.CanDelete(selected.IsActive, restartsRoute, next),
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
@@ -438,6 +451,22 @@ public sealed partial class MainWindow
         {
             updatingProfileSelection = false;
         }
+    }
+
+    /// <summary>Asks before a profile action that restarts the route or discards edits; Cancel is the default.</summary>
+    private async Task<bool> ConfirmProfileActionAsync(string title, string message, string primaryText, string closeText)
+    {
+        if (Content?.XamlRoot is null) return false;
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = primaryText,
+            CloseButtonText = closeText,
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        return await ShowDialogAsync(dialog) == ContentDialogResult.Primary;
     }
 
     private void SelectActiveProfile()
