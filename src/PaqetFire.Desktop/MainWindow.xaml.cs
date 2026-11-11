@@ -573,6 +573,10 @@ public sealed partial class MainWindow : Window
             HappGuideView.Visibility = destination == "guide-happ" ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        // Focus starts inside a guide, so Esc or Alt+Left returns to Routing straight away.
+        if (destination == "guide-v2rayng") V2rayNgGuideView?.FocusBackButton();
+        else if (destination == "guide-happ") HappGuideView?.FocusBackButton();
+
         UpdateDataUsagePolling(destination == "usage");
     }
 

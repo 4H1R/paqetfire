@@ -615,9 +615,12 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
                 <TextBlock Text="Excluded applications" FontSize="18" FontWeight="SemiBold" />
-                <Border Padding="14" CornerRadius="12" Background="#12FF6B42">
+                <Border Padding="14" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                   <StackPanel Spacing="5">
-                    <TextBlock Text="Always bypassed · locked" FontWeight="SemiBold" Foreground="{StaticResource PaqetFireAccentBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <FontIcon Glyph="&#xE72E;" FontSize="14" VerticalAlignment="Center" />
+                      <TextBlock Text="Always bypassed · locked" FontWeight="SemiBold" />
+                    </StackPanel>
                     <TextBlock Text="Paqet engine path  ·  Xray engine path  ·  ProxiFyre engine path  ·  PaqetFire broker path  ·  Mobile hotspot service"
                                TextWrapping="Wrap" Opacity="0.76" />
                   </StackPanel>
@@ -836,10 +839,8 @@
                 </Grid>
                 <Button Content="Generate strong password" Click="RotateSharingPasswordButton_Click" HorizontalAlignment="Left" />
                 <InfoBar x:Name="SharedCredentialsInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
-                <Border Padding="12" CornerRadius="10" Background="#18FFB020">
-                  <TextBlock Text="SOCKS5 does not encrypt traffic between local devices and this computer. Use this only on a trusted local network and keep the password private."
-                             FontSize="12" TextWrapping="Wrap" />
-                </Border>
+                <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" HorizontalAlignment="Stretch"
+                         Message="SOCKS5 does not encrypt traffic between local devices and this computer. Use this only on a trusted local network and keep the password private." />
               </StackPanel>
             </Border>
 
@@ -909,9 +910,9 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- v2rayNG Vector Icon Badge -->
-                        <Border Width="38" Height="38" CornerRadius="10" Background="#7C4DFF" VerticalAlignment="Center">
+                        <Border Width="38" Height="38" CornerRadius="10" Background="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center">
                           <Path Data="M 9,26 L 29,19 L 9,12 L 9,17 L 22,19 L 9,21 Z"
-                                Fill="White" Stretch="Uniform" Width="18" Height="18"
+                                Fill="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Stretch="Uniform" Width="18" Height="18"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
 
@@ -938,9 +939,9 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- HAPP Vector Icon Badge -->
-                        <Border Width="38" Height="38" CornerRadius="10" Background="#0D9488" VerticalAlignment="Center">
+                        <Border Width="38" Height="38" CornerRadius="10" Background="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center">
                           <Path Data="M 19,8 L 29,12 L 29,20 C 29,26 19,30 19,30 C 19,30 9,26 9,20 L 9,12 Z"
-                                Fill="White" Stretch="Uniform" Width="17" Height="17"
+                                Fill="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Stretch="Uniform" Width="17" Height="17"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
 
@@ -953,9 +954,8 @@
                       </Grid>
                     </Button>
                   </Grid>
-                  <Border Padding="12" CornerRadius="10" Background="#18FFB020">
-                    <TextBlock Text="Same warning as LAN: SOCKS does not encrypt phone→laptop traffic. Keep hotspot WPA2 password strong and never forward this port." FontSize="12" TextWrapping="Wrap" />
-                  </Border>
+                  <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" HorizontalAlignment="Stretch"
+                           Message="SOCKS5 does not encrypt traffic from phones to this laptop. Keep the hotspot's Wi-Fi password strong and never forward this port." />
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -1348,8 +1348,8 @@
             </Border>
           </StackPanel>
         </ScrollViewer>
-        <controls:V2rayNgGuideControl x:Name="V2rayNgGuideView" Visibility="Collapsed" />
-        <controls:HappGuideControl x:Name="HappGuideView" Visibility="Collapsed" />
+        <controls:HotspotClientGuideControl x:Name="V2rayNgGuideView" App="V2rayNg" Visibility="Collapsed" />
+        <controls:HotspotClientGuideControl x:Name="HappGuideView" App="Happ" Visibility="Collapsed" />
         <Border x:Name="UpdateToast" Visibility="Collapsed" MaxWidth="440" Margin="24"
                 HorizontalAlignment="Right" VerticalAlignment="Bottom" CornerRadius="8"
                 Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"

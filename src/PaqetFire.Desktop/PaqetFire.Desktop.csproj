@@ -64,7 +64,7 @@
         SkipUnchangedFiles="true" />
 
     <Error
-        Condition="!Exists('$(PublishDir)App.xbf') or !Exists('$(PublishDir)MainWindow.xbf') or !Exists('$(PublishDir)Controls\HappGuideControl.xbf') or !Exists('$(PublishDir)Controls\V2rayNgGuideControl.xbf') or !Exists('$(PublishDir)$(AssemblyName).pri')"
+        Condition="!Exists('$(PublishDir)App.xbf') or !Exists('$(PublishDir)MainWindow.xbf') or !Exists('$(PublishDir)Controls\HotspotClientGuideControl.xbf') or !Exists('$(PublishDir)$(AssemblyName).pri')"
         Text="The WinUI PRI/XBF resources were not copied into the publish directory." />
   </Target>
 </Project>
