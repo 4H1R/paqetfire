@@ -87,15 +87,34 @@ public sealed partial class MainWindow
         UpdatePsiphonStatus(snapshot);
         if (snapshot.ExitProxy is { Kind: ExitProxyKind.OpenVpn } openVpn)
         {
-            OpenVpnStatusText.Text = openVpn.TunnelActive
-                ? $"Connected through {openVpn.Server ?? "your VPN provider"}."
-                : "OpenVPN lost its tunnel and is reconnecting through Paqet.";
-            OpenVpnStatusText.Visibility = Visibility.Visible;
+            ShowExitStatus(
+                OpenVpnStatusBar,
+                openVpn.TunnelActive ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
+                openVpn.TunnelActive ? "Connected" : "Reconnecting",
+                openVpn.TunnelActive
+                    ? $"Connected through {openVpn.Server ?? "your VPN provider"}."
+                    : "OpenVPN lost its tunnel and is reconnecting through Paqet. Routed traffic fails until it is back.");
         }
         else
         {
-            OpenVpnStatusText.Visibility = Visibility.Collapsed;
+            OpenVpnStatusBar.IsOpen = false;
         }
+    }
+
+    /// <summary>Shows a running exit's state; an unchanged state is left alone so it is not announced again.</summary>
+    private static void ShowExitStatus(InfoBar bar, InfoBarSeverity severity, string title, string message)
+    {
+        if (bar.IsOpen && bar.Severity == severity &&
+            string.Equals(bar.Title, title, StringComparison.Ordinal) &&
+            string.Equals(bar.Message, message, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        bar.Severity = severity;
+        bar.Title = title;
+        bar.Message = message;
+        bar.IsOpen = true;
     }
 
     private void UpdateExitEngines(IReadOnlyList<ExitEngineAvailability> engines)
@@ -130,6 +149,7 @@ public sealed partial class MainWindow
                 ? $"Using your OpenVPN {openVpn.Version} installation."
                 : openVpn.Detail ?? "OpenVPN is not installed.";
             OpenVpnDownloadLink.Visibility = openVpn.IsInstalled ? Visibility.Collapsed : Visibility.Visible;
+            OpenVpnVersionNote.Visibility = OpenVpnDownloadLink.Visibility;
             if (openVpn.DownloadUrl is { } url && Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
                 OpenVpnDownloadLink.NavigateUri = uri;
@@ -141,7 +161,7 @@ public sealed partial class MainWindow
     {
         if (snapshot.ExitProxy is not { Kind: ExitProxyKind.Psiphon } status)
         {
-            PsiphonStatusText.Visibility = Visibility.Collapsed;
+            PsiphonStatusBar.IsOpen = false;
             return;
         }
 
@@ -151,20 +171,25 @@ public sealed partial class MainWindow
         }
 
         var saved = snapshot.Settings?.Psiphon?.EgressRegion ?? string.Empty;
-        PsiphonStatusText.Text = status switch
+        var message = status switch
         {
-            { TunnelActive: false } => "Psiphon lost its tunnel and is reconnecting through Paqet.",
+            { TunnelActive: false } => "Psiphon lost its tunnel and is reconnecting through Paqet. Routed TCP fails until it is back.",
             { ConnectedRegion: { Length: > 0 } region } =>
                 $"Connected through a Psiphon server in {RegionName(region)}." +
                 (status.AvailableRegions.Count > 0 ? $" {status.AvailableRegions.Count} countries are available right now." : string.Empty),
             _ => "Psiphon is connected.",
         };
-        if (saved.Length > 0 && status.AvailableRegions.Count > 0 && !status.AvailableRegions.Contains(saved))
+        var savedUnavailable = saved.Length > 0 && status.AvailableRegions.Count > 0 && !status.AvailableRegions.Contains(saved);
+        if (savedUnavailable)
         {
-            PsiphonStatusText.Text += $" {RegionName(saved)} is not offered at the moment.";
+            message += $" {RegionName(saved)} is not offered at the moment.";
         }
 
-        PsiphonStatusText.Visibility = Visibility.Visible;
+        ShowExitStatus(
+            PsiphonStatusBar,
+            status.TunnelActive && !savedUnavailable ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
+            status.TunnelActive ? "Connected" : "Reconnecting",
+            message);
     }
 
     private async void PsiphonDownloadButton_Click(object sender, RoutedEventArgs e) =>
@@ -327,6 +352,26 @@ public sealed partial class MainWindow
         OpenVpnPasswordBox.PlaceholderText = savedOpenVpn.HasPassword && pendingOpenVpnConfiguration is null
             ? SavedSecretPlaceholder
             : "The OpenVPN password from your VPN account";
+        UpdateOpenVpnCredentialsAvailability();
+    }
+
+    /// <summary>
+    /// The account fields mean nothing before a configuration is imported, nor for an imported
+    /// one without <c>auth-user-pass</c>. The saved file is never sent back, so a saved
+    /// configuration keeps them open.
+    /// </summary>
+    private void UpdateOpenVpnCredentialsAvailability()
+    {
+        if (OpenVpnUsernameBox is null || OpenVpnPasswordBox is null) return;
+        var needed = pendingOpenVpnConfiguration is not null
+            ? OpenVpnConfiguration.Parse(pendingOpenVpnConfiguration).RequiresCredentials
+            : savedOpenVpn.HasConfiguration;
+        OpenVpnUsernameBox.IsEnabled = OpenVpnPasswordBox.IsEnabled = configurationEditingEnabled && needed;
+        OpenVpnUsernameBox.PlaceholderText = needed
+            ? "The OpenVPN username from your VPN account"
+            : pendingOpenVpnConfiguration is not null
+                ? "This configuration needs no username or password"
+                : "Import a configuration first";
     }
 
     private ComboBoxItem? FindPsiphonRegion(string region) =>

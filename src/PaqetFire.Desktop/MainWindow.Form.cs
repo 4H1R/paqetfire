@@ -310,6 +310,7 @@ public sealed partial class MainWindow
         foreach (var control in ConfigurationControls()) control.IsEnabled = enabled;
         AdvancedTransportExpander.IsEnabled = enabled;
         UpdateFakeDnsCompatibility();
+        UpdateOpenVpnCredentialsAvailability();
     }
 
     private void ClearFieldErrors()
