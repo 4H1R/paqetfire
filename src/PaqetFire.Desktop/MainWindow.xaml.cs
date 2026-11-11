@@ -619,7 +619,7 @@ public sealed partial class MainWindow : Window
 
     private void RoutingModeButtons_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ConfigurationEdited();
+        ConfigurationEdited(RoutingModeButtons);
         UpdateFakeDnsCompatibility();
         var selectedOnly = RoutingModeButtons.SelectedIndex == 1;
         SelectedAppsCard.Visibility = selectedOnly ? Visibility.Visible : Visibility.Collapsed;

@@ -282,7 +282,7 @@ public sealed partial class MainWindow
         pendingOpenVpnFileName = Path.GetFileName(dialog.FileName);
         ApplyOpenVpnConfigurationText();
         AddActivity($"OpenVPN configuration {pendingOpenVpnFileName} imported; save to apply it.");
-        ConfigurationEdited();
+        ConfigurationEdited(OpenVpnImportButton);
     }
 
     /// <summary>

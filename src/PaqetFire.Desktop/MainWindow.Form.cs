@@ -11,7 +11,7 @@ namespace PaqetFire.Desktop;
 /// <summary>Connection and routing form: one population path, change tracking, and validation.</summary>
 public sealed partial class MainWindow
 {
-    private readonly List<(Panel Parent, TextBlock Error)> fieldErrors = [];
+    private readonly List<(Control Field, Panel Parent, TextBlock Error)> fieldErrors = [];
     private Dictionary<Control, string>? defaultHelpTexts;
     private ConnectionFormState? appliedFormState;
     private int formPopulationDepth;
@@ -157,20 +157,20 @@ public sealed partial class MainWindow
             switch (control)
             {
                 case TextBox box when !box.IsReadOnly:
-                    box.TextChanged += (_, _) => ConfigurationEdited(); break;
+                    box.TextChanged += (_, _) => ConfigurationEdited(box); break;
                 case PasswordBox box:
-                    box.PasswordChanged += (_, _) => ConfigurationEdited(); break;
+                    box.PasswordChanged += (_, _) => ConfigurationEdited(box); break;
                 case NumberBox box:
-                    box.ValueChanged += (_, _) => ConfigurationEdited(); break;
+                    box.ValueChanged += (_, _) => ConfigurationEdited(box); break;
                 case ComboBox box when box != NetworkInterfaceBox:
-                    box.SelectionChanged += (_, _) => ConfigurationEdited(); break;
+                    box.SelectionChanged += (_, _) => ConfigurationEdited(box); break;
                 case ListView list:
-                    list.SelectionChanged += (_, _) => ConfigurationEdited(); break;
+                    list.SelectionChanged += (_, _) => ConfigurationEdited(list); break;
                 case ToggleSwitch toggle:
-                    toggle.Toggled += (_, _) => ConfigurationEdited(); break;
+                    toggle.Toggled += (_, _) => ConfigurationEdited(toggle); break;
                 case CheckBox check:
-                    check.Checked += (_, _) => ConfigurationEdited();
-                    check.Unchecked += (_, _) => ConfigurationEdited(); break;
+                    check.Checked += (_, _) => ConfigurationEdited(check);
+                    check.Unchecked += (_, _) => ConfigurationEdited(check); break;
             }
         }
 
@@ -183,8 +183,9 @@ public sealed partial class MainWindow
     /// <summary>
     /// Pending changes are a comparison with the last applied form, so programmatic updates
     /// (including text-changed events WinUI raises after population) never mark it dirty.
+    /// Editing a field clears only that field's error; the others stay until the next save.
     /// </summary>
-    private void ConfigurationEdited()
+    private void ConfigurationEdited(Control? edited = null)
     {
         if (!trackingConfigurationChanges || IsPopulatingForm || configurationSaveInProgress || appliedFormState is null)
         {
@@ -203,9 +204,9 @@ public sealed partial class MainWindow
             ConnectionInfoBar.IsOpen = RoutingInfoBar.IsOpen = false;
         }
 
-        if (pending)
+        if (edited is not null)
         {
-            ClearFieldErrors();
+            ClearFieldErrors(edited);
         }
     }
 
@@ -327,15 +328,48 @@ public sealed partial class MainWindow
 
     private void ClearFieldErrors()
     {
-        foreach (var (parent, error) in fieldErrors) parent.Children.Remove(error);
+        foreach (var (_, parent, error) in fieldErrors) parent.Children.Remove(error);
         fieldErrors.Clear();
-        // A field error replaces a control's help text; put back the help text it was given.
-        defaultHelpTexts ??= ConfigurationControls().Distinct().ToDictionary(
-            control => control,
-            control => Microsoft.UI.Xaml.Automation.AutomationProperties.GetHelpText(control) ?? string.Empty);
         foreach (var control in ConfigurationControls())
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(
-                control, defaultHelpTexts.GetValueOrDefault(control, string.Empty));
+            RestoreHelpText(control);
+    }
+
+    /// <summary>A field error replaces a control's help text; put back the help text it was given.</summary>
+    private void RestoreHelpText(Control control)
+    {
+        defaultHelpTexts ??= ConfigurationControls().Distinct().ToDictionary(
+            item => item,
+            item => Microsoft.UI.Xaml.Automation.AutomationProperties.GetHelpText(item) ?? string.Empty);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(
+            control, defaultHelpTexts.GetValueOrDefault(control, string.Empty));
+    }
+
+    /// <summary>Removes the errors an edit of <paramref name="edited"/> may have resolved.</summary>
+    private void ClearFieldErrors(Control edited)
+    {
+        var resolved = FieldsResolvedBy(edited);
+        foreach (var entry in fieldErrors.Where(entry => resolved.Contains(entry.Field)).ToList())
+        {
+            entry.Parent.Children.Remove(entry.Error);
+            fieldErrors.Remove(entry);
+            RestoreHelpText(entry.Field);
+        }
+    }
+
+    /// <summary>
+    /// The fields whose errors an edit can fix: the field itself, both boxes of a paired
+    /// choice, and the details a switch or picker makes unnecessary when it changes.
+    /// </summary>
+    private Control[] FieldsResolvedBy(Control edited)
+    {
+        if (edited == RouteTcpCheckBox || edited == RouteUdpCheckBox) return [RouteTcpCheckBox, RouteUdpCheckBox];
+        if (edited == RouteIpv4CheckBox || edited == RouteIpv6CheckBox) return [RouteIpv4CheckBox, RouteIpv6CheckBox];
+        if (edited == ExitProxyBox)
+            return [ExitProxyBox, PsiphonRegionBox, OpenVpnImportButton, OpenVpnUsernameBox, OpenVpnPasswordBox];
+        if (edited == ShareWithLanSwitch || edited == ShareViaHotspotSwitch)
+            return [edited, LanSharePortBox, HotspotPortBox, ShareUsernameBox, SharePasswordBox];
+        if (edited == RoutingModeButtons) return [RoutingModeButtons, SelectedApplicationsBox];
+        return [edited];
     }
 
     private void ShowFieldErrors(IReadOnlyList<string> errors)
@@ -387,8 +421,13 @@ public sealed partial class MainWindow
                     TextWrapping = TextWrapping.Wrap,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 };
+                if (Application.Current.Resources.TryGetValue("SystemFillColorCriticalBrush", out var critical) && critical is Brush brush)
+                {
+                    error.Foreground = brush;
+                }
+
                 panel.Children.Insert(panel.Children.IndexOf(rowElement) + 1, error);
-                fieldErrors.Add((panel, error));
+                fieldErrors.Add((control, panel, error));
             }
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(control, message);
         }

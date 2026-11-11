@@ -117,7 +117,7 @@ public sealed partial class MainWindow
 
             if (!double.IsNaN(number) && (!double.IsFinite(number) || number < int.MinValue || number > int.MaxValue)) return;
             advancedOptions = write(advancedOptions, double.IsNaN(number) ? null : (int)number);
-            ConfigurationEdited();
+            ConfigurationEdited(AdvancedTransportExpander);
         };
         advancedOptionReloaders.Add(() => control.Value = read(advancedOptions) is { } number ? number : double.NaN);
         advancedNumberInputs.Add(control);
@@ -161,7 +161,7 @@ public sealed partial class MainWindow
             }
 
             advancedOptions = write(advancedOptions, selected);
-            ConfigurationEdited();
+            ConfigurationEdited(AdvancedTransportExpander);
         };
         advancedOptionReloaders.Add(Reload);
         AdvancedOptionsPanel.Children.Add(control);
@@ -197,7 +197,7 @@ public sealed partial class MainWindow
         {
             if (loadingAdvancedOptions) return;
             advancedOptions = write(advancedOptions, control.Text);
-            ConfigurationEdited();
+            ConfigurationEdited(AdvancedTransportExpander);
         };
         advancedOptionReloaders.Add(() => control.Text = read(advancedOptions) ?? string.Empty);
         AdvancedOptionsPanel.Children.Add(control);
@@ -209,6 +209,6 @@ public sealed partial class MainWindow
         LoadAdvancedOptions(new());
         KcpModeBox.SelectedIndex = 1;
         LocalFlagsBox.Text = RemoteFlagsBox.Text = "PA";
-        ConfigurationEdited();
+        ConfigurationEdited(AdvancedTransportExpander);
     }
 }
