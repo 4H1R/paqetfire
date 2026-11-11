@@ -1341,6 +1341,8 @@
                   <Button x:Name="CheckForUpdatesButton" Content="Check for updates" Click="CheckForUpdatesButton_Click" />
                   <Button x:Name="InstallUpdateButton" Content="Download and install" Visibility="Collapsed"
                           Style="{StaticResource AccentButtonStyle}" Click="InstallUpdateButton_Click" />
+                  <Button x:Name="CancelUpdateButton" Content="Cancel download" Visibility="Collapsed"
+                          Click="CancelUpdateButton_Click" />
                   <Button x:Name="ViewReleaseButton" Content="View release notes" Visibility="Collapsed"
                           Click="ViewReleaseButton_Click" />
                 </StackPanel>

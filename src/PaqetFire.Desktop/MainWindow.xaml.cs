@@ -72,6 +72,7 @@ public sealed partial class MainWindow : Window
     private readonly CancellationTokenSource updateCancellation = new();
     private SoftwareRelease? availableUpdate;
     private bool updateActionInProgress;
+    private CancellationTokenSource? updateDownloadCancellation;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? updateCheckTimer;
     private Version? announcedUpdateVersion;
     private Version? dismissedUpdateVersion;
@@ -372,12 +373,28 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        // Windows Installer stops the broker, so an active route drops until PaqetFire reopens.
+        if (ViewModel.ConnectionState is BrokerConnectionState.Connected or BrokerConnectionState.Degraded or BrokerConnectionState.Connecting)
+        {
+            updateActionInProgress = true;
+            var confirmed = await ConfirmUpdateDisconnectAsync();
+            updateActionInProgress = false;
+            if (!confirmed || availableUpdate is null)
+            {
+                return;
+            }
+        }
+
         updateActionInProgress = true;
         CheckForUpdatesButton.IsEnabled = false;
         InstallUpdateButton.IsEnabled = false;
         UpdateProgressBar.Visibility = Visibility.Visible;
         UpdateProgressBar.IsIndeterminate = true;
         UpdateStatusText.Text = "Reading the published checksum…";
+        using var downloadCancellation = CancellationTokenSource.CreateLinkedTokenSource(updateCancellation.Token);
+        updateDownloadCancellation = downloadCancellation;
+        CancelUpdateButton.Visibility = Visibility.Visible;
+        CancelUpdateButton.IsEnabled = true;
 
         try
         {
@@ -397,8 +414,10 @@ public sealed partial class MainWindow : Window
             var installerPath = await updateService.DownloadVerifiedInstallerAsync(
                 availableUpdate,
                 progress,
-                updateCancellation.Token);
+                downloadCancellation.Token);
 
+            // Past this point the installer is starting; there is nothing left to cancel.
+            CancelUpdateButton.Visibility = Visibility.Collapsed;
             UpdateProgressBar.IsIndeterminate = false;
             UpdateProgressBar.Value = 100;
             UpdateStatusText.Text = "Download verified. Opening Windows Installer…";
@@ -419,6 +438,12 @@ public sealed partial class MainWindow : Window
         {
             return;
         }
+        catch (OperationCanceledException) when (downloadCancellation.IsCancellationRequested)
+        {
+            UpdateProgressBar.Visibility = Visibility.Collapsed;
+            UpdateStatusText.Text = "Download cancelled. Nothing was installed.";
+            AddActivity("The PaqetFire update download was cancelled.");
+        }
         catch (Exception exception)
         {
             UpdateProgressBar.Visibility = Visibility.Collapsed;
@@ -428,13 +453,41 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
+            updateDownloadCancellation = null;
             updateActionInProgress = false;
             if (!exitRequested)
             {
+                CancelUpdateButton.Visibility = Visibility.Collapsed;
                 CheckForUpdatesButton.IsEnabled = true;
                 InstallUpdateButton.IsEnabled = availableUpdate is not null;
             }
         }
+    }
+
+    private void CancelUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        CancelUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = "Cancelling the download…";
+        updateDownloadCancellation?.Cancel();
+    }
+
+    private async Task<bool> ConfirmUpdateDisconnectAsync()
+    {
+        if (Content?.XamlRoot is null)
+        {
+            return false;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Install the update now?",
+            Content = "Installing the update disconnects your route for about a minute. PaqetFire reopens when Windows Installer finishes.",
+            PrimaryButtonText = "Install update",
+            CloseButtonText = "Not now",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content.XamlRoot,
+        };
+        return await ShowDialogAsync(dialog) == ContentDialogResult.Primary;
     }
 
     private void ViewReleaseButton_Click(object sender, RoutedEventArgs e)
