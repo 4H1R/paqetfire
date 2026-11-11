@@ -21,19 +21,58 @@ public sealed record DataUsageDayRow(
     string TotalText,
     double Share);
 
+/// <summary>The span of days the Data usage page totals and lists; the broker keeps 90 days.</summary>
+public enum DataUsagePeriod
+{
+    Last30Days,
+    ThisMonth,
+    LastMonth,
+    Last90Days,
+}
+
+/// <param name="Period">Totals for the selected period, which the daily list also covers.</param>
 public sealed record DataUsageSummary(
     DataUsageTotals Today,
     DataUsageTotals ThisMonth,
-    DataUsageTotals RecentDays,
+    DataUsageTotals Period,
     IReadOnlyList<DataUsageDayRow> Days);
 
 public static class DataUsageText
 {
-    /// <summary>How many days, ending today, the recent total and the daily list cover.</summary>
-    public const int RecentDayCount = 30;
+    /// <summary>The first and last day, inclusive, of a period that ends no later than <paramref name="today"/>.</summary>
+    public static (DateOnly First, DateOnly Last) Range(DataUsagePeriod period, DateOnly today)
+    {
+        var firstOfMonth = new DateOnly(today.Year, today.Month, 1);
+        return period switch
+        {
+            DataUsagePeriod.ThisMonth => (firstOfMonth, today),
+            DataUsagePeriod.LastMonth => (firstOfMonth.AddMonths(-1), firstOfMonth.AddDays(-1)),
+            DataUsagePeriod.Last90Days => (today.AddDays(-(DataUsageLedger.RetentionDays - 1)), today),
+            _ => (today.AddDays(-29), today),
+        };
+    }
+
+    public static string PeriodName(DataUsagePeriod period) => period switch
+    {
+        DataUsagePeriod.ThisMonth => "This month",
+        DataUsagePeriod.LastMonth => "Last month",
+        DataUsagePeriod.Last90Days => "Last 90 days",
+        _ => "Last 30 days",
+    };
+
+    public static string EmptyText(DataUsagePeriod period) => period switch
+    {
+        DataUsagePeriod.ThisMonth => "No traffic went through Paqet this month.",
+        DataUsagePeriod.LastMonth => "No traffic went through Paqet last month.",
+        DataUsagePeriod.Last90Days => "No traffic went through Paqet in the last 90 days.",
+        _ => "No traffic went through Paqet in the last 30 days.",
+    };
 
     /// <summary>Totals for one profile, or for every recorded profile when <paramref name="profileId"/> is null.</summary>
-    public static DataUsageSummary Summarize(DataUsageReport report, Guid? profileId)
+    public static DataUsageSummary Summarize(
+        DataUsageReport report,
+        Guid? profileId,
+        DataUsagePeriod period = DataUsagePeriod.Last30Days)
     {
         ArgumentNullException.ThrowIfNull(report);
         var today = report.Today;
@@ -49,15 +88,15 @@ public static class DataUsageText
             .OrderByDescending(day => day.Date)
             .ToArray();
 
-        var firstRecent = today.AddDays(-(RecentDayCount - 1));
+        var (first, last) = Range(period, today);
         var firstOfMonth = new DateOnly(today.Year, today.Month, 1);
-        var recent = days.Where(day => day.Date >= firstRecent && day.TotalBytes > 0).ToArray();
-        var busiest = recent.Length == 0 ? 0 : recent.Max(day => day.TotalBytes);
+        var selected = days.Where(day => day.Date >= first && day.Date <= last && day.TotalBytes > 0).ToArray();
+        var busiest = selected.Length == 0 ? 0 : selected.Max(day => day.TotalBytes);
         return new DataUsageSummary(
             Total(days.Where(day => day.Date == today)),
             Total(days.Where(day => day.Date >= firstOfMonth)),
-            Total(recent),
-            recent.Select(day => new DataUsageDayRow(
+            Total(selected),
+            selected.Select(day => new DataUsageDayRow(
                 FormatDay(day.Date, today),
                 LiveStatsText.FormatBytes(day.DownloadBytes),
                 LiveStatsText.FormatBytes(day.UploadBytes),

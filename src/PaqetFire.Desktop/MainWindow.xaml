@@ -990,6 +990,13 @@
                            FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
               </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                <ComboBox x:Name="DataUsagePeriodBox" MinWidth="150" SelectedIndex="0" AutomationProperties.Name="Period"
+                          SelectionChanged="DataUsagePeriodBox_SelectionChanged">
+                  <ComboBoxItem Content="Last 30 days" />
+                  <ComboBoxItem Content="This month" />
+                  <ComboBoxItem Content="Last month" />
+                  <ComboBoxItem Content="Last 90 days" />
+                </ComboBox>
                 <ComboBox x:Name="DataUsageProfileBox" MinWidth="200" ItemsSource="{x:Bind DataUsageProfiles}"
                           DisplayMemberPath="Name" AutomationProperties.Name="Profile"
                           SelectionChanged="DataUsageProfileBox_SelectionChanged" />
@@ -1019,7 +1026,7 @@
               </Border>
               <Border Grid.Column="2" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="5">
-                  <TextBlock Text="Last 30 days" Opacity="0.65"/>
+                  <TextBlock x:Name="DataUsagePeriodLabel" Text="Last 30 days" Opacity="0.65"/>
                   <TextBlock x:Name="DataUsageRecentText" Text="0 B" FontSize="24" FontWeight="SemiBold"/>
                   <TextBlock x:Name="DataUsageRecentDetail" Text="↓ 0 B   ↑ 0 B" FontSize="12" Opacity="0.65"/>
                 </StackPanel>

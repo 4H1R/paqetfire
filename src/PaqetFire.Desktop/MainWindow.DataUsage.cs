@@ -27,6 +27,12 @@ public sealed partial class MainWindow
 
     private Guid? SelectedDataUsageProfileId => (DataUsageProfileBox.SelectedItem as DataUsageProfileOption)?.Id;
 
+    /// <summary>The period box lists the periods in enum order.</summary>
+    private DataUsagePeriod SelectedDataUsagePeriod =>
+        DataUsagePeriodBox?.SelectedIndex is int index && Enum.IsDefined((DataUsagePeriod)index)
+            ? (DataUsagePeriod)index
+            : DataUsagePeriod.Last30Days;
+
     /// <summary>Refreshes while the page is shown; usage keeps being recorded by the broker regardless.</summary>
     private void UpdateDataUsagePolling(bool visible)
     {
@@ -62,6 +68,8 @@ public sealed partial class MainWindow
             RenderDataUsage();
         }
     }
+
+    private void DataUsagePeriodBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => RenderDataUsage();
 
     private async void RefreshDataUsageButton_Click(object sender, RoutedEventArgs e) =>
         await RefreshDataUsageAsync(reset: null);
@@ -171,13 +179,16 @@ public sealed partial class MainWindow
             return;
         }
 
-        var summary = DataUsageText.Summarize(lastDataUsage, SelectedDataUsageProfileId);
+        var period = SelectedDataUsagePeriod;
+        var summary = DataUsageText.Summarize(lastDataUsage, SelectedDataUsageProfileId, period);
         DataUsageTodayText.Text = summary.Today.TotalText;
         DataUsageTodayDetail.Text = summary.Today.DetailText;
         DataUsageMonthText.Text = summary.ThisMonth.TotalText;
         DataUsageMonthDetail.Text = summary.ThisMonth.DetailText;
-        DataUsageRecentText.Text = summary.RecentDays.TotalText;
-        DataUsageRecentDetail.Text = summary.RecentDays.DetailText;
+        DataUsagePeriodLabel.Text = DataUsageText.PeriodName(period);
+        DataUsageRecentText.Text = summary.Period.TotalText;
+        DataUsageRecentDetail.Text = summary.Period.DetailText;
+        DataUsageEmptyText.Text = DataUsageText.EmptyText(period);
         // The page refreshes every few seconds; replacing an unchanged list would reset focus and scrolling.
         if (DataUsageDaysList.ItemsSource is not IReadOnlyList<DataUsageDayRow> shown || !shown.SequenceEqual(summary.Days))
         {

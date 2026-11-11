@@ -281,7 +281,7 @@ public sealed class DataUsageTests
 
         Assert.Equal(new DataUsageTotals(3072, 1024), all.Today);
         Assert.Equal(new DataUsageTotals(4096, 1024), all.ThisMonth);
-        Assert.Equal(new DataUsageTotals(8192, 1024), all.RecentDays);
+        Assert.Equal(new DataUsageTotals(8192, 1024), all.Period);
         Assert.Equal(new DataUsageTotals(2048, 1024), home.Today);
         Assert.Equal("3.0 KB", home.Today.TotalText);
         Assert.Equal("↓ 2.0 KB   ↑ 1.0 KB", home.Today.DetailText);
@@ -295,7 +295,42 @@ public sealed class DataUsageTests
         var summary = DataUsageText.Summarize(new DataUsageReport(Day, []), Home);
 
         Assert.Empty(summary.Days);
-        Assert.Equal("0 B", summary.RecentDays.TotalText);
+        Assert.Equal("0 B", summary.Period.TotalText);
+    }
+
+    [Theory]
+    [InlineData(DataUsagePeriod.Last30Days, "2026-09-27", "2026-10-26")]
+    [InlineData(DataUsagePeriod.ThisMonth, "2026-10-01", "2026-10-26")]
+    [InlineData(DataUsagePeriod.LastMonth, "2026-09-01", "2026-09-30")]
+    [InlineData(DataUsagePeriod.Last90Days, "2026-07-29", "2026-10-26")]
+    public void PeriodsEndNoLaterThanToday(DataUsagePeriod period, string first, string last) =>
+        Assert.Equal((DateOnly.Parse(first), DateOnly.Parse(last)), DataUsageText.Range(period, Day));
+
+    [Fact]
+    public void LastMonthAcrossAYearBoundaryIsDecember() =>
+        Assert.Equal((new DateOnly(2026, 12, 1), new DateOnly(2026, 12, 31)),
+            DataUsageText.Range(DataUsagePeriod.LastMonth, new DateOnly(2027, 1, 5)));
+
+    [Fact]
+    public void SummaryTotalsAndListsTheSelectedPeriod()
+    {
+        var report = new DataUsageReport(Day, [
+            new ProfileDataUsage(Home, [
+                new DailyDataUsage(Day, 2048, 0),
+                new DailyDataUsage(new DateOnly(2026, 9, 30), 4096, 0),
+                new DailyDataUsage(new DateOnly(2026, 9, 1), 1024, 1024),
+                new DailyDataUsage(Day.AddDays(-80), 512, 0),
+            ]),
+        ]);
+
+        var lastMonth = DataUsageText.Summarize(report, Home, DataUsagePeriod.LastMonth);
+        var ninety = DataUsageText.Summarize(report, Home, DataUsagePeriod.Last90Days);
+
+        Assert.Equal(new DataUsageTotals(5120, 1024), lastMonth.Period);
+        Assert.Equal(2, lastMonth.Days.Count);
+        Assert.Equal(new DataUsageTotals(2048, 0), lastMonth.ThisMonth);
+        Assert.Equal(new DataUsageTotals(7680, 1024), ninety.Period);
+        Assert.Equal(4, ninety.Days.Count);
     }
 
     private sealed class RecorderFixture
