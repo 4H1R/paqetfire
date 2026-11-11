@@ -69,7 +69,7 @@ public sealed class ConnectionVerifier(IRouteProbe routeProbe, TimeProvider? tim
         checks.Add(new ConnectionVerificationCheck(
             VerificationCheckKind.ApplicationCapture,
             connection.ProxiFyre.State == EngineState.Running
-                ? VerificationCheckStatus.Warning
+                ? VerificationCheckStatus.Info
                 : VerificationCheckStatus.Failed,
             "Capture process",
             connection.ProxiFyre.State == EngineState.Running

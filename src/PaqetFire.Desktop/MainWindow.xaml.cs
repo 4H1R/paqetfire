@@ -479,7 +479,7 @@ public sealed partial class MainWindow : Window
         ShowInfo(
             VerificationInfoBar,
             report.FailedCount > 0 ? InfoBarSeverity.Error :
-                report.Checks.Any(check => check.Status == VerificationCheckStatus.Warning)
+                report.WarningCount > 0
                     ? InfoBarSeverity.Warning
                     : InfoBarSeverity.Success,
             report.FailedCount > 0 ? "Route needs attention" : "Verification complete",
@@ -1239,6 +1239,7 @@ public sealed partial class MainWindow : Window
                 VerificationCheckStatus.Passed => ("✓", "Passed"),
                 VerificationCheckStatus.Warning => ("!", "Warning"),
                 VerificationCheckStatus.Failed => ("×", "Failed"),
+                VerificationCheckStatus.Info => ("i", "Note"),
                 _ => ("–", "Skipped"),
             };
             var detail = string.IsNullOrWhiteSpace(check.ObservedValue)

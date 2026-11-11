@@ -20,8 +20,10 @@ public sealed class ConnectionVerifierTests
         Assert.True(report.IsHealthy);
         Assert.Equal(7, report.PassedCount);
         Assert.Equal(0, report.FailedCount);
-        Assert.Equal(VerificationCheckStatus.Warning,
+        Assert.Equal(0, report.WarningCount);
+        Assert.Equal(VerificationCheckStatus.Info,
             report.Checks.Single(check => check.Kind == VerificationCheckKind.ApplicationCapture).Status);
+        Assert.Equal("7 of 7 checks passed", report.Summary);
         Assert.Equal(1, probe.LocalCalls);
         Assert.Equal(1, probe.TcpCalls);
         Assert.Equal(1, probe.UdpCalls);
@@ -68,6 +70,21 @@ public sealed class ConnectionVerifierTests
         Assert.Equal(0, probe.UdpCalls);
         Assert.Equal(0, probe.Ipv6Calls);
         Assert.Equal(0, probe.DnsLeakCalls);
+    }
+
+    [Fact]
+    public void InformationalChecks_AreLeftOutOfTheCount()
+    {
+        var report = new ConnectionVerificationReport(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, [
+            new(VerificationCheckKind.EngineChain, VerificationCheckStatus.Passed, "Engine chain", "Running."),
+            new(VerificationCheckKind.ApplicationCapture, VerificationCheckStatus.Info, "Capture process", "Caveat."),
+            new(VerificationCheckKind.Ipv6, VerificationCheckStatus.Skipped, "IPv6 route", "Disabled."),
+        ]);
+
+        Assert.True(report.IsHealthy);
+        Assert.Equal(0, report.WarningCount);
+        Assert.Equal(2, report.CountedCheckCount);
+        Assert.Equal("1 of 2 checks passed", report.Summary);
     }
 
     private static ConnectionStatus ConnectedStatus() => new(

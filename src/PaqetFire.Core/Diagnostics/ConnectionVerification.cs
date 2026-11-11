@@ -18,6 +18,12 @@ public enum VerificationCheckStatus
     Warning,
     Failed,
     Skipped,
+
+    /// <summary>
+    /// A caveat rather than a test result: it never fails the route and is left out of the
+    /// passed count. Added last so earlier values keep their names and ordinals over IPC.
+    /// </summary>
+    Info,
 }
 
 public sealed record ConnectionVerificationCheck(
@@ -40,5 +46,10 @@ public sealed record ConnectionVerificationReport(
     public bool IsHealthy => FailedCount == 0 &&
         Checks.Any(check => check.Status == VerificationCheckStatus.Passed);
 
-    public string Summary => $"{PassedCount} of {Checks.Count} checks passed";
+    public int WarningCount => Checks.Count(check => check.Status == VerificationCheckStatus.Warning);
+
+    /// <summary>Checks that test something; informational notes are not counted.</summary>
+    public int CountedCheckCount => Checks.Count(check => check.Status != VerificationCheckStatus.Info);
+
+    public string Summary => $"{PassedCount} of {CountedCheckCount} checks passed";
 }
