@@ -1852,28 +1852,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         OnPropertyChanged(nameof(ShowDiagnosticsShortcut));
     }
 
-    private static string CreateEffectiveRoutingText(PaqetFireSettingsView? settings)
-    {
-        if (settings is null || (!settings.HasTransportKey && PaqetConfigurationValidator.RequiresTransportKey(settings.Advanced.KcpBlock)))
-        {
-            return "Set up a profile to preview which traffic will use PaqetFire.";
-        }
-
-        var scope = RoutingScopeText.Create(settings);
-        var destination = settings.RegionalPreset == RegionalRoutingPreset.IranDirect
-            ? "Iran direct"
-            : "All destinations routed";
-        var lan = settings.BypassLan ? "LAN bypass on" : "LAN routed";
-        var bitTorrent = settings.DirectBitTorrent ? "BitTorrent direct" : "BitTorrent routed";
-        var killSwitch = settings.KillSwitchEnabled ? "Kill switch on" : "Kill switch off";
-        var customDirect = settings.DirectRouteDestinations.Count switch
-        {
-            0 => "no custom direct destinations",
-            1 => "1 custom direct destination",
-            var count => $"{count} custom direct destinations",
-        };
-        return $"{scope} · {destination} · {lan} · {bitTorrent} · {customDirect} · {killSwitch}";
-    }
+    private static string CreateEffectiveRoutingText(PaqetFireSettingsView? settings) =>
+        EffectiveRoutingSummary.Create(settings);
 
     private async Task SafeCloseTransportAsync()
     {

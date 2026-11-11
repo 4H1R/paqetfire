@@ -753,11 +753,13 @@
               <StackPanel Spacing="14">
                 <TextBlock Text="Share with your network" FontSize="18" FontWeight="SemiBold" />
                 <ToggleSwitch x:Name="ShareWithLanSwitch" Header="LAN SOCKS5 proxy"
-                              OnContent="Enabled in this profile — save to apply"
+                              OnContent="On — save to apply"
                               OffContent="Off — local access only" Toggled="ShareWithLanSwitch_Toggled" />
                 <TextBlock Text="Creates a separate password-protected SOCKS5 listener on this computer's active LAN IPv4 address. The installer limits incoming connections to the local subnet."
                            FontSize="12" Opacity="0.68" TextWrapping="Wrap" />
                 <StackPanel x:Name="LanShareOptions" Spacing="12" Visibility="Collapsed">
+                  <InfoBar x:Name="LanExposureInfoBar" IsOpen="False" IsClosable="False" Severity="Warning"
+                           Title="This network is not marked trusted" HorizontalAlignment="Stretch" />
                   <NumberBox x:Name="LanSharePortBox" Header="LAN SOCKS5 port" Value="1082"
                              Minimum="1024" Maximum="65535" SpinButtonPlacementMode="Compact"
                              ValueChanged="LanSharePortBox_ValueChanged" HorizontalAlignment="Left" Width="200" />

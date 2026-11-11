@@ -374,6 +374,7 @@ public sealed partial class MainWindow
         if (currentNetworkContext is null)
         {
             CurrentNetworkText.Text = "No upstream Ethernet or Wi-Fi network is currently available.";
+            UpdateLanShareStatus();
             return;
         }
 
@@ -381,5 +382,6 @@ public sealed partial class MainWindow
             string.Equals(candidate.NetworkId, currentNetworkContext.NetworkId, StringComparison.Ordinal));
         var policy = rule is null ? "unknown" : rule.IsTrusted ? "trusted" : "route required";
         CurrentNetworkText.Text = $"Current: {currentNetworkDisplayName} · {currentNetworkContext.Kind} · {currentNetworkContext.Connectivity} · {policy}.";
+        UpdateLanShareStatus();
     }
 }

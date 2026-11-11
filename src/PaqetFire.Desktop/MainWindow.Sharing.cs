@@ -340,6 +340,41 @@ public sealed partial class MainWindow
         LanShareEndpointText.Text = string.IsNullOrEmpty(address)
             ? $"Configured SOCKS5 endpoint: this computer's LAN IPv4 address:{port}"
             : $"Configured SOCKS5 endpoint: {address}:{port}";
+        UpdateLanShareStatus();
+    }
+
+    /// <summary>
+    /// Says whether the LAN listener runs, and warns while it follows a network the user has
+    /// not marked trusted in Settings.
+    /// </summary>
+    private void UpdateLanShareStatus()
+    {
+        if (ShareWithLanSwitch is null || LanExposureInfoBar is null || LanSharePortBox is null || LocalIpv4Box is null)
+        {
+            return;
+        }
+
+        var saved = ViewModel.LastSnapshot?.Settings;
+        var port = double.IsNaN(LanSharePortBox.Value) ? 1082 : (int)LanSharePortBox.Value;
+        ShareWithLanSwitch.OnContent = LanShareStatusText.OnContent(
+            saved?.ShareWithLan == true,
+            saved?.LanSocksPort,
+            port,
+            ViewModel.IsConnected,
+            LocalIpv4Box.Text);
+
+        var rule = currentNetworkContext is { } network
+            ? preferences.NetworkRules.FirstOrDefault(candidate =>
+                string.Equals(candidate.NetworkId, network.NetworkId, StringComparison.Ordinal))
+            : null;
+        var warning = LanShareStatusText.ExposureWarning(
+            ShareWithLanSwitch.IsOn,
+            rule?.IsTrusted,
+            currentNetworkContext is null ? null : currentNetworkDisplayName);
+        LanExposureInfoBar.Message = warning is null
+            ? string.Empty
+            : $"{warning} SOCKS5 does not encrypt this traffic. Share only on a network you trust.";
+        LanExposureInfoBar.IsOpen = warning is not null;
     }
 
     private void UpdateHotspotEndpointText()

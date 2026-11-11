@@ -1133,6 +1133,7 @@ public sealed partial class MainWindow : Window
 
         UpdatePrerequisites(snapshot, previousSnapshot);
         UpdateExitProxyStatus(snapshot);
+        UpdateLanShareStatus();
         if (RouteNotificationPolicy.Classify(previousSnapshot, snapshot, ViewModel.IsUserTransition) is { } notification)
         {
             NotifyRouteTransition(notification);
