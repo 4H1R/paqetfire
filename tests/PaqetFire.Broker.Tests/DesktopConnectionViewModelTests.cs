@@ -292,6 +292,7 @@ public sealed class DesktopConnectionViewModelTests
         var settings = new PaqetFireSettings
         {
             ProfileName = "France",
+            ServerEndpoint = "vpn.example.com:9999",
             RoutingMode = RoutingMode.SelectedApplications,
             SelectedApplications = ["chrome.exe", "telegram.exe"],
             TransportKey = "k",
@@ -306,6 +307,7 @@ public sealed class DesktopConnectionViewModelTests
         Assert.False(model.HasStateLabel);
         Assert.Equal("Active", model.ApplicationRoutingStatusText);
         Assert.Equal("3 of 3 running", model.EngineSummaryText);
+        Assert.Equal("Server · vpn.example.com:9999", model.PaqetDetailText);
         Assert.True(model.CanVerify);
     }
 

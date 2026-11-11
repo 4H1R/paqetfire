@@ -1508,8 +1508,11 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         {
             null => "The broker did not report a Paqet engine.",
             { State: EngineState.NotInstalled } => "The bundled Paqet engine was not found.",
-            { Endpoint: not null } => $"SOCKS5 endpoint · {paqet.Endpoint}",
+            // The local SOCKS5 port is for Diagnostics; here, name the server the route uses.
+            { State: EngineState.Running } when !string.IsNullOrWhiteSpace(snapshot.Settings?.ServerEndpoint)
+                => $"Server · {snapshot.Settings.ServerEndpoint}",
             { Detail: not null } => paqet.Detail,
+            _ when !string.IsNullOrWhiteSpace(snapshot.Settings?.ServerEndpoint) => $"Server · {snapshot.Settings.ServerEndpoint}",
             { Version: not null } => $"Version {paqet.Version}",
             _ => "Engine status reported by the broker.",
         };
