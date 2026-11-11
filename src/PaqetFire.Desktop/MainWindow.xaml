@@ -489,8 +489,9 @@
                <StackPanel Spacing="16">
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <ComboBox x:Name="KcpModeBox" Header="KCP mode" SelectedIndex="1" HorizontalAlignment="Stretch">
-                    <ComboBoxItem Content="normal" Tag="normal"/><ComboBoxItem Content="fast" Tag="fast"/><ComboBoxItem Content="fast2" Tag="fast2"/><ComboBoxItem Content="fast3" Tag="fast3"/><ComboBoxItem Content="manual" Tag="manual"/>
+                  <ComboBox x:Name="KcpModeBox" Header="KCP mode" SelectedIndex="1" HorizontalAlignment="Stretch"
+                            Description="How quickly lost packets are resent. Faster modes cut delay but use more data.">
+                    <ComboBoxItem Content="normal · steady, least extra data" Tag="normal"/><ComboBoxItem Content="fast (default) · balanced" Tag="fast"/><ComboBoxItem Content="fast2 · quicker, more data" Tag="fast2"/><ComboBoxItem Content="fast3 · quickest, most data" Tag="fast3"/><ComboBoxItem Content="manual · set the values below" Tag="manual"/>
                   </ComboBox>
                   <TextBox x:Name="LocalFlagsBox" Grid.Column="1" Header="Local TCP flags" PlaceholderText="PA" />
                   <TextBox x:Name="RemoteFlagsBox" Grid.Column="2" Header="Remote TCP flags" PlaceholderText="PA" />

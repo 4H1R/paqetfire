@@ -113,4 +113,41 @@ public sealed class ProfileUxPresentationTests
         Assert.Contains("unsaved changes", ProfileImportText.ReplaceMessage(1, hasPendingChanges: true), StringComparison.Ordinal);
         Assert.DoesNotContain("unsaved changes", ProfileImportText.ReplaceMessage(1, hasPendingChanges: false), StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("null")]
+    [InlineData("NULL")]
+    public void BothNoEncryptionSpellingsShowAsOneInsecureChoice(string saved)
+    {
+        Assert.True(AdvancedTransportText.IsUnencrypted(saved));
+        Assert.Equal(AdvancedTransportText.NoEncryption, AdvancedTransportText.EncryptionChoice(saved));
+        Assert.Equal("none (insecure)", AdvancedTransportText.EncryptionLabel(AdvancedTransportText.EncryptionChoice(saved)));
+    }
+
+    [Fact]
+    public void ThePickerOffersNoEncryptionOnceAndKeepsOtherAlgorithms()
+    {
+        Assert.Single(AdvancedTransportText.EncryptionChoices, AdvancedTransportText.IsUnencrypted);
+        Assert.Equal("aes", AdvancedTransportText.EncryptionChoice("aes"));
+        Assert.Equal("aes", AdvancedTransportText.EncryptionLabel("aes"));
+        Assert.False(AdvancedTransportText.IsUnencrypted("aes"));
+        Assert.All(AdvancedTransportText.EncryptionChoices, choice =>
+            Assert.Empty(PaqetFire.Core.Configuration.PaqetConfigurationValidator.ValidateAdvanced(
+                new PaqetFire.Core.Configuration.PaqetAdvancedOptions { KcpBlock = choice }, "fast")));
+    }
+
+    [Theory]
+    [InlineData(1.5, 2.0)]
+    [InlineData(2.4, 2.0)]
+    [InlineData(-0.5, -1.0)]
+    public void FractionsRoundToTheStoredWholeNumber(double typed, double stored) =>
+        Assert.Equal(stored, AdvancedTransportText.WholeNumberFor(typed));
+
+    [Theory]
+    [InlineData(3.0)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void WholeAndBlankNumbersNeedNoRounding(double typed) =>
+        Assert.Null(AdvancedTransportText.WholeNumberFor(typed));
 }
