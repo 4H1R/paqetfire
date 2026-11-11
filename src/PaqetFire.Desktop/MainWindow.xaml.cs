@@ -694,6 +694,26 @@ public sealed partial class MainWindow : Window
         await ViewModel.RefreshAsync();
     }
 
+    /// <summary>Ctrl+1 to Ctrl+6 open the pages in the order the navigation pane lists them.</summary>
+    private void NavigationAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        var destination = sender.Key switch
+        {
+            Windows.System.VirtualKey.Number1 => "overview",
+            Windows.System.VirtualKey.Number2 => "connection",
+            Windows.System.VirtualKey.Number3 => "routing",
+            Windows.System.VirtualKey.Number4 => "usage",
+            Windows.System.VirtualKey.Number5 => "diagnostics",
+            Windows.System.VirtualKey.Number6 => "settings",
+            _ => null,
+        };
+        if (destination is not null)
+        {
+            args.Handled = true;
+            NavigateTo(destination);
+        }
+    }
+
     private void NavigationView_SelectionChanged(
         NavigationView sender,
         NavigationViewSelectionChangedEventArgs args)

@@ -35,6 +35,9 @@ public sealed record SetupChecklistItem
     public string Glyph => IsDone ? "✓" : IsCurrent ? "→" : "○";
 
     public string StatusText => IsDone ? "Done" : IsCurrent ? "Next" : "Waiting";
+
+    /// <summary>"Required software, done": the row's name for screen readers, with its status.</summary>
+    public string AccessibleName => $"{Title}, {StatusText.ToLowerInvariant()}";
 }
 
 /// <summary>First-run progress: required software, then a server profile, then the first connection.</summary>

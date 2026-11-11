@@ -75,6 +75,8 @@ public sealed class DesktopPresentationTests
 
         checklist = SetupChecklist.Create(missing with { Prerequisites = [new PrerequisiteStatus("npcap", "Npcap", true, "OK")] }, false);
         Assert.Equal(SetupStep.ServerProfile, checklist.CurrentStep);
+        Assert.Equal(["Required software, done", "Server profile, next", "Connect, waiting"],
+            checklist.Items.Select(item => item.AccessibleName));
 
         checklist = SetupChecklist.Create(missing with { IsConfigured = true, Prerequisites = [] }, false);
         Assert.Equal(SetupStep.Connect, checklist.CurrentStep);

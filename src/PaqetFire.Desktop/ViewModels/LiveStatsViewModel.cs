@@ -23,6 +23,7 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
     private DateTimeOffset? connectedSince;
     private DateTimeOffset? lastLatencySampleAt;
     private string elapsedText = "00:00:00";
+    private string elapsedAccessibleName = LiveStatsText.DescribeElapsed(TimeSpan.Zero);
     private string publicAddressText = "Checking…";
     private string countryCode = string.Empty;
     private string downloadRateText = "0 B/s";
@@ -46,6 +47,18 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
 
     public string ElapsedText { get => elapsedText; private set => SetProperty(ref elapsedText, value); }
 
+    // Screen reader names that carry the value; they change at most once a minute or per sample
+    // and are read on navigation, never announced as live regions.
+    public string ElapsedAccessibleName { get => elapsedAccessibleName; private set => SetProperty(ref elapsedAccessibleName, value); }
+
+    public string CountryAccessibleName => $"Exit country {CountryCode}";
+
+    public string DownloadAccessibleName => LiveStatsText.DescribeTraffic("Download", DownloadRateText, DownloadTotalText);
+
+    public string UploadAccessibleName => LiveStatsText.DescribeTraffic("Upload", UploadRateText, UploadTotalText);
+
+    public string LatencyAccessibleName => LiveStatsText.DescribeLatency(LatencyText, Quality);
+
     public string PublicAddressText { get => publicAddressText; private set => SetProperty(ref publicAddressText, value); }
 
     public string CountryCode
@@ -56,19 +69,20 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
             if (SetProperty(ref countryCode, value))
             {
                 OnPropertyChanged(nameof(HasCountryCode));
+                OnPropertyChanged(nameof(CountryAccessibleName));
             }
         }
     }
 
     public bool HasCountryCode => CountryCode.Length > 0;
 
-    public string DownloadRateText { get => downloadRateText; private set => SetProperty(ref downloadRateText, value); }
+    public string DownloadRateText { get => downloadRateText; private set => SetDisplayed(ref downloadRateText, value, nameof(DownloadAccessibleName)); }
 
-    public string UploadRateText { get => uploadRateText; private set => SetProperty(ref uploadRateText, value); }
+    public string UploadRateText { get => uploadRateText; private set => SetDisplayed(ref uploadRateText, value, nameof(UploadAccessibleName)); }
 
-    public string DownloadTotalText { get => downloadTotalText; private set => SetProperty(ref downloadTotalText, value); }
+    public string DownloadTotalText { get => downloadTotalText; private set => SetDisplayed(ref downloadTotalText, value, nameof(DownloadAccessibleName)); }
 
-    public string UploadTotalText { get => uploadTotalText; private set => SetProperty(ref uploadTotalText, value); }
+    public string UploadTotalText { get => uploadTotalText; private set => SetDisplayed(ref uploadTotalText, value, nameof(UploadAccessibleName)); }
 
     public bool HasTrafficCounters { get => hasTrafficCounters; private set => SetProperty(ref hasTrafficCounters, value); }
 
@@ -76,7 +90,7 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
 
     public string EndpointText { get => endpointText; private set => SetProperty(ref endpointText, value); }
 
-    public string LatencyText { get => latencyText; private set => SetProperty(ref latencyText, value); }
+    public string LatencyText { get => latencyText; private set => SetDisplayed(ref latencyText, value, nameof(LatencyAccessibleName)); }
 
     public LatencyQuality Quality
     {
@@ -86,6 +100,7 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
             if (SetProperty(ref quality, value))
             {
                 OnPropertyChanged(nameof(QualityText));
+                OnPropertyChanged(nameof(LatencyAccessibleName));
             }
         }
     }
@@ -127,6 +142,7 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
         if (connectedSince is { } since)
         {
             ElapsedText = LiveStatsText.FormatElapsed(now - since);
+            ElapsedAccessibleName = LiveStatsText.DescribeElapsed(now - since);
         }
     }
 
@@ -136,6 +152,7 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
         connectedSince = null;
         lastLatencySampleAt = null;
         ElapsedText = "00:00:00";
+        ElapsedAccessibleName = LiveStatsText.DescribeElapsed(TimeSpan.Zero);
         PublicAddressText = "Checking…";
         CountryCode = string.Empty;
         DownloadRateText = "0 B/s";
@@ -212,6 +229,18 @@ public sealed class LiveStatsViewModel : INotifyPropertyChanged
 
         storage = value;
         OnPropertyChanged(propertyName);
+        return true;
+    }
+
+    /// <summary>Sets a value shown on screen and refreshes the accessible name built from it.</summary>
+    private bool SetDisplayed<T>(ref T storage, T value, string accessibleName, [CallerMemberName] string? propertyName = null)
+    {
+        if (!SetProperty(ref storage, value, propertyName))
+        {
+            return false;
+        }
+
+        OnPropertyChanged(accessibleName);
         return true;
     }
 

@@ -178,6 +178,26 @@ public sealed class LiveStatsTests
     public void ElapsedTimeIncludesDaysForLongSessions() =>
         Assert.Equal("1d 02:03:04", LiveStatsText.FormatElapsed(new TimeSpan(1, 2, 3, 4)));
 
+    [Theory]
+    [InlineData(20, "Connected for less than a minute")]
+    [InlineData(61, "Connected for 1 minute")]
+    [InlineData(2 * 3600 + 5 * 60 + 9, "Connected for 2 hours 5 minutes")]
+    [InlineData(86400 + 3600, "Connected for 1 day 1 hour")]
+    public void ElapsedTimeIsSpokenToTheMinute(int seconds, string expected) =>
+        Assert.Equal(expected, LiveStatsText.DescribeElapsed(TimeSpan.FromSeconds(seconds)));
+
+    [Fact]
+    public void AccessibleNamesCarryTheValues()
+    {
+        Assert.Equal("Download 5.6 KB per second, total 16.5 KB", LiveStatsText.DescribeTraffic("Download", "5.6 KB/s", "Total 16.5 KB"));
+        Assert.Equal("Latency 133 milliseconds, good", LiveStatsText.DescribeLatency("133 ms", LatencyQuality.Good));
+        Assert.Equal("Latency not measured yet", LiveStatsText.DescribeLatency("—", LatencyQuality.Unknown));
+
+        var live = new LiveStatsViewModel();
+        Assert.Equal("Download 0 B per second, total 0 B", live.DownloadAccessibleName);
+        Assert.Equal("Connected for less than a minute", live.ElapsedAccessibleName);
+    }
+
     private static byte[] Stat(string name, long value) =>
         Concat(Field(1, Encoding.UTF8.GetBytes(name)), [0x10, .. Varint((ulong)value)]);
 

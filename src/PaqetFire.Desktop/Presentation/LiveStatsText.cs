@@ -49,6 +49,40 @@ public static class LiveStatsText
             : clock;
     }
 
+    /// <summary>The session length for screen readers, to the minute: "Connected for 1 hour 5 minutes".</summary>
+    public static string DescribeElapsed(TimeSpan elapsed)
+    {
+        if (elapsed < TimeSpan.FromMinutes(1))
+        {
+            return "Connected for less than a minute";
+        }
+
+        var parts = new List<string>();
+        AddUnit(parts, elapsed.Days, "day");
+        AddUnit(parts, elapsed.Hours, "hour");
+        AddUnit(parts, elapsed.Minutes, "minute");
+        return "Connected for " + string.Join(" ", parts);
+    }
+
+    /// <summary>"Download 5.6 KB per second, total 16.5 KB": a rate as a screen reader should say it.</summary>
+    public static string DescribeTraffic(string direction, string rateText, string totalText) =>
+        $"{direction} {rateText.Replace("/s", " per second", StringComparison.Ordinal)}, {totalText.Replace("Total ", "total ", StringComparison.Ordinal)}";
+
+    public static string DescribeLatency(string latencyText, LatencyQuality quality) => quality switch
+    {
+        LatencyQuality.Unknown => "Latency not measured yet",
+        LatencyQuality.Unreachable => "Latency: the Paqet server did not respond",
+        _ => $"Latency {latencyText.Replace(" ms", " milliseconds", StringComparison.Ordinal)}, {GetQualityLabel(quality).ToLowerInvariant()}",
+    };
+
+    private static void AddUnit(List<string> parts, int value, string unit)
+    {
+        if (value > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{value} {unit}{(value == 1 ? string.Empty : "s")}"));
+        }
+    }
+
     public static LatencyQuality GetQuality(int? latencyMilliseconds) => latencyMilliseconds switch
     {
         null => LatencyQuality.Unreachable,
