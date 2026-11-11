@@ -414,7 +414,7 @@
                   <Button Content="New profile" Click="NewProfileButton_Click" />
                   <Button Content="Rename" Click="RenameProfileButton_Click" />
                   <Button Content="Duplicate" Click="DuplicateProfileButton_Click" />
-                  <Button Content="Make default" Click="MakeDefaultProfileButton_Click" />
+                  <Button x:Name="MakeDefaultProfileButton" Content="Make default" Click="MakeDefaultProfileButton_Click" />
                   <Button Content="Delete" Click="DeleteProfileButton_Click" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">

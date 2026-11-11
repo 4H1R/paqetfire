@@ -14,6 +14,12 @@ public sealed partial class MainWindow
 {
     private async void ProfilePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // The picker always shows the active profile; it can be made default only once.
+        if (MakeDefaultProfileButton is not null)
+        {
+            MakeDefaultProfileButton.IsEnabled = ProfilePicker.SelectedItem is ProfileDisplayItem { IsDefault: false };
+        }
+
         if (updatingProfileSelection || ProfilePicker.SelectedItem is not ProfileDisplayItem selected || selected.IsActive)
         {
             return;
@@ -180,6 +186,10 @@ public sealed partial class MainWindow
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = Content.XamlRoot,
         };
+        // Renaming needs a name, and a different one.
+        nameBox.TextChanged += (_, _) => dialog.IsPrimaryButtonEnabled =
+            !string.IsNullOrWhiteSpace(nameBox.Text) && !string.Equals(nameBox.Text.Trim(), selected.Name, StringComparison.Ordinal);
+        dialog.IsPrimaryButtonEnabled = false;
         if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary) return;
 
         var renamed = await RunProfileActionAsync(
