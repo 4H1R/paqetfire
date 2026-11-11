@@ -135,7 +135,8 @@ public sealed partial class MainWindow
         {
             // A background update failed; say so once, without interrupting.
             shownRoutingDataError = error;
-            ShowInfo(RoutingDataInfoBar, InfoBarSeverity.Warning, "The last routing data update failed", error);
+            ShowInfo(RoutingDataInfoBar, InfoBarSeverity.Warning, "The last routing data update failed", error,
+                bringIntoView: false);
         }
         else if (status.LastError is null && shownRoutingDataError is not null)
         {

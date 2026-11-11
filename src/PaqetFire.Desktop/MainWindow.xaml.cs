@@ -1209,12 +1209,29 @@ public sealed partial class MainWindow : Window
         InfoBar infoBar,
         InfoBarSeverity severity,
         string title,
-        string message)
+        string message,
+        bool bringIntoView = true)
     {
         infoBar.Severity = severity;
         infoBar.Title = title;
         infoBar.Message = message;
         infoBar.IsOpen = true;
+
+        // A result can open a bar scrolled out of sight; scroll it to the top once it has its size.
+        if (bringIntoView)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (infoBar.IsOpen && infoBar.XamlRoot is not null)
+                {
+                    infoBar.StartBringIntoView(new BringIntoViewOptions
+                    {
+                        VerticalAlignmentRatio = 0,
+                        AnimationDesired = true,
+                    });
+                }
+            });
+        }
 
         // Screen readers do not notice an InfoBar opening elsewhere on the page; announce it.
         if (AppWindow.IsVisible &&

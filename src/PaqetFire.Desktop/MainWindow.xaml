@@ -704,6 +704,7 @@
                   <ComboBoxItem Content="Psiphon — Leave through the Psiphon network" Tag="psiphon" />
                   <ComboBoxItem Content="OpenVPN — Leave through your own VPN provider, such as Proton VPN" Tag="openvpn" />
                 </ComboBox>
+                <InfoBar x:Name="ExitProxyInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
                 <StackPanel x:Name="PsiphonOptionsPanel" Spacing="10" Visibility="Collapsed">
                   <TextBlock x:Name="PsiphonEngineText" FontSize="12" TextWrapping="Wrap"
                              AutomationProperties.LiveSetting="Polite" />
@@ -766,6 +767,7 @@
                     <Button Content="Test listener" Tag="lan" Click="TestShareListenerButton_Click" />
                     <Button Content="Copy redacted setup" Tag="lan" Click="CopyShareSetupButton_Click" />
                   </StackPanel>
+                  <InfoBar x:Name="LanShareInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -787,6 +789,7 @@
                                PasswordChanged="SharePasswordBox_PasswordChanged" />
                 </Grid>
                 <Button Content="Generate strong password" Click="RotateSharingPasswordButton_Click" HorizontalAlignment="Left" />
+                <InfoBar x:Name="SharedCredentialsInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
                 <Border Padding="12" CornerRadius="10" Background="#18FFB020">
                   <TextBlock Text="SOCKS5 does not encrypt traffic between local devices and this computer. Use this only on a trusted local network and keep the password private."
                              FontSize="12" TextWrapping="Wrap" />
@@ -804,6 +807,7 @@
                 <TextBlock Text="Turn on Mobile hotspot in Windows Settings first. PaqetFire detects the hotspot address (usually 192.168.137.1) and shares the same route as LAN clients. SOCKS-only — phones need a SOCKS app."
                           FontSize="12" Opacity="0.68" TextWrapping="Wrap" />
                 <StackPanel x:Name="HotspotOptions" Spacing="12" Visibility="Collapsed">
+                  <InfoBar x:Name="HotspotInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
                   <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />

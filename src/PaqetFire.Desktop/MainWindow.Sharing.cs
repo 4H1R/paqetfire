@@ -184,7 +184,7 @@ public sealed partial class MainWindow
 
     private void OnGuideRotateRequested(object? sender, EventArgs e)
     {
-        RotateSharingPassword();
+        RotateSharingPassword(HotspotInfoBar);
         SyncGuideEndpoints();
     }
 
@@ -212,7 +212,7 @@ public sealed partial class MainWindow
         var uri = HotspotUriBox.Text.Trim();
         if (string.IsNullOrEmpty(uri))
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Warning, "No URI to copy",
+            ShowInfo(HotspotInfoBar, InfoBarSeverity.Warning, "No URI to copy",
                 string.IsNullOrWhiteSpace(HotspotIpBox.Text)
                     ? "Turn on Mobile hotspot in Windows Settings, then click Detect hotspot."
                     : "Enter the sharing password or generate a new one to create the URI.");
@@ -222,14 +222,15 @@ public sealed partial class MainWindow
         var package = new DataPackage();
         package.SetText(uri);
         Clipboard.SetContent(package);
-        ShowInfo(RoutingInfoBar, InfoBarSeverity.Success, "SOCKS URI copied",
+        ShowInfo(HotspotInfoBar, InfoBarSeverity.Success, "SOCKS URI copied",
             "Paste it into v2rayNG or HAPP/Hiddify, or scan the QR code. It contains the sharing password; send it only to your own devices.");
         AddActivity("Hotspot SOCKS URI copied to the clipboard.");
     }
 
-    private void RotateSharingPasswordButton_Click(object sender, RoutedEventArgs e) => RotateSharingPassword();
+    private void RotateSharingPasswordButton_Click(object sender, RoutedEventArgs e) =>
+        RotateSharingPassword(ReferenceEquals(sender, RotateForQrButton) ? HotspotInfoBar : SharedCredentialsInfoBar);
 
-    private void RotateSharingPassword()
+    private void RotateSharingPassword(InfoBar feedback)
     {
         try
         {
@@ -237,28 +238,29 @@ public sealed partial class MainWindow
                 string.IsNullOrWhiteSpace(ShareUsernameBox.Text) ? "paqetfire" : ShareUsernameBox.Text.Trim());
             ShareUsernameBox.Text = credentials.Username;
             SharePasswordBox.Password = credentials.Password;
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Warning, "New sharing password generated",
+            ShowInfo(feedback, InfoBarSeverity.Warning, "New sharing password generated",
                 "Save the routing policy to apply it, then update every LAN and hotspot client. The QR code already shows the new password.");
             AddActivity("A new sharing password was generated; the value was not logged.");
             UpdateHotspotUri();
         }
         catch (ArgumentException exception)
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Error, "Password could not be generated", exception.Message);
+            ShowInfo(feedback, InfoBarSeverity.Error, "Password could not be generated", exception.Message);
         }
     }
 
     private async void TestShareListenerButton_Click(object sender, RoutedEventArgs e)
     {
+        var feedback = ShareFeedbackFor(sender);
         if (!TryGetShareEndpoint((sender as FrameworkElement)?.Tag?.ToString(), out var endpoint, out var error))
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Warning, "Listener cannot be tested", error);
+            ShowInfo(feedback, InfoBarSeverity.Warning, "Listener cannot be tested", error);
             return;
         }
 
         var result = await new TcpShareReachabilityProbe().CheckAsync(endpoint, TimeSpan.FromSeconds(3));
         ShowInfo(
-            RoutingInfoBar,
+            feedback,
             result.Status == ShareReachabilityStatus.Reachable ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
             result.Status == ShareReachabilityStatus.Reachable ? "Listener reachable" : "Listener unavailable",
             result.Summary);
@@ -266,9 +268,10 @@ public sealed partial class MainWindow
 
     private void CopyShareSetupButton_Click(object sender, RoutedEventArgs e)
     {
+        var feedback = ShareFeedbackFor(sender);
         if (!TryGetShareEndpoint((sender as FrameworkElement)?.Tag?.ToString(), out var endpoint, out var error))
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Warning, "Setup cannot be copied", error);
+            ShowInfo(feedback, InfoBarSeverity.Warning, "Setup cannot be copied", error);
             return;
         }
 
@@ -283,14 +286,20 @@ public sealed partial class MainWindow
             var package = new DataPackage();
             package.SetText(bundle.ToJson());
             Clipboard.SetContent(package);
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Success, "Redacted setup copied",
+            ShowInfo(feedback, InfoBarSeverity.Success, "Redacted setup copied",
                 "The address, port, and username were copied. The sharing password was not included.");
         }
         catch (ArgumentException exception)
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Error, "Setup cannot be copied", exception.Message);
+            ShowInfo(feedback, InfoBarSeverity.Error, "Setup cannot be copied", exception.Message);
         }
     }
+
+    /// <summary>The card a LAN or hotspot share button sits in reports its result.</summary>
+    private InfoBar ShareFeedbackFor(object sender) =>
+        string.Equals((sender as FrameworkElement)?.Tag?.ToString(), "hotspot", StringComparison.Ordinal)
+            ? HotspotInfoBar
+            : LanShareInfoBar;
 
     private bool TryGetShareEndpoint(string? kind, out SocksShareEndpoint endpoint, out string error)
     {
@@ -446,13 +455,13 @@ public sealed partial class MainWindow
         UpdateHotspotUri();
         if (detected is { } hotspot && notifyOnSuccess)
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Success, "Hotspot detected",
+            ShowInfo(HotspotInfoBar, InfoBarSeverity.Success, "Hotspot detected",
                 $"Detected active mobile hotspot at {hotspot.Address} ({hotspot.Name}).");
             AddActivity($"Detected active mobile hotspot at {hotspot.Address} ({hotspot.Name}).");
         }
         else if (detected is null && notifyOnFailure)
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Warning, "Hotspot not detected",
+            ShowInfo(HotspotInfoBar, InfoBarSeverity.Warning, "Hotspot not detected",
                 "Turn on Mobile hotspot in Windows Settings first, then click Detect hotspot.");
         }
     }

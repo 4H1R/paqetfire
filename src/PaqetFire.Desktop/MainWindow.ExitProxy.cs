@@ -196,14 +196,14 @@ public sealed partial class MainWindow
 
     private async Task SendExitEngineActionAsync(ExitEngineAction action, string failureTitle, string activity)
     {
-        RoutingInfoBar.IsOpen = false;
+        ExitProxyInfoBar.IsOpen = false;
         exitEngineRequestInFlight = true;
         UpdateExitEngines(ViewModel.LastSnapshot?.ExitEngines ?? []);
         try
         {
             if (await ViewModel.ManageExitEngineAsync(action) is { } error)
             {
-                ShowInfo(RoutingInfoBar, InfoBarSeverity.Error, failureTitle, error);
+                ShowInfo(ExitProxyInfoBar, InfoBarSeverity.Error, failureTitle, error);
                 return;
             }
 
@@ -231,7 +231,7 @@ public sealed partial class MainWindow
             // UTF-8 can take up to four bytes per character.
             if (new FileInfo(dialog.FileName).Length > OpenVpnConfiguration.MaximumLength * 4L)
             {
-                ShowInfo(RoutingInfoBar, InfoBarSeverity.Error, "This OpenVPN configuration cannot be used",
+                ShowInfo(ExitProxyInfoBar, InfoBarSeverity.Error, "This OpenVPN configuration cannot be used",
                     "The file is far larger than an OpenVPN configuration.");
                 return;
             }
@@ -240,19 +240,19 @@ public sealed partial class MainWindow
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Error, "The file could not be read", exception.Message);
+            ShowInfo(ExitProxyInfoBar, InfoBarSeverity.Error, "The file could not be read", exception.Message);
             return;
         }
 
         var configuration = OpenVpnConfiguration.Parse(text);
         if (!configuration.IsValid)
         {
-            ShowInfo(RoutingInfoBar, InfoBarSeverity.Error, "This OpenVPN configuration cannot be used",
+            ShowInfo(ExitProxyInfoBar, InfoBarSeverity.Error, "This OpenVPN configuration cannot be used",
                 string.Join(" ", configuration.Errors));
             return;
         }
 
-        RoutingInfoBar.IsOpen = false;
+        ExitProxyInfoBar.IsOpen = false;
         pendingOpenVpnConfiguration = text;
         pendingOpenVpnFileName = Path.GetFileName(dialog.FileName);
         ApplyOpenVpnConfigurationText();
