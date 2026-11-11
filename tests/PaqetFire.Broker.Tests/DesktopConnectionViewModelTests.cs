@@ -274,13 +274,13 @@ public sealed class DesktopConnectionViewModelTests
         var client = new FakeBrokerClient { Snapshot = Connected() };
         await using var model = new ConnectionViewModel(client, new ImmediateDispatcher(), FastOptions());
         await model.RefreshAsync();
-        Assert.Equal("ROUTING ACTIVE", model.StateLabel);
+        Assert.Equal("Connected", model.StatusText);
 
         var gate = new TaskCompletionSource<BrokerSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         client.OnSnapshot = () => gate.Task.Result;
         var refresh = Task.Run(() => model.RefreshAsync());
         await Task.Delay(50);
-        Assert.Equal("ROUTING ACTIVE", model.StateLabel);
+        Assert.Equal("Connected", model.StatusText);
         Assert.Equal(BrokerConnectionState.Connected, model.ConnectionState);
         gate.SetResult(Connected());
         await refresh.WaitAsync(Wait);
@@ -291,6 +291,7 @@ public sealed class DesktopConnectionViewModelTests
     {
         var settings = new PaqetFireSettings
         {
+            ProfileName = "France",
             RoutingMode = RoutingMode.SelectedApplications,
             SelectedApplications = ["chrome.exe", "telegram.exe"],
             TransportKey = "k",
@@ -301,6 +302,10 @@ public sealed class DesktopConnectionViewModelTests
         await model.RefreshAsync();
 
         Assert.Equal("2 selected apps · loop exclusions locked", model.RoutingStatusText);
+        Assert.Equal("Connected via France", model.StatusText);
+        Assert.False(model.HasStateLabel);
+        Assert.Equal("Active", model.ApplicationRoutingStatusText);
+        Assert.Equal("3 of 3 running", model.EngineSummaryText);
         Assert.True(model.CanVerify);
     }
 

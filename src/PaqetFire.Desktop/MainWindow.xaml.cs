@@ -601,6 +601,14 @@ public sealed partial class MainWindow : Window
 
     public InfoBarSeverity ErrorSeverity(bool severe) => severe ? InfoBarSeverity.Error : InfoBarSeverity.Warning;
 
+    /// <summary>Only a step forward is accented; Disconnect stays a plain button so it never looks like Connect.</summary>
+    public Style? PrimaryActionStyle(PrimaryConnectionAction action) =>
+        Application.Current.Resources.TryGetValue(
+            action == PrimaryConnectionAction.Disconnect ? "DefaultButtonStyle" : "AccentButtonStyle",
+            out var style)
+            ? style as Style
+            : null;
+
     private async void SaveAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         // Ctrl+S saves only where the form is on screen, so it never applies edits unseen.

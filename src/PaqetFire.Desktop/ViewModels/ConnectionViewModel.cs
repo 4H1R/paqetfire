@@ -40,6 +40,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     private string routingStatusText = "Not active";
     private string paqetDetailText = "Waiting for the broker readiness check.";
     private string routingDetailText = "Routing is currently inactive.";
+    private string applicationRoutingStatusText = "Not active";
+    private string engineSummaryText = "Not checked";
     private string lastCheckedText = "Not checked yet";
     private string brokerStatusText = "Checking";
     private string effectiveRoutingText = "Set up a profile to preview which traffic will use PaqetFire.";
@@ -133,11 +135,20 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         private set => SetProperty(ref statusText, value);
     }
 
+    /// <summary>A short qualifier above the headline; empty when the headline says it all.</summary>
     public string StateLabel
     {
         get => stateLabel;
-        private set => SetProperty(ref stateLabel, value);
+        private set
+        {
+            if (SetProperty(ref stateLabel, value))
+            {
+                OnPropertyChanged(nameof(HasStateLabel));
+            }
+        }
     }
+
+    public bool HasStateLabel => StateLabel.Length > 0;
 
     public string StatusDescription
     {
@@ -180,6 +191,20 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     {
         get => routingDetailText;
         private set => SetProperty(ref routingDetailText, value);
+    }
+
+    /// <summary>The Overview application routing card's state; the scope is in <see cref="EffectiveRoutingText"/>.</summary>
+    public string ApplicationRoutingStatusText
+    {
+        get => applicationRoutingStatusText;
+        private set => SetProperty(ref applicationRoutingStatusText, value);
+    }
+
+    /// <summary>"3 of 3 running", kept out of the headline for the readiness line.</summary>
+    public string EngineSummaryText
+    {
+        get => engineSummaryText;
+        private set => SetProperty(ref engineSummaryText, value);
     }
 
     public string LastCheckedText
@@ -1469,6 +1494,9 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             1 => "1 engine running",
             _ => $"{runningCount} engines running",
         };
+        EngineSummaryText = snapshot.Engines.Count == 0
+            ? "None reported"
+            : $"{runningCount} of {snapshot.Engines.Count} running";
 
         var paqet = snapshot.Engines.FirstOrDefault(engine => engine.Engine == EngineKind.Paqet);
         var xray = snapshot.Engines.FirstOrDefault(engine => engine.Engine == EngineKind.Xray);
@@ -1499,12 +1527,10 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             : proxiFyre is null
                 ? "Unavailable"
                 : EngineStateText.GetDisplayName(proxiFyre.State);
+        ApplicationRoutingStatusText = snapshot.IsRouting ? "Active" : RoutingStatusText;
+        // The scope, regional policy, and kill switch are in the Effective routing summary.
         RoutingDetailText = snapshot.IsRouting
-            ? snapshot.IsKillSwitchEnabled
-                ? "Traffic is routed with application-level fail-closed protection."
-                : snapshot.Settings?.RegionalPreset == RegionalRoutingPreset.IranDirect
-                    ? "Iranian destinations go direct; other selected traffic uses Paqet."
-                    : "All selected destinations use Paqet; kill switch is off."
+            ? "Paqet, Xray, ProxiFyre, and the PaqetFire service are always left out, so routed traffic cannot loop back into itself."
             : snapshot.IsKillSwitchEnabled
                 ? "Protected applications stay attached to an unavailable local proxy until you reconnect or turn the kill switch off."
             : proxiFyre switch
@@ -1561,7 +1587,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         else
         {
             Readiness = ReadinessIssue.None;
-            ApplyRouteState(snapshot, runningCount, engineSummary, previousState);
+            ApplyRouteState(snapshot, runningCount, previousState);
         }
 
         SnapshotReceived?.Invoke(snapshot);
@@ -1586,7 +1612,6 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     private void ApplyRouteState(
         BrokerSnapshot snapshot,
         int runningCount,
-        string engineSummary,
         BrokerConnectionState previousState)
     {
         if (snapshot.Progress is { Stage: ConnectionStage.RecoveringTransport } recovery)
@@ -1611,9 +1636,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         {
             ConnectionState = BrokerConnectionState.Connecting;
             StateLabel = "CONNECTING";
-            StatusText = cancelRequested
-                ? "Cancelling…"
-                : $"{ConnectionProgressText.GetStageLabel(connecting.Stage, connecting.Attempt)}…";
+            // The progress list under the headline names the current step.
+            StatusText = cancelRequested ? "Cancelling…" : Via("Connecting", snapshot) + "…";
             StatusDescription = "Paqet starts first, then Xray policy routing, then ProxiFyre application routing.";
         }
         else if (snapshot.ConnectionState == CoreConnectionState.Guarded)
@@ -1628,7 +1652,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         {
             ConnectionState = BrokerConnectionState.Faulted;
             StateLabel = "CONNECTION FAULT";
-            StatusText = $"Connection fault · {engineSummary}";
+            StatusText = "Connection failed";
             StatusDescription = "One or more engines need attention before traffic can be protected.";
             if (!HasError)
             {
@@ -1650,14 +1674,14 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             // snapshot must not flip the card back to "not connected".
             ConnectionState = BrokerConnectionState.Connecting;
             StateLabel = "CONNECTING";
-            StatusText = cancelRequested ? "Cancelling…" : $"Connecting · {engineSummary}";
+            StatusText = cancelRequested ? "Cancelling…" : Via("Connecting", snapshot) + "…";
             StatusDescription = "Waiting for Paqet, Xray, and ProxiFyre to report stable running states.";
         }
         else if (snapshot.Engines.Any(engine => engine.State == EngineState.Stopping))
         {
             ConnectionState = BrokerConnectionState.Disconnecting;
             StateLabel = "DISCONNECTING";
-            StatusText = $"Disconnecting · {engineSummary}";
+            StatusText = "Disconnecting…";
             StatusDescription = "Stopping application routing before the carrier.";
         }
         else if (snapshot.IsRouting && runningCount == snapshot.Engines.Count &&
@@ -1675,11 +1699,12 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         else if (snapshot.IsRouting && runningCount == snapshot.Engines.Count)
         {
             ConnectionState = BrokerConnectionState.Connected;
-            StateLabel = snapshot.IsKillSwitchEnabled ? "ROUTING ACTIVE · KILL SWITCH ON" : "ROUTING ACTIVE";
-            StatusText = $"Routing active · {engineSummary}";
+            // The headline already says connected; the eyebrow only adds the kill switch.
+            StateLabel = snapshot.IsKillSwitchEnabled ? "KILL SWITCH ON" : string.Empty;
+            StatusText = Via("Connected", snapshot);
             StatusDescription = snapshot.IsKillSwitchEnabled
-                ? "Applications covered by the routing policy are protected by the route and fail-closed policy."
-                : "Traffic is routed, but applications may reconnect directly if the route fails.";
+                ? "If the route drops, routed apps are blocked instead of connecting directly."
+                : "If the route drops, apps can connect directly. Turn on the kill switch in Routing to block them instead.";
         }
         else if (runningCount == 0)
         {
@@ -1692,10 +1717,16 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         {
             ConnectionState = BrokerConnectionState.Degraded;
             StateLabel = "DEGRADED";
-            StatusText = $"Connection incomplete · {engineSummary}";
+            StatusText = "Connection incomplete";
             StatusDescription = "The engine states do not currently form a safe route.";
         }
     }
+
+    /// <summary>"Connected via Work laptop": the outcome in plain words, with the profile it uses.</summary>
+    private static string Via(string outcome, BrokerSnapshot snapshot) =>
+        string.IsNullOrWhiteSpace(snapshot.Settings?.ProfileName)
+            ? outcome
+            : $"{outcome} via {snapshot.Settings.ProfileName.Trim()}";
 
     private void UpdateLivePolling()
     {
@@ -1837,6 +1868,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         StatusDescription = "Start the PaqetFire Broker service from Windows Services, or reinstall PaqetFire, then select Retry.";
         PaqetStatusText = "Unknown";
         RoutingStatusText = "Unknown";
+        ApplicationRoutingStatusText = "Unknown";
+        EngineSummaryText = "Unknown";
         PaqetDetailText = "No engine status is available while the broker is unreachable.";
         RoutingDetailText = "No routing status is available while the broker is unreachable.";
         BrokerStatusText = "Unavailable";
