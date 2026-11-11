@@ -172,7 +172,9 @@
                       </ItemsControl>
                     </StackPanel>
                   </Border>
-                  <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Warning"
+                  <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                           Severity="{x:Bind ErrorSeverity(ViewModel.IsErrorSevere), Mode=OneWay}"
+                           Title="{x:Bind ViewModel.ErrorTitle, Mode=OneWay}"
                            IsClosable="False" Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                            AutomationProperties.LiveSetting="Assertive">
                     <InfoBar.ActionButton>

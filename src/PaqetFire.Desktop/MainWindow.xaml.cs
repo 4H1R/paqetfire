@@ -580,8 +580,26 @@ public sealed partial class MainWindow : Window
             case FailureAction.ReviewProfile:
                 FocusServerEndpoint();
                 break;
+            case FailureAction.OpenServices:
+                OpenWindowsServices();
+                break;
         }
     }
+
+    private void OpenWindowsServices()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("services.msc") { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            ShowInfo(OverviewInfoBar, InfoBarSeverity.Warning, "Services could not be opened",
+                "Open Windows Services yourself, start PaqetFire Broker, then select Retry.");
+        }
+    }
+
+    public InfoBarSeverity ErrorSeverity(bool severe) => severe ? InfoBarSeverity.Error : InfoBarSeverity.Warning;
 
     private async void SaveAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {

@@ -31,6 +31,8 @@ public sealed class DesktopConnectionViewModelTests
 
         Assert.Equal("Paqet exited: the transport key does not match.", model.ErrorMessage);
         Assert.Equal(action, model.FailureAction);
+        Assert.True(model.IsErrorSevere);
+        Assert.NotEmpty(model.ErrorTitle);
         Assert.Equal("Running", model.BrokerStatusText);
         Assert.True(model.IsBrokerReachable);
         Assert.NotEqual("BROKER UNAVAILABLE", model.StateLabel);
@@ -47,7 +49,8 @@ public sealed class DesktopConnectionViewModelTests
 
         await model.ConnectAsync();
 
-        Assert.Equal("The broker could not understand the request.", model.ErrorMessage);
+        Assert.Equal("The PaqetFire service could not understand the request. Update or reinstall PaqetFire so the app and service match.", model.ErrorMessage);
+        Assert.Equal("PaqetFire service error", model.ErrorTitle);
     }
 
     [Fact]
@@ -61,6 +64,8 @@ public sealed class DesktopConnectionViewModelTests
 
         Assert.Null(await model.VerifyConnectionAsync());
         Assert.Equal("A connection change is in progress.", model.ErrorMessage);
+        Assert.Equal("PaqetFire is busy", model.ErrorTitle);
+        Assert.False(model.IsErrorSevere);
         Assert.Equal("Running", model.BrokerStatusText);
 
         Assert.False(await model.ManageProfileAsync(new ProfileAction(ProfileActionKind.Import, Payload: "{}")));
@@ -81,6 +86,11 @@ public sealed class DesktopConnectionViewModelTests
         Assert.False(model.IsBrokerReachable);
         Assert.Equal(PrimaryConnectionAction.RetryBroker, model.PrimaryAction);
         Assert.Equal("Retry", model.PrimaryActionText);
+        Assert.Equal("PaqetFire service unavailable", model.ErrorTitle);
+        Assert.True(model.IsErrorSevere);
+        Assert.Equal(FailureAction.OpenServices, model.FailureAction);
+        Assert.Equal("Open Services", model.FailureActionText);
+        Assert.Contains("Retry", model.ErrorMessage);
     }
 
     [Fact]

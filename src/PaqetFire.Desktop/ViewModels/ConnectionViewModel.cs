@@ -45,6 +45,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
     private string effectiveRoutingText = "Set up a profile to preview which traffic will use PaqetFire.";
     private string progressSummary = string.Empty;
     private string? errorMessage;
+    private string errorTitle = string.Empty;
     private string? notice;
     private string? dismissedNotice;
     private RoutingDataStatus? routingData;
@@ -112,6 +113,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             {
                 OnPropertyChanged(nameof(IsConnected));
                 OnPropertyChanged(nameof(IsFaulted));
+                OnPropertyChanged(nameof(IsErrorSevere));
                 RaiseActionStateChanged();
                 UpdateLivePolling();
             }
@@ -215,6 +217,16 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         }
     }
 
+    /// <summary>A short headline for <see cref="ErrorMessage"/>: what went wrong, not how to fix it.</summary>
+    public string ErrorTitle
+    {
+        get => errorTitle;
+        private set => SetProperty(ref errorTitle, value);
+    }
+
+    /// <summary>The service is out of reach or the route faulted, rather than one request being refused.</summary>
+    public bool IsErrorSevere => errorKind == ErrorKind.Transport || ConnectionState == BrokerConnectionState.Faulted;
+
     /// <summary>
     /// A lasting broker notice (hotspot share paused, no IPv6 on the server, recovery
     /// stopped retrying). Informational, never an error; once dismissed, the same text
@@ -268,6 +280,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         FailureAction.OpenRequiredSoftware => "Open required software",
         FailureAction.CopyDiagnostics => "Copy diagnostics",
         FailureAction.ReviewProfile => "Review profile",
+        FailureAction.OpenServices => "Open Services",
         _ => string.Empty,
     };
 
@@ -746,7 +759,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                                 ? "Save was cancelled — nothing was stored. Your changes are still pending."
                                 : "The broker did not confirm that the profile was stored. Your changes are still pending; save again.",
                             ErrorKind.Operation,
-                            FailureAction.None);
+                            FailureAction.None,
+                            "Changes not saved");
                         ActivityOccurred?.Invoke(cancelled ? "The save was cancelled before it was stored." : "The save was not confirmed by the broker.");
                         return;
                     }
@@ -762,7 +776,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                     if (!string.IsNullOrWhiteSpace(snapshot.OperationWarning) && !cancelled &&
                         (connectAfterSave || wasRouting) && !snapshot.IsRouting)
                     {
-                        SetError(snapshot.OperationWarning, ErrorKind.Operation, FailureAction.CopyDiagnostics);
+                        SetError(snapshot.OperationWarning, ErrorKind.Operation, FailureAction.CopyDiagnostics, "Could not connect");
                         ActivityOccurred?.Invoke("The profile was saved, but the connection did not start.");
                     }
                 }).ConfigureAwait(false);
@@ -790,7 +804,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                         StateLabel = "SAVE CANCELLED";
                         StatusText = "Save cancelled";
                         StatusDescription = "Nothing was stored; the broker kept the previous configuration.";
-                        SetError("Save was cancelled — nothing was stored. Your changes are still pending.", ErrorKind.Operation, FailureAction.None);
+                        SetError("Save was cancelled — nothing was stored. Your changes are still pending.", ErrorKind.Operation, FailureAction.None, "Changes not saved");
                         ActivityOccurred?.Invoke("The save was cancelled before it was stored.");
                         return;
                     }
@@ -887,7 +901,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                     StateLabel = "DISCONNECT INCOMPLETE";
                     StatusText = "Disconnect incomplete";
                     StatusDescription = "Check the broker status before reconnecting.";
-                    SetError(GetFriendlyError(exception), ErrorKind.Transport, FailureAction.None);
+                    SetError(GetFriendlyError(exception), ErrorKind.Transport, FailureAction.None, "Disconnect incomplete");
                 }).ConfigureAwait(false);
             }
             finally
@@ -912,7 +926,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                 StateLabel = "DISCONNECT INCOMPLETE";
                 StatusText = "Disconnect incomplete";
                 StatusDescription = "Check the broker status before reconnecting.";
-                SetError(GetFriendlyError(exception), ErrorKind.Transport, FailureAction.None);
+                SetError(GetFriendlyError(exception), ErrorKind.Transport, FailureAction.None, "Disconnect incomplete");
                 IsBusy = false;
             }).ConfigureAwait(false);
         }
@@ -1009,7 +1023,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                 // A profile switch that took the route down reports why; anything else is a notice.
                 if (!string.IsNullOrWhiteSpace(snapshot.OperationWarning) && wasRouting && !snapshot.IsRouting)
                 {
-                    SetError(snapshot.OperationWarning, ErrorKind.Operation, FailureAction.CopyDiagnostics);
+                    SetError(snapshot.OperationWarning, ErrorKind.Operation, FailureAction.CopyDiagnostics, "Could not connect");
                 }
             }).ConfigureAwait(false);
             return true;
@@ -1261,7 +1275,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
             SetError(
                 GetBrokerErrorMessage(brokerEvent.Error),
                 ErrorKind.Operation,
-                GetFailureAction(brokerEvent.Error?.Code));
+                GetFailureAction(brokerEvent.Error?.Code),
+                GetBrokerErrorTitle(brokerEvent.Error?.Code));
         }
     }
 
@@ -1620,7 +1635,8 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
                 SetError(
                     snapshot.StatusMessage ?? "An engine stopped unexpectedly. Copy diagnostics to see what it reported, then retry.",
                     ErrorKind.Operation,
-                    FailureAction.CopyDiagnostics);
+                    FailureAction.CopyDiagnostics,
+                    "Connection stopped");
             }
             else if (FailureAction == FailureAction.None)
             {
@@ -1801,7 +1817,11 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         // The broker answered, so it is running; its message is written for users.
         IsBrokerReachable = true;
         BrokerStatusText = "Running";
-        SetError(GetBrokerErrorMessage(exception.Error), ErrorKind.Operation, GetFailureAction(exception.Error.Code));
+        SetError(
+            GetBrokerErrorMessage(exception.Error),
+            ErrorKind.Operation,
+            GetFailureAction(exception.Error.Code),
+            GetBrokerErrorTitle(exception.Error.Code));
         // The broker's message goes into the activity log, which diagnostics copy.
         ActivityOccurred?.Invoke(string.IsNullOrWhiteSpace(exception.Error.Message)
             ? $"The broker refused the request: {exception.Error.Code}."
@@ -1814,7 +1834,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         ConnectionState = BrokerConnectionState.Faulted;
         StateLabel = "BROKER UNAVAILABLE";
         StatusText = "Broker unavailable";
-        StatusDescription = "Install or start the PaqetFire Broker service, then retry.";
+        StatusDescription = "Start the PaqetFire Broker service from Windows Services, or reinstall PaqetFire, then select Retry.";
         PaqetStatusText = "Unknown";
         RoutingStatusText = "Unknown";
         PaqetDetailText = "No engine status is available while the broker is unreachable.";
@@ -1822,22 +1842,26 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         BrokerStatusText = "Unavailable";
         LastCheckedText = $"Failed {DateTimeOffset.Now:t}";
         Progress = null;
-        SetError(GetFriendlyError(exception), ErrorKind.Transport, FailureAction.None);
+        SetError(GetFriendlyError(exception), ErrorKind.Transport, FailureAction.OpenServices, "PaqetFire service unavailable");
         ActivityOccurred?.Invoke("Could not contact the broker.");
     }
 
-    private void SetError(string message, ErrorKind kind, FailureAction action)
+    private void SetError(string message, ErrorKind kind, FailureAction action, string? title = null)
     {
         errorKind = kind;
+        ErrorTitle = title ?? (kind == ErrorKind.Transport ? "Lost contact with the PaqetFire service" : "Something needs attention");
         ErrorMessage = message;
         FailureAction = action;
+        OnPropertyChanged(nameof(IsErrorSevere));
     }
 
     private void ClearError()
     {
         errorKind = ErrorKind.None;
         ErrorMessage = null;
+        ErrorTitle = string.Empty;
         FailureAction = FailureAction.None;
+        OnPropertyChanged(nameof(IsErrorSevere));
     }
 
     private void RaiseActionStateChanged()
@@ -1907,6 +1931,17 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
         }
     }
 
+    private static string GetBrokerErrorTitle(BrokerErrorCode? code) => code switch
+    {
+        BrokerErrorCode.EngineFailure => "Could not connect",
+        BrokerErrorCode.ConfigurationInvalid => "Profile needs attention",
+        BrokerErrorCode.PrerequisiteMissing => "Required software missing",
+        BrokerErrorCode.Busy => "PaqetFire is busy",
+        BrokerErrorCode.IncompatibleProtocol => "App and service versions differ",
+        BrokerErrorCode.Unauthorized => "Not allowed",
+        _ => "PaqetFire service error",
+    };
+
     private static FailureAction GetFailureAction(BrokerErrorCode? code) => code switch
     {
         BrokerErrorCode.PrerequisiteMissing => FailureAction.OpenRequiredSoftware,
@@ -1927,26 +1962,26 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IAsyncDisposab
 
     private static string GetFriendlyError(Exception exception) => exception switch
     {
-        TimeoutException => "The broker did not respond in time.",
-        OperationCanceledException => "The operation was cancelled.",
-        UnauthorizedAccessException => "PaqetFire does not have permission to contact the broker.",
-        InvalidDataException => "The broker returned an incompatible response.",
+        TimeoutException => "The PaqetFire service did not respond in time. Retry; if it keeps happening, restart the PaqetFire Broker service from Windows Services.",
+        OperationCanceledException => "The operation was cancelled. Try again when you are ready.",
+        UnauthorizedAccessException => "PaqetFire does not have permission to contact its service. Reinstall PaqetFire, then retry.",
+        InvalidDataException => "The PaqetFire service sent a response this app does not understand. Update or reinstall PaqetFire so both match.",
         BrokerRequestException requestException => GetBrokerErrorMessage(requestException.Error),
-        IOException => "The broker connection was interrupted.",
-        InvalidOperationException => "The broker connection is not ready.",
-        _ => "PaqetFire could not contact the broker.",
+        IOException => "The connection to the PaqetFire service was interrupted. Retry in a moment.",
+        InvalidOperationException => "The connection to the PaqetFire service is not ready yet. Retry in a moment.",
+        _ => "PaqetFire could not contact its service. Check that the PaqetFire Broker service is running in Windows Services, then retry.",
     };
 
     private static string GetFriendlyBrokerError(BrokerErrorCode? code) => code switch
     {
         BrokerErrorCode.IncompatibleProtocol => "The app and broker versions are incompatible. Reinstall or update PaqetFire.",
-        BrokerErrorCode.InvalidRequest => "The broker could not understand the request.",
-        BrokerErrorCode.Unauthorized => "The broker denied this operation.",
+        BrokerErrorCode.InvalidRequest => "The PaqetFire service could not understand the request. Update or reinstall PaqetFire so the app and service match.",
+        BrokerErrorCode.Unauthorized => "The PaqetFire service refused this operation. Reinstall PaqetFire if it keeps happening.",
         BrokerErrorCode.Busy => "The broker is busy. Try again shortly.",
-        BrokerErrorCode.ConfigurationInvalid => "The connection or routing settings are invalid.",
-        BrokerErrorCode.PrerequisiteMissing => "A required packet-capture component is missing.",
-        BrokerErrorCode.EngineFailure => "A bundled network engine reported a failure.",
-        _ => "The broker encountered an internal error.",
+        BrokerErrorCode.ConfigurationInvalid => "The connection or routing settings are invalid. Review the profile, then save it again.",
+        BrokerErrorCode.PrerequisiteMissing => "A required packet-capture component is missing. Install the required software, then connect again.",
+        BrokerErrorCode.EngineFailure => "A bundled network engine reported a failure. Copy diagnostics to see what it reported, then retry.",
+        _ => "The PaqetFire service hit an internal error. Retry; if it happens again, copy diagnostics for a bug report.",
     };
 
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)

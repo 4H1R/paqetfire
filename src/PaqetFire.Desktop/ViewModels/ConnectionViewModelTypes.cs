@@ -16,6 +16,8 @@ public enum FailureAction
     OpenRequiredSoftware,
     CopyDiagnostics,
     ReviewProfile,
+    /// <summary>The broker service is out of reach; Windows Services can start it.</summary>
+    OpenServices,
 }
 
 public enum PrimaryConnectionAction
