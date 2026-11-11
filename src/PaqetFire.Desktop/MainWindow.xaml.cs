@@ -191,7 +191,42 @@ public sealed partial class MainWindow : Window
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e) =>
-        await ViewModel.ConnectAsync();
+        await ConnectFromOverviewAsync();
+
+    /// <summary>Connect offers to save pending edits first, so it never quietly uses older settings.</summary>
+    private async Task ConnectFromOverviewAsync()
+    {
+        if (!hasPendingConfigurationChanges)
+        {
+            await ViewModel.ConnectAsync();
+            return;
+        }
+
+        if (Content?.XamlRoot is null) return;
+        var dialog = new ContentDialog
+        {
+            Title = "You have unsaved changes",
+            Content = new TextBlock
+            {
+                Text = "The connection profile or routing policy has edits that are not saved yet. Save them and connect, or connect with the last saved settings and keep the edits pending.",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Save and connect",
+            SecondaryButtonText = "Connect with saved settings",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content.XamlRoot,
+        };
+        switch (await ShowDialogAsync(dialog))
+        {
+            case ContentDialogResult.Primary:
+                await SaveConfigurationAsync(OverviewInfoBar, connectAfterSave: true);
+                break;
+            case ContentDialogResult.Secondary:
+                await ViewModel.ConnectAsync();
+                break;
+        }
+    }
 
     private async void DisconnectButton_Click(object sender, RoutedEventArgs e) =>
         await ViewModel.DisconnectAsync();
@@ -469,7 +504,7 @@ public sealed partial class MainWindow : Window
                 await ViewModel.DisconnectAsync();
                 break;
             case PrimaryConnectionAction.Connect:
-                await ViewModel.ConnectAsync();
+                await ConnectFromOverviewAsync();
                 break;
         }
     }
