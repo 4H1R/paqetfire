@@ -1066,7 +1066,7 @@
         </ScrollViewer>
 
         <ScrollViewer x:Name="DiagnosticsPage" Visibility="Collapsed">
-          <StackPanel MaxWidth="960" Padding="36,28,36,48" HorizontalAlignment="Stretch" Spacing="20">
+          <StackPanel x:Name="DiagnosticsContent" MaxWidth="960" Padding="36,28,36,48" HorizontalAlignment="Stretch" Spacing="20">
             <Grid HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Spacing="6">
@@ -1091,7 +1091,7 @@
 
             <InfoBar x:Name="DiagnosticsReportInfoBar" IsOpen="False" IsClosable="True" />
 
-            <Grid ColumnSpacing="14" HorizontalAlignment="Stretch">
+            <Grid x:Name="DiagnosticsEngineCards" ColumnSpacing="14" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <Border Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="5"><TextBlock Text="Broker service" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.BrokerStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
@@ -1110,7 +1110,7 @@
               </Border>
             </Grid>
 
-            <Border Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
+            <Border x:Name="VerificationCard" Padding="22" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
                 <StackPanel Spacing="5">
@@ -1161,6 +1161,30 @@
                              Opacity="0.68" TextWrapping="Wrap" />
                 </StackPanel>
                 <InfoBar x:Name="PrerequisitesInfoBar" IsOpen="False" IsClosable="True" />
+
+                <Border x:Name="PrerequisiteRestartNote" Visibility="Collapsed" Padding="16" CornerRadius="14"
+                        Background="{ThemeResource SystemFillColorCautionBackgroundBrush}">
+                  <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="Restart required" FontWeight="SemiBold" />
+                      <TextBlock x:Name="PrerequisiteRestartText" TextWrapping="Wrap" Opacity="0.8"
+                                 Text="Restart Windows to finish the installation. PaqetFire cannot connect until you do." />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Restart now" VerticalAlignment="Center" Click="RestartWindowsButton_Click" />
+                  </Grid>
+                </Border>
+
+                <StackPanel x:Name="PrerequisiteProgressPanel" Visibility="Collapsed" Spacing="6">
+                  <TextBlock x:Name="PrerequisiteProgressText" TextWrapping="Wrap" />
+                  <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <ProgressBar x:Name="PrerequisiteProgressBar" Maximum="100" VerticalAlignment="Center"
+                                 AutomationProperties.Name="Download progress" />
+                    <Button x:Name="CancelPrerequisiteButton" Grid.Column="1" Content="Cancel"
+                            Click="CancelPrerequisiteButton_Click" />
+                  </Grid>
+                </StackPanel>
 
                 <Grid ColumnSpacing="16" RowSpacing="16">
                   <Grid.ColumnDefinitions>

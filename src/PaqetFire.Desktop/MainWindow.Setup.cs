@@ -14,6 +14,8 @@ public sealed partial class MainWindow
     private static readonly TimeSpan PrerequisiteRecheckInterval = TimeSpan.FromSeconds(3);
 
     private DateTimeOffset lastPrerequisiteRecheck = DateTimeOffset.MinValue;
+    private CancellationTokenSource? prerequisiteCancellation;
+    private readonly List<string> restartPendingPrerequisites = [];
 
     private async void PrerequisiteActionButton_Click(object sender, RoutedEventArgs e)
     {
@@ -50,6 +52,8 @@ public sealed partial class MainWindow
             return true;
         }
 
+        PrerequisitesInfoBar.ActionButton = null;
+
         if (!PrerequisiteInstallerService.CanInstallAutomatically(id))
         {
             if (prerequisite.HelpUri is null)
@@ -72,7 +76,9 @@ public sealed partial class MainWindow
             }
             catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
             {
-                ShowInfo(feedback, InfoBarSeverity.Error, "Could not open the download page", exception.Message);
+                ShowInfo(feedback, InfoBarSeverity.Error, "Could not open the download page",
+                    $"Windows could not open your browser. Visit {prerequisite.HelpUri.AbsoluteUri} to download {prerequisite.DisplayName}.");
+                AddActivity($"Could not open the {prerequisite.DisplayName} download page: {exception.Message}", "ERROR");
                 return false;
             }
 
@@ -81,11 +87,31 @@ public sealed partial class MainWindow
 
         prerequisiteActionInProgress = true;
         UpdatePrerequisiteCards();
+        using var cancellation = new CancellationTokenSource();
+        prerequisiteCancellation = cancellation;
         try
         {
-            var progress = new Progress<string>(message =>
-                ShowInfo(feedback, InfoBarSeverity.Informational, "Installing required software", message));
-            var result = await prerequisiteInstaller.InstallAsync(id, progress);
+            string? shownMessage = null;
+            var progress = new Progress<PrerequisiteInstallProgress>(update =>
+            {
+                ShowPrerequisiteProgress(update);
+                // Announce each step once; percentages only move the bar and the text.
+                if (update.Message != shownMessage)
+                {
+                    shownMessage = update.Message;
+                    ShowInfo(feedback, InfoBarSeverity.Informational, "Installing required software", update.Message);
+                }
+                else if (feedback != PrerequisitesInfoBar && update.Percentage is double percentage)
+                {
+                    feedback.Message = $"{update.Message} {percentage:0}%";
+                }
+            });
+            var result = await prerequisiteInstaller.InstallAsync(id, progress, cancellation.Token);
+            if (result.RestartRequired)
+            {
+                ShowRestartNote(prerequisite.DisplayName);
+            }
+
             ShowInfo(
                 feedback,
                 result.RestartRequired ? InfoBarSeverity.Warning : InfoBarSeverity.Success,
@@ -98,19 +124,22 @@ public sealed partial class MainWindow
         }
         catch (OperationCanceledException exception)
         {
-            ShowInfo(feedback, InfoBarSeverity.Warning, "Installation cancelled", exception.Message);
+            ShowInfo(feedback, InfoBarSeverity.Warning, "Installation cancelled",
+                cancellation.IsCancellationRequested ? "The download was cancelled. Nothing was installed." : exception.Message);
             AddActivity($"Installation cancelled for {prerequisite.DisplayName}.");
             return false;
         }
         catch (Exception exception) when (
             exception is HttpRequestException or IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
         {
-            ShowInfo(feedback, InfoBarSeverity.Error, "Installation failed", exception.Message);
-            AddActivity($"Could not install {prerequisite.DisplayName}.", "ERROR");
+            ShowPrerequisiteFailure(feedback, prerequisite);
+            AddActivity($"Could not install {prerequisite.DisplayName}: {exception.Message}", "ERROR");
             return false;
         }
         finally
         {
+            prerequisiteCancellation = null;
+            PrerequisiteProgressPanel.Visibility = Visibility.Collapsed;
             prerequisiteActionInProgress = false;
             UpdatePrerequisiteCards();
             // Re-check whenever an installer process has exited, whatever its result.
@@ -132,6 +161,113 @@ public sealed partial class MainWindow
 
         lastPrerequisiteRecheck = DateTimeOffset.UtcNow;
         _ = ViewModel.RefreshAsync();
+    }
+
+    private void ShowPrerequisiteProgress(PrerequisiteInstallProgress update)
+    {
+        PrerequisiteProgressPanel.Visibility = Visibility.Visible;
+        PrerequisiteProgressBar.IsIndeterminate = update.Percentage is null;
+        PrerequisiteProgressBar.Value = update.Percentage ?? 0;
+        PrerequisiteProgressText.Text = update.Percentage is double percentage
+            ? $"{update.Message} {percentage:0}%"
+            : update.Message;
+        CancelPrerequisiteButton.Visibility = update.CanCancel ? Visibility.Visible : Visibility.Collapsed;
+        CancelPrerequisiteButton.IsEnabled = update.CanCancel && prerequisiteCancellation?.IsCancellationRequested == false;
+    }
+
+    private void CancelPrerequisiteButton_Click(object sender, RoutedEventArgs e)
+    {
+        CancelPrerequisiteButton.IsEnabled = false;
+        prerequisiteCancellation?.Cancel();
+    }
+
+    /// <summary>A short, plain failure with the official page as the way forward; the raw error goes to the activity log.</summary>
+    private void ShowPrerequisiteFailure(InfoBar feedback, PrerequisiteStatus prerequisite)
+    {
+        const string Title = "Installation failed";
+        var message = $"{prerequisite.DisplayName} could not be downloaded or installed. Check your internet connection and try again, or install it from the official download page.";
+        ShowInfo(feedback, InfoBarSeverity.Error, Title, message);
+        if (feedback != PrerequisitesInfoBar)
+        {
+            ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Error, Title, message);
+        }
+
+        // Only this card's InfoBar gets the link: every other message on it comes from this file, which clears it.
+        if (prerequisite.HelpUri is { } helpUri)
+        {
+            PrerequisitesInfoBar.ActionButton = new HyperlinkButton { Content = "Open download page", NavigateUri = helpUri };
+        }
+    }
+
+    /// <summary>Stays on the card until PaqetFire restarts, unlike an InfoBar that can be closed and forgotten.</summary>
+    private void ShowRestartNote(string displayName)
+    {
+        if (!restartPendingPrerequisites.Contains(displayName))
+        {
+            restartPendingPrerequisites.Add(displayName);
+        }
+
+        PrerequisiteRestartText.Text =
+            $"Restart Windows to finish installing {string.Join(" and ", restartPendingPrerequisites)}. PaqetFire cannot connect until you do.";
+        PrerequisiteRestartNote.Visibility = Visibility.Visible;
+    }
+
+    private async void RestartWindowsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (Content?.XamlRoot is null)
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = "Restart Windows now?",
+            Content = "Save your work in other apps first. Windows restarts right away and the route disconnects.",
+            PrimaryButtonText = "Restart now",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "shutdown.exe",
+                ArgumentList = { "/r", "/t", "0" },
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            AddActivity("Windows restart requested to finish installing required software.");
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+        {
+            ShowInfo(PrerequisitesInfoBar, InfoBarSeverity.Error, "Windows did not restart", "Restart from the Start menu instead.");
+            AddActivity($"Windows restart could not be started: {exception.Message}", "ERROR");
+        }
+    }
+
+    /// <summary>Until everything is installed, the Required software card comes first on Diagnostics.</summary>
+    private void PlaceRequiredSoftwareCard(bool first)
+    {
+        var children = DiagnosticsContent.Children;
+        var current = children.IndexOf(RequiredSoftwareCard);
+        var placed = first
+            ? children.IndexOf(DiagnosticsEngineCards) == current + 1
+            : children.IndexOf(VerificationCard) == current - 1;
+        if (current < 0 || placed)
+        {
+            return;
+        }
+
+        children.RemoveAt(current);
+        children.Insert(
+            first ? children.IndexOf(DiagnosticsEngineCards) : children.IndexOf(VerificationCard) + 1,
+            RequiredSoftwareCard);
     }
 
     private void UpdatePrerequisites(BrokerSnapshot snapshot, BrokerSnapshot? previousSnapshot)
@@ -156,6 +292,7 @@ public sealed partial class MainWindow
         }
 
         UpdatePrerequisiteCards();
+        PlaceRequiredSoftwareCard(first: prerequisites.Values.Any(item => !item.IsInstalled));
         UpdateSetupChecklist(snapshot);
 
         // Everything is installed now: the next step is the server profile.

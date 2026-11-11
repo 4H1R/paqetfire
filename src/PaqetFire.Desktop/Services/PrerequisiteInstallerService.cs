@@ -45,9 +45,12 @@ public sealed class PrerequisiteInstallerService : IDisposable
         Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     }
 
+    /// <param name="cancellationToken">
+    /// Cancels the download. Once the installer runs it cannot be stopped from here, so it is awaited to the end.
+    /// </param>
     public async Task<PrerequisiteInstallResult> InstallAsync(
         string prerequisiteId,
-        IProgress<string>? progress = null,
+        IProgress<PrerequisiteInstallProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (!Packages.TryGetValue(prerequisiteId, out var package))
@@ -65,10 +68,16 @@ public sealed class PrerequisiteInstallerService : IDisposable
         try
         {
             Directory.CreateDirectory(downloadDirectory);
-            progress?.Report($"Downloading {package.DisplayName}…");
-            await DownloadVerifiedAsync(package, downloadPath, cancellationToken).ConfigureAwait(false);
+            var downloading = $"Downloading {package.DisplayName}…";
+            progress?.Report(new PrerequisiteInstallProgress(downloading, 0, CanCancel: true));
+            await DownloadVerifiedAsync(
+                    package,
+                    downloadPath,
+                    percentage => progress?.Report(new PrerequisiteInstallProgress(downloading, percentage, CanCancel: true)),
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-            progress?.Report($"Waiting for permission to install {package.DisplayName}…");
+            progress?.Report(new PrerequisiteInstallProgress($"Waiting for permission to install {package.DisplayName}…"));
             var executable = package.ExecutableName ?? downloadPath;
             var arguments = package.Arguments(downloadPath);
             using var process = Process.Start(new ProcessStartInfo
@@ -80,7 +89,7 @@ public sealed class PrerequisiteInstallerService : IDisposable
                 WorkingDirectory = downloadDirectory,
             }) ?? throw new InvalidOperationException($"Could not start the {package.DisplayName} installer.");
 
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
             return process.ExitCode switch
             {
                 0 or 1638 => new PrerequisiteInstallResult(false),
@@ -104,6 +113,7 @@ public sealed class PrerequisiteInstallerService : IDisposable
     private async Task DownloadVerifiedAsync(
         InstallerPackage package,
         string destination,
+        Action<double> reportPercentage,
         CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(
@@ -126,7 +136,21 @@ public sealed class PrerequisiteInstallerService : IDisposable
             81_920,
             FileOptions.Asynchronous | FileOptions.SequentialScan))
         {
-            await source.CopyToAsync(target, cancellationToken).ConfigureAwait(false);
+            var buffer = new byte[81_920];
+            long received = 0;
+            var reported = 0;
+            int read;
+            while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                received += read;
+                var percentage = (int)Math.Min(100, received * 100 / package.Size);
+                if (percentage != reported)
+                {
+                    reported = percentage;
+                    reportPercentage(percentage);
+                }
+            }
         }
 
         var fileInfo = new FileInfo(destination);
@@ -169,3 +193,7 @@ public sealed class PrerequisiteInstallerService : IDisposable
 }
 
 public sealed record PrerequisiteInstallResult(bool RestartRequired);
+
+/// <param name="Percentage">How much of the download has arrived, from 0 to 100; null once the installer runs.</param>
+/// <param name="CanCancel">True while downloading, the only step that can be cancelled.</param>
+public sealed record PrerequisiteInstallProgress(string Message, double? Percentage = null, bool CanCancel = false);
