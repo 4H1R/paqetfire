@@ -21,7 +21,6 @@ public sealed partial class MainWindow
     private WinForms.ToolStripMenuItem? trayConnectionMenuItem;
     private WinForms.ToolStripMenuItem? trayProfilesMenuItem;
     private TrayBalloonAction balloonAction;
-    private bool trayNoticeShown;
     private bool startedInBackground;
     // Pending edits were saved or discarded for this exit, so closing no longer asks.
     private bool exitConfirmed;
@@ -272,14 +271,28 @@ public sealed partial class MainWindow
 
         args.Cancel = true;
         HideToTray();
-        if (trayIcon is not null && !trayNoticeShown)
+        if (trayIcon is not null && !preferences.TrayNoticeShown)
         {
-            trayNoticeShown = true;
+            preferences.TrayNoticeShown = true;
             balloonAction = TrayBalloonAction.None;
             trayIcon.ShowBalloonTip(2500);
+            _ = RememberTrayNoticeAsync();
         }
 
         AddActivity("Window hidden to the notification area.");
+    }
+
+    /// <summary>The "still running" notice is shown once per installation, not once per session.</summary>
+    private async Task RememberTrayNoticeAsync()
+    {
+        try
+        {
+            await SavePreferencesAsync();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            AddActivity("Settings could not be written to disk.", "WARN");
+        }
     }
 
     private void HideToTray()

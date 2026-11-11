@@ -107,6 +107,8 @@ public sealed class DesktopPresentationTests
         var recovering = connected with { Tunnel = connected.Tunnel! with { State = TunnelHealthState.Recovering } };
 
         Assert.Equal(RouteNotificationKind.RouteDropped, RouteNotificationPolicy.Classify(connected, dropped, false)?.Kind);
+        // Clicking the notification only opens the window; it must not promise a reconnect.
+        Assert.EndsWith("Open PaqetFire to see what happened.", RouteNotificationPolicy.Classify(connected, dropped, false)?.Message);
         Assert.Equal(RouteNotificationKind.KillSwitchBlocking, RouteNotificationPolicy.Classify(connected, guarded, false)?.Kind);
         Assert.Equal(RouteNotificationKind.Reconnecting, RouteNotificationPolicy.Classify(connected, recovering, false)?.Kind);
         Assert.Equal(RouteNotificationKind.Recovered, RouteNotificationPolicy.Classify(recovering, connected, false)?.Kind);

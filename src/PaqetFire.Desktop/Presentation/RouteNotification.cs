@@ -40,7 +40,7 @@ public static class RouteNotificationPolicy
         {
             return new(RouteNotificationKind.RouteDropped,
                 "PaqetFire route dropped",
-                "Traffic is no longer routed through Paqet. Open PaqetFire to reconnect.");
+                "Traffic is no longer routed through Paqet. Open PaqetFire to see what happened.");
         }
 
         // Once per episode: between attempts the broker reports a tunnel test, not a stable route.

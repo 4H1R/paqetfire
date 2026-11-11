@@ -79,6 +79,9 @@ public sealed class DesktopPreferences
 
     public bool ShowNotifications { get; set; } = true;
 
+    /// <summary>The first close to the notification area has explained that PaqetFire keeps running.</summary>
+    public bool TrayNoticeShown { get; set; }
+
     public bool EnableNetworkAutomation { get; set; }
 
     public bool ConnectOnTrustedNetworks { get; set; }
