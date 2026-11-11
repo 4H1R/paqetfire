@@ -107,13 +107,14 @@
                   <Button x:Name="InstallAllMissingButton" Content="Install all missing" Style="{StaticResource AccentButtonStyle}"
                           Click="InstallAllMissingButton_Click" />
                   <Button x:Name="ChecklistServerButton" Content="Enter server details" Visibility="Collapsed"
+                          Style="{StaticResource AccentButtonStyle}"
                           Click="ChecklistServerButton_Click" />
                   <HyperlinkButton Content="Required software details" Tag="diagnostics" Click="NavigateLink_Click" />
                 </StackPanel>
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="3" Padding="28" CornerRadius="24" HorizontalAlignment="Stretch"
+            <Border x:Name="StatusCard" Grid.Row="3" Padding="28" CornerRadius="24" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <Grid x:Name="StatusCardGrid" ColumnSpacing="24">
                 <Grid.ColumnDefinitions>

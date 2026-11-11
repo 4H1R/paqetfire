@@ -666,9 +666,10 @@ public sealed partial class MainWindow : Window
 
     /// <summary>Only a step forward is accented; Disconnect stays a plain button so it never looks like Connect.</summary>
     public Style? PrimaryActionStyle(PrimaryConnectionAction action) =>
-        Application.Current.Resources.TryGetValue(
-            action == PrimaryConnectionAction.Disconnect ? "DefaultButtonStyle" : "AccentButtonStyle",
-            out var style)
+        ButtonStyle(accent: action != PrimaryConnectionAction.Disconnect);
+
+    private static Style? ButtonStyle(bool accent) =>
+        Application.Current.Resources.TryGetValue(accent ? "AccentButtonStyle" : "DefaultButtonStyle", out var style)
             ? style as Style
             : null;
 
@@ -1463,6 +1464,11 @@ public sealed partial class MainWindow : Window
             {
                 UpdateSetupChecklist(lastSnapshot);
             }
+        }
+        else if (args.PropertyName is nameof(ConnectionViewModel.HasError) or nameof(ConnectionViewModel.Readiness) &&
+                 lastSnapshot is not null)
+        {
+            UpdateSetupChecklist(lastSnapshot);
         }
         else if (args.PropertyName is nameof(ConnectionViewModel.RoutingData))
         {

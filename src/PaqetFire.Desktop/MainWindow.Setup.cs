@@ -5,6 +5,7 @@ using PaqetFire.Core.Deployment;
 using PaqetFire.Core.Ipc;
 using PaqetFire.Desktop.Presentation;
 using PaqetFire.Desktop.Services;
+using PaqetFire.Desktop.ViewModels;
 
 namespace PaqetFire.Desktop;
 
@@ -309,6 +310,17 @@ public sealed partial class MainWindow
     {
         var checklist = SetupChecklist.Create(snapshot, ViewModel.IsConnected);
         SetupChecklistCard.Visibility = checklist.ShouldShow ? Visibility.Visible : Visibility.Collapsed;
+
+        // During first-run setup the checklist is the call to action: hide the status card that
+        // would repeat it with an empty profile picker, and the engine cards that only say Stopped.
+        // An error, or a broken install the checklist does not cover, keeps the status card.
+        var checklistOwnsSetup = checklist.ShouldShow && !ViewModel.HasError &&
+            ViewModel.Readiness is ReadinessIssue.ProfileRequired or ReadinessIssue.PrerequisiteMissing;
+        StatusCard.Visibility = checklistOwnsSetup ? Visibility.Collapsed : Visibility.Visible;
+        EngineCardsGrid.Visibility = checklist.ShouldShow ? Visibility.Collapsed : Visibility.Visible;
+        // One accented button at a time: the checklist's only while the status card is hidden.
+        InstallAllMissingButton.Style = ButtonStyle(accent: checklistOwnsSetup);
+        ChecklistServerButton.Style = ButtonStyle(accent: checklistOwnsSetup);
         // Snapshots repeat every few seconds; rebuilding would move focus and re-announce the list.
         if (!ChecklistEntries.SequenceEqual(checklist.Items))
         {
