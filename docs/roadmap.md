@@ -39,7 +39,7 @@ Open work only; shipped changes are recorded in [release notes](releases/).
 
 - Test the Paqet handshake against the server from the setup checklist, not
   only ICMP reachability.
-- Localization and explicit light/dark theme support.
+- Explicit light/dark theme support.
 - Optional routing-decision diagnostics using Xray per-rule webhooks, with a
   broker-owned authenticated receiver and destination redaction.
 
