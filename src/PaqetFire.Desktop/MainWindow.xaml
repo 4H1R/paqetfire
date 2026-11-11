@@ -523,8 +523,6 @@
             </StackPanel>
 
             <InfoBar x:Name="RoutingInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
-            <TextBlock x:Name="RoutingPendingText" Text="No pending changes." TextWrapping="Wrap" />
-            <TextBlock Text="Either Save button applies the connection profile and routing policy together, including edits on the other page. Applying changes restarts an active connection." FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
 
             <TextBlock Text="Applications" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,-8"
                        AutomationProperties.HeadingLevel="Level2" />
@@ -951,11 +949,18 @@
               </StackPanel>
             </Border>
 
-            <StackPanel x:Name="RoutingSaveActions" Orientation="Horizontal" Spacing="10">
-              <Button Content="Save routing policy" Style="{StaticResource AccentButtonStyle}" Click="SaveRoutingButton_Click"
-                      ToolTipService.ToolTip="Save (Ctrl+S)" />
-              <Button Content="Save and connect" IsEnabled="{x:Bind ViewModel.CanSaveAndConnect, Mode=OneWay}"
-                      Click="SaveRoutingAndConnectButton_Click" AccessKey="C" />
+            <StackPanel Spacing="10" Margin="0,8,0,0">
+              <TextBlock x:Name="RoutingPendingText" Text="No pending changes." FontWeight="SemiBold" TextWrapping="Wrap" />
+              <StackPanel x:Name="RoutingSaveActions" Orientation="Horizontal" Spacing="10">
+                <Button Content="{x:Bind RoutingSaveButtonText(ViewModel.IsConnected), Mode=OneWay}"
+                        Style="{StaticResource AccentButtonStyle}" Click="SaveRoutingButton_Click"
+                        ToolTipService.ToolTip="Save (Ctrl+S)" />
+                <Button Content="Save and connect" IsEnabled="{x:Bind ViewModel.CanSaveAndConnect, Mode=OneWay}"
+                        Visibility="{x:Bind RoutingSaveAndConnectVisibility(ViewModel.IsConnected), Mode=OneWay}"
+                        Click="SaveRoutingAndConnectButton_Click" AccessKey="C" />
+              </StackPanel>
+              <TextBlock Text="Saving applies the connection profile and routing policy together, including edits on the Paqet connection page. An active connection restarts."
+                         FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>
