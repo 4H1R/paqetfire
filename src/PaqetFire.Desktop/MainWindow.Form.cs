@@ -12,6 +12,7 @@ namespace PaqetFire.Desktop;
 public sealed partial class MainWindow
 {
     private readonly List<(Panel Parent, TextBlock Error)> fieldErrors = [];
+    private Dictionary<Control, string>? defaultHelpTexts;
     private ConnectionFormState? appliedFormState;
     private int formPopulationDepth;
     private string currentProfileName = "Default";
@@ -315,8 +316,13 @@ public sealed partial class MainWindow
     {
         foreach (var (parent, error) in fieldErrors) parent.Children.Remove(error);
         fieldErrors.Clear();
+        // A field error replaces a control's help text; put back the help text it was given.
+        defaultHelpTexts ??= ConfigurationControls().Distinct().ToDictionary(
+            control => control,
+            control => Microsoft.UI.Xaml.Automation.AutomationProperties.GetHelpText(control) ?? string.Empty);
         foreach (var control in ConfigurationControls())
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(control, string.Empty);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(
+                control, defaultHelpTexts.GetValueOrDefault(control, string.Empty));
     }
 
     private void ShowFieldErrors(IReadOnlyList<string> errors)
