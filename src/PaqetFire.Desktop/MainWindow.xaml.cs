@@ -1231,6 +1231,13 @@ public sealed partial class MainWindow : Window
 
     private void ApplyVerification(ConnectionVerificationReport report)
     {
+        // Every snapshot repeats the last report; rebuilding would move focus and re-announce the list.
+        if (VerificationEntries.Count > 0 && IsSameVerification(report, appliedVerification))
+        {
+            return;
+        }
+
+        appliedVerification = report;
         VerificationEntries.Clear();
         foreach (var item in VerificationDisplayItem.FromReport(report))
         {

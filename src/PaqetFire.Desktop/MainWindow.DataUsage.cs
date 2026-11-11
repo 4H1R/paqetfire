@@ -178,7 +178,12 @@ public sealed partial class MainWindow
         DataUsageMonthDetail.Text = summary.ThisMonth.DetailText;
         DataUsageRecentText.Text = summary.RecentDays.TotalText;
         DataUsageRecentDetail.Text = summary.RecentDays.DetailText;
-        DataUsageDaysList.ItemsSource = summary.Days;
+        // The page refreshes every few seconds; replacing an unchanged list would reset focus and scrolling.
+        if (DataUsageDaysList.ItemsSource is not IReadOnlyList<DataUsageDayRow> shown || !shown.SequenceEqual(summary.Days))
+        {
+            DataUsageDaysList.ItemsSource = summary.Days;
+        }
+
         var empty = summary.Days.Count == 0;
         DataUsageEmptyText.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
         DataUsageDaysHeader.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
