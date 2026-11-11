@@ -329,7 +329,11 @@ public sealed partial class MainWindow
 
     private void ClearFieldErrors()
     {
-        foreach (var (_, parent, error) in fieldErrors) parent.Children.Remove(error);
+        foreach (var (field, parent, error) in fieldErrors)
+        {
+            parent.Children.Remove(error);
+            RestoreHelpText(field);
+        }
         fieldErrors.Clear();
         foreach (var control in ConfigurationControls())
             RestoreHelpText(control);
@@ -370,6 +374,8 @@ public sealed partial class MainWindow
         if (edited == ShareWithLanSwitch || edited == ShareViaHotspotSwitch)
             return [edited, LanSharePortBox, HotspotPortBox, ShareUsernameBox, SharePasswordBox];
         if (edited == RoutingModeButtons) return [RoutingModeButtons, SelectedApplicationsBox];
+        // A new configuration can drop the need for credentials, which then disables their boxes.
+        if (edited == OpenVpnImportButton) return [OpenVpnImportButton, OpenVpnUsernameBox, OpenVpnPasswordBox];
         return [edited];
     }
 
@@ -493,6 +499,8 @@ public sealed partial class MainWindow
     {
         formProfileId = profileId;
         brokerSettingsApplied = true;
+        // Errors belong to the form that was saved, not to the profile now being shown.
+        ClearFieldErrors();
         TransportKeyBox.Password = string.Empty;
         SharePasswordBox.Password = string.Empty;
         hasSavedTransportKey = settings.HasTransportKey;
