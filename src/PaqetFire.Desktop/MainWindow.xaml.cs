@@ -331,7 +331,9 @@ public sealed partial class MainWindow : Window
                     UpdateInfoBar,
                     InfoBarSeverity.Informational,
                     "Update available",
-                    $"PaqetFire {latestVersion} is newer than the installed version. The installer will be verified before it opens.");
+                    $"PaqetFire {latestVersion} is newer than the installed version. The installer will be verified before it opens.",
+                    // The launch and daily checks run in the background; only a requested check scrolls.
+                    bringIntoView: showCurrentVersionResult);
                 AnnounceUpdate(availableUpdate);
             }
             else
@@ -979,7 +981,9 @@ public sealed partial class MainWindow : Window
         {
             if (!TryCreateBrokerSettings(out var settings, out var errors))
             {
-                ShowInfo(feedback, InfoBarSeverity.Error, "Configuration needs attention", errors);
+                // A placed field error already scrolled to and focused its field; keep it in view.
+                ShowInfo(feedback, InfoBarSeverity.Error, "Configuration needs attention", errors,
+                    bringIntoView: fieldErrors.Count == 0);
                 return;
             }
             SetConfigurationEditingEnabled(false);
