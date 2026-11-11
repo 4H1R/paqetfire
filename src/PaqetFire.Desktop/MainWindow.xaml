@@ -36,7 +36,7 @@
         Grid.Row="1"
         IsBackButtonVisible="Collapsed"
         IsSettingsVisible="True"
-        PaneDisplayMode="Left"
+        PaneDisplayMode="Auto"
         OpenPaneLength="224"
         SelectedItem="{x:Bind OverviewNavigationItem}"
         SelectionChanged="NavigationView_SelectionChanged"
@@ -60,7 +60,7 @@
       </NavigationView.MenuItems>
 
       <Grid>
-        <ScrollViewer x:Name="OverviewPage">
+        <ScrollViewer x:Name="OverviewPage" SizeChanged="OverviewPage_SizeChanged">
           <Grid MaxWidth="1120" Padding="36,28,36,48" HorizontalAlignment="Stretch">
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto" />
@@ -115,7 +115,7 @@
 
             <Border Grid.Row="3" Padding="28" CornerRadius="24" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-              <Grid ColumnSpacing="24">
+              <Grid x:Name="StatusCardGrid" ColumnSpacing="24">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
@@ -179,7 +179,7 @@
                            IsClosable="True" Message="{x:Bind ViewModel.Notice, Mode=OneWay}"
                            CloseButtonClick="NoticeInfoBar_CloseButtonClick"
                            AutomationProperties.LiveSetting="Polite" />
-                  <StackPanel Orientation="Horizontal" Spacing="10">
+                  <controls:WrapPanel HorizontalSpacing="10" VerticalSpacing="10">
                     <Button Content="{x:Bind ViewModel.PrimaryActionText, Mode=OneWay}"
                             IsEnabled="{x:Bind ViewModel.CanPrimaryAction, Mode=OneWay}"
                             Click="PrimaryConnectionActionButton_Click"
@@ -190,9 +190,9 @@
                             ToolTipService.ToolTip="Stop connecting and shut down the engines that already started" />
                     <Button Content="Open diagnostics" Tag="diagnostics" Click="NavigateLink_Click"
                             Visibility="{x:Bind ViewModel.ShowDiagnosticsShortcut, Mode=OneWay}" />
-                    <ProgressRing Width="20" Height="20" IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                    <ProgressRing Width="20" Height="20" Margin="0,6" IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
                                   AutomationProperties.Name="Working" />
-                  </StackPanel>
+                  </controls:WrapPanel>
                 </StackPanel>
                 <Border x:Name="ConnectionStateIconSurface" Grid.Column="1" Width="112" Height="112" CornerRadius="56"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}"
@@ -209,11 +209,15 @@
                     Visibility="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{StaticResource PaqetFireSuccessBrush}" BorderThickness="1">
-              <Grid ColumnSpacing="24" RowSpacing="18">
+              <Grid x:Name="LiveSessionGrid" ColumnSpacing="24">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
                 <StackPanel Spacing="12">
                   <StackPanel Spacing="2">
@@ -331,11 +335,15 @@
               </Grid>
             </Border>
 
-            <Grid Grid.Row="5" Margin="0,18,0,0" ColumnSpacing="18" HorizontalAlignment="Stretch">
+            <Grid x:Name="EngineCardsGrid" Grid.Row="5" Margin="0,18,0,0" ColumnSpacing="18" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
               <Border Padding="22" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="10">
                   <StackPanel Orientation="Horizontal" Spacing="10">
@@ -369,12 +377,12 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="6">
                   <TextBlock Text="System readiness" FontSize="16" FontWeight="SemiBold" />
-                  <StackPanel Orientation="Horizontal" Spacing="18">
+                  <controls:WrapPanel HorizontalSpacing="18" VerticalSpacing="4">
                     <TextBlock><Run Text="Broker · "/><Run Text="{x:Bind ViewModel.BrokerStatusText, Mode=OneWay}" FontWeight="SemiBold" /></TextBlock>
                     <TextBlock Opacity="0.7"><Run Text="Engines · "/><Run Text="{x:Bind ViewModel.EngineSummaryText, Mode=OneWay}" /></TextBlock>
                     <TextBlock x:Name="PrerequisiteSummaryText" Text="Prerequisites · checking" Opacity="0.7" />
                     <TextBlock Text="{x:Bind ViewModel.LastCheckedText, Mode=OneWay}" Opacity="0.7" />
-                  </StackPanel>
+                  </controls:WrapPanel>
                 </StackPanel>
                 <Button Grid.Column="1" Content="Open diagnostics" Tag="diagnostics" Click="NavigateLink_Click"
                         VerticalAlignment="Center" />

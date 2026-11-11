@@ -308,6 +308,24 @@ public sealed class DesktopPresentationTests
         Assert.Equal(2, lookups);
     }
 
+    [Fact]
+    public void WindowSizeFollowsTheDisplayScaleAndCentresOnTheWorkArea()
+    {
+        var workArea = new WindowBounds(0, 0, 3840, 2100);
+
+        Assert.Equal(new WindowBounds(1035, 465, 1770, 1170), WindowSizing.Initial(1.5, workArea));
+        Assert.Equal((750, 780), WindowSizing.Minimum(1.5, workArea));
+    }
+
+    [Fact]
+    public void WindowSizeNeverExceedsASmallWorkArea()
+    {
+        var workArea = new WindowBounds(-1366, 0, 1366, 728);
+
+        Assert.Equal(new WindowBounds(-1366, 0, 1366, 728), WindowSizing.Initial(2, workArea));
+        Assert.Equal((1000, 728), WindowSizing.Minimum(2, workArea));
+    }
+
     private static BrokerSnapshot Snapshot() => new([], false, false, DateTimeOffset.UtcNow, IsConfigured: true,
         ConnectionState: ConnectionState.Disconnected);
 }

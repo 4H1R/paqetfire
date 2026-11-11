@@ -26,6 +26,13 @@ internal static class NativeWindow
     /// <summary>Lets the running instance take the foreground when this launch hands over to it.</summary>
     public static void AllowForeground(uint processId) => AllowSetForegroundWindow(processId);
 
+    /// <summary>The window's display scale (1.0 at 96 DPI, 1.5 at 150%).</summary>
+    public static double GetScale(IntPtr window) =>
+        window != IntPtr.Zero && GetDpiForWindow(window) is var dpi and > 0 ? dpi / 96d : 1d;
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr window);
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsIconic(IntPtr window);

@@ -78,6 +78,8 @@ public sealed partial class MainWindow : Window
     private Version? dismissedUpdateVersion;
     private Task? initialization;
     private InfoBar? saveProgressFeedback;
+    private double minimumSizeScale;
+    private bool overviewIsNarrow;
 
     private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromDays(1);
 
@@ -123,7 +125,7 @@ public sealed partial class MainWindow : Window
         Title = "PaqetFire";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        AppWindow.Resize(new SizeInt32(1180, 780));
+        ApplyInitialWindowSize();
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "PaqetFire.ico");
         AppWindow.SetIcon(iconPath);
         InitializeTrayIcon(iconPath);
@@ -148,7 +150,68 @@ public sealed partial class MainWindow : Window
         Closed += OnClosed;
     }
 
-    private void RootGrid_Loaded(object sender, RoutedEventArgs e) => _ = InitializeAsync();
+    private void RootGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Moving to a display with another scale changes how many pixels the minimum needs.
+        RootGrid.XamlRoot.Changed += (root, _) => ApplyMinimumWindowSize(root.RasterizationScale);
+        _ = InitializeAsync();
+    }
+
+    private void ApplyInitialWindowSize()
+    {
+        var scale = NativeWindow.GetScale(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var bounds = WindowSizing.Initial(scale, CurrentWorkArea());
+        AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+        ApplyMinimumWindowSize(scale);
+    }
+
+    private void ApplyMinimumWindowSize(double scale)
+    {
+        if (scale != minimumSizeScale && AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            minimumSizeScale = scale;
+            var (width, height) = WindowSizing.Minimum(scale, CurrentWorkArea());
+            presenter.PreferredMinimumWidth = width;
+            presenter.PreferredMinimumHeight = height;
+        }
+    }
+
+    private WindowBounds CurrentWorkArea()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        return new WindowBounds(area.X, area.Y, area.Width, area.Height);
+    }
+
+    /// <summary>Below 720 effective pixels the Overview cards stack into one column.</summary>
+    private void OverviewPage_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var narrow = e.NewSize.Width < 720;
+        if (narrow == overviewIsNarrow && e.PreviousSize.Width > 0)
+        {
+            return;
+        }
+
+        overviewIsNarrow = narrow;
+        StackColumns(LiveSessionGrid, narrow, 18);
+        StackColumns(EngineCardsGrid, narrow, 18);
+        // The state icon is decoration; give its column to the text.
+        ConnectionStateIconSurface.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        StatusCardGrid.ColumnSpacing = narrow ? 0 : 24;
+    }
+
+    private static void StackColumns(Grid grid, bool narrow, double rowSpacing)
+    {
+        grid.RowSpacing = narrow ? rowSpacing : 0;
+        for (var index = 0; index < grid.Children.Count; index++)
+        {
+            if (grid.Children[index] is FrameworkElement child)
+            {
+                Grid.SetRow(child, narrow ? index : 0);
+                Grid.SetColumn(child, narrow ? 0 : index);
+                Grid.SetColumnSpan(child, narrow ? grid.ColumnDefinitions.Count : 1);
+            }
+        }
+    }
 
     /// <summary>Runs once, from the first load or from a hidden sign-in start that never shows the window.</summary>
     private Task InitializeAsync() => initialization ??= InitializeCoreAsync();
