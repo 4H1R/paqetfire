@@ -1116,23 +1116,17 @@ public sealed partial class MainWindow : Window
     }
 
     private async void CopyDiagnosticsButton_Click(object sender, RoutedEventArgs e) =>
-        await CopyDiagnosticsAsync(VerificationInfoBar);
+        await CopyDiagnosticsAsync(DiagnosticsReportInfoBar);
 
     private async Task CopyDiagnosticsAsync(InfoBar feedback)
     {
-        var diagnostics = await ViewModel.GetDiagnosticsAsync();
-        if (diagnostics is null)
+        if (await BuildDiagnosticReportAsync(feedback) is not { } report)
         {
-            ShowInfo(feedback, InfoBarSeverity.Error, "Diagnostics unavailable",
-                ViewModel.ErrorMessage ?? "The broker did not return a diagnostic report.");
             return;
         }
 
-        var activity = string.Join(Environment.NewLine, ActivityEntries.Select(entry =>
-            $"{entry.Time} [{entry.Level}] {entry.Message}"));
         var package = new DataPackage();
-        package.SetText(diagnostics + Environment.NewLine + "[Desktop activity]" + Environment.NewLine +
-            DiagnosticRedactor.Redact(activity, []));
+        package.SetText(report);
         Clipboard.SetContent(package);
         ShowInfo(feedback, InfoBarSeverity.Success, "Diagnostics copied",
             "Paste the report into your bug report. Review it first; secrets, the server host, and public IP addresses are redacted.");
@@ -1270,7 +1264,7 @@ public sealed partial class MainWindow : Window
                     brokerLogLines.Remove(brokerLogLineOrder.Dequeue());
                 }
 
-                AddActivity(line, line.Contains(" ERR ", StringComparison.Ordinal) ? "ERROR" : "ENGINE");
+                AddActivity(line, line.Contains(" ERR ", StringComparison.Ordinal) ? "ERROR" : "ENGINE", isEngineLine: true);
             }
         }
 
@@ -1302,15 +1296,18 @@ public sealed partial class MainWindow : Window
 
     private void OnActivityOccurred(string message) => AddActivity(message);
 
-    private void AddActivity(string message, string level = "INFO")
+    private void AddActivity(string message, string level = "INFO", bool isEngineLine = false)
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            _ = DispatcherQueue.TryEnqueue(() => AddActivity(message, level));
+            _ = DispatcherQueue.TryEnqueue(() => AddActivity(message, level, isEngineLine));
             return;
         }
 
-        ActivityEntries.Insert(0, new ActivityLogEntry(DateTimeOffset.Now.ToString("HH:mm:ss"), message, level));
+        ActivityEntries.Insert(0, new ActivityLogEntry(DateTimeOffset.Now.ToString("HH:mm:ss"), message, level)
+        {
+            IsEngineLine = isEngineLine,
+        });
         while (ActivityEntries.Count > 200)
         {
             ActivityEntries.RemoveAt(ActivityEntries.Count - 1);

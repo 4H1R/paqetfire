@@ -1080,12 +1080,16 @@
                 <Button Content="Refresh status" Click="RefreshButton_Click" ToolTipService.ToolTip="Refresh status (F5)" />
                 <Button Content="Copy diagnostics" Click="CopyDiagnosticsButton_Click"
                         ToolTipService.ToolTip="Copies a report for bug reports. Secrets, the server host, and public IP addresses are redacted." />
+                <Button Content="Save diagnostics…" Click="SaveDiagnosticsButton_Click"
+                        ToolTipService.ToolTip="Saves the same redacted report as a text file." />
                 <Button Content="Verify route" Style="{StaticResource AccentButtonStyle}"
                         IsEnabled="{x:Bind ViewModel.CanVerify, Mode=OneWay}"
                         Click="VerifyConnectionButton_Click"
                         ToolTipService.ToolTip="Available while the route is connected" />
               </StackPanel>
             </Grid>
+
+            <InfoBar x:Name="DiagnosticsReportInfoBar" IsOpen="False" IsClosable="True" />
 
             <Grid ColumnSpacing="14" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

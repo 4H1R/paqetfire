@@ -77,7 +77,7 @@ The daily download and upload totals per profile of traffic that went through Pa
 _Avoid_: Bandwidth, quota, traffic log
 
 **Diagnostic report**:
-The redacted plain-text summary copied from Diagnostics for bug reports.
+The redacted plain-text summary copied or saved from Diagnostics for bug reports.
 _Avoid_: Log dump, support bundle
 
 **Local network bypass**:

@@ -1,3 +1,4 @@
+using PaqetFire.Core.Deployment;
 using PaqetFire.Core.Diagnostics;
 using PaqetFire.Desktop.Presentation;
 using PaqetFire.Desktop.ViewModels;
@@ -96,6 +97,50 @@ public sealed class DesktopDiagnosticsPresentationTests
         Assert.Equal(row.AutomationName, row.ToString());
         Assert.Equal("12:00:00, WARN: Route connected.", entry.ToString());
         Assert.Equal(StatusTone.Caution, entry.Tone);
+    }
+
+    [Fact]
+    public void ReportSummaryNamesMissingSoftwareAndFailedChecks()
+    {
+        var summary = DiagnosticReportText.Summary(
+            "Degraded",
+            [
+                new PrerequisiteStatus("npcap", "Npcap", false, "Missing."),
+                new PrerequisiteStatus("winpkfilter", "Windows Packet Filter", true, "Installed."),
+            ],
+            Report(
+                Check(VerificationCheckKind.TcpIpv4, VerificationCheckStatus.Failed, "TCP over IPv4"),
+                Check(VerificationCheckKind.DnsLeak, VerificationCheckStatus.Passed, "DNS leak")));
+
+        Assert.Equal("Summary: Degraded · missing Npcap · failed checks: TCP over IPv4", summary);
+    }
+
+    [Fact]
+    public void ReportSummaryOfAHealthyOrUnknownState()
+    {
+        Assert.Equal(
+            "Summary: Connected · required software installed · last verification 1 of 1 checks passed",
+            DiagnosticReportText.Summary("Connected", [],
+                Report(Check(VerificationCheckKind.EngineChain, VerificationCheckStatus.Passed, "Engine chain"))));
+        Assert.Equal(
+            "Summary: Disconnected · required software not reported · route not verified",
+            DiagnosticReportText.Summary("Disconnected", null, null));
+    }
+
+    [Fact]
+    public void ReportStartsWithTheSummaryAndLeavesEngineLinesToTheBrokerSection()
+    {
+        var report = DiagnosticReportText.Compose(
+            "Summary: Connected",
+            "PaqetFire diagnostics",
+            [
+                new ActivityLogEntry("12:00:02", "paqet: ERR handshake", "ERROR") { IsEngineLine = true },
+                new ActivityLogEntry("12:00:01", "xray: started", "ENGINE") { IsEngineLine = true },
+                new ActivityLogEntry("12:00:00", "Route connected."),
+            ]);
+
+        var lines = report.Split(Environment.NewLine);
+        Assert.Equal(["Summary: Connected", "PaqetFire diagnostics", "[Desktop activity]", "12:00:00 [INFO] Route connected."], lines);
     }
 
     private static ConnectionVerificationCheck Check(VerificationCheckKind kind, VerificationCheckStatus status, string name) =>

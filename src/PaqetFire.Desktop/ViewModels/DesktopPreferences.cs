@@ -187,6 +187,9 @@ public sealed class ActivityLogEntry
 
     public string Level { get; set; } = "INFO";
 
+    /// <summary>A line copied from an engine's log in a broker snapshot.</summary>
+    public bool IsEngineLine { get; set; }
+
     public Presentation.StatusTone Tone => Presentation.StatusToneText.ForActivityLevel(Level);
 
     /// <summary>What a screen reader says for the row.</summary>
