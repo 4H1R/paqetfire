@@ -239,6 +239,16 @@ public sealed partial class MainWindow
 
     private async void ExportProfilesButton_Click(object sender, RoutedEventArgs e)
     {
+        // The file holds every transport key in plain text: say so before it is written.
+        if (!await ConfirmProfileActionAsync(
+                "Export profiles with their keys?",
+                "The export file contains every profile's transport key in plain text. Anyone who gets the file can connect to your servers, so keep it private and share it only with people you trust. SOCKS credentials stay on this PC.",
+                "Choose where to save",
+                "Cancel"))
+        {
+            return;
+        }
+
         var json = await ViewModel.ExportProfilesAsync();
         if (json is null)
         {
@@ -257,7 +267,7 @@ public sealed partial class MainWindow
         if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
         await File.WriteAllTextAsync(dialog.FileName, json);
         ShowInfo(ConnectionInfoBar, InfoBarSeverity.Success, "Profiles exported",
-            "The export includes transport keys. Keep it private and share it only with trusted recipients. SOCKS credentials stay on this PC.");
+            $"Saved to {dialog.FileName}. It includes transport keys, so keep it private.");
         AddActivity("Portable profiles exported.");
     }
 
