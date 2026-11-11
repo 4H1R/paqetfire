@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using PaqetFire.Desktop.Presentation;
 using PaqetFire.Desktop.Services;
 using PaqetFire.Desktop.ViewModels;
@@ -21,6 +23,11 @@ public sealed partial class MainWindow
     private TrayBalloonAction balloonAction;
     private bool trayNoticeShown;
     private bool startedInBackground;
+    // Pending edits were saved or discarded for this exit, so closing no longer asks.
+    private bool exitConfirmed;
+    private bool exitPromptActive;
+    // Set from the SystemEvents thread: Windows ending the session never waits on a prompt.
+    private volatile bool sessionEnding;
 
     private enum TrayBalloonAction
     {
@@ -48,6 +55,7 @@ public sealed partial class MainWindow
     private void InitializeTrayIcon(string iconPath)
     {
         trayIconFactory = new TrayIconFactory(iconPath);
+        Microsoft.Win32.SystemEvents.SessionEnding += OnSessionEnding;
         var menu = new WinForms.ContextMenuStrip();
         trayStatusMenuItem = new WinForms.ToolStripMenuItem("Status: Checking…")
         {
@@ -251,6 +259,14 @@ public sealed partial class MainWindow
     {
         if (exitRequested || !preferences.MinimizeToTray)
         {
+            // Unsaved edits get a chance to be saved first; ExitAsync closes again afterwards.
+            if (hasPendingConfigurationChanges && !exitConfirmed && !sessionEnding)
+            {
+                args.Cancel = true;
+                exitRequested = false;
+                _ = DispatcherQueue.TryEnqueue(() => RunSafely(ExitAsync));
+            }
+
             return;
         }
 
@@ -300,20 +316,95 @@ public sealed partial class MainWindow
 
     private void ExitFromTray()
     {
-        _ = DispatcherQueue.TryEnqueue(() =>
-        {
-            exitRequested = true;
-            if (trayIcon is not null)
-            {
-                trayIcon.Visible = false;
-            }
-
-            Close();
-        });
+        _ = DispatcherQueue.TryEnqueue(() => RunSafely(ExitAsync));
     }
+
+    /// <summary>Exits PaqetFire, first letting the user save or discard unsaved edits.</summary>
+    private async Task ExitAsync()
+    {
+        if (!await ConfirmExitWithPendingChangesAsync())
+        {
+            return;
+        }
+
+        exitRequested = true;
+        if (trayIcon is not null)
+        {
+            trayIcon.Visible = false;
+        }
+
+        Close();
+    }
+
+    /// <summary>
+    /// True when the exit may go ahead: nothing is pending, the edits were discarded, or they
+    /// were saved. A save that fails or is refused keeps the window open with its error.
+    /// </summary>
+    private async Task<bool> ConfirmExitWithPendingChangesAsync()
+    {
+        if (!hasPendingConfigurationChanges || exitConfirmed || sessionEnding)
+        {
+            return true;
+        }
+
+        RestoreFromTray();
+        // A second close request while the prompt or its save is running only brings the window forward.
+        if (exitPromptActive || Content?.XamlRoot is null)
+        {
+            return false;
+        }
+
+        exitPromptActive = true;
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Save changes before exiting?",
+                Content = new TextBlock
+                {
+                    Text = "The connection profile or routing policy has edits that are not saved yet. Exiting without saving discards them.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                PrimaryButtonText = "Save and exit",
+                SecondaryButtonText = "Discard and exit",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = Content.XamlRoot,
+            };
+            switch (await ShowDialogAsync(dialog))
+            {
+                case ContentDialogResult.Secondary:
+                    exitConfirmed = true;
+                    return true;
+                case ContentDialogResult.Primary:
+                    var feedback = RoutingPage.Visibility == Visibility.Visible ? RoutingInfoBar : ConnectionInfoBar;
+                    if (feedback == ConnectionInfoBar && ConnectionPage.Visibility != Visibility.Visible)
+                    {
+                        NavigateTo("connection");
+                    }
+
+                    await SaveConfigurationAsync(feedback, connectAfterSave: false);
+                    if (hasPendingConfigurationChanges && !feedback.IsOpen)
+                    {
+                        ShowInfo(feedback, InfoBarSeverity.Warning, "Changes were not saved", BusyMessage);
+                    }
+
+                    return !hasPendingConfigurationChanges;
+                default:
+                    return false;
+            }
+        }
+        finally
+        {
+            exitPromptActive = false;
+        }
+    }
+
+    private void OnSessionEnding(object? sender, Microsoft.Win32.SessionEndingEventArgs args) => sessionEnding = true;
 
     private void DisposeTrayIcon()
     {
+        Microsoft.Win32.SystemEvents.SessionEnding -= OnSessionEnding;
         if (trayIcon is not null)
         {
             trayIcon.Visible = false;

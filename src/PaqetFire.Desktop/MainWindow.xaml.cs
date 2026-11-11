@@ -406,6 +406,8 @@ public sealed partial class MainWindow : Window
 
             SoftwareUpdateInstaller.Start(installerPath);
 
+            // The installer is already running; unsaved edits cannot hold the exit back.
+            exitConfirmed = true;
             exitRequested = true;
             if (trayIcon is not null)
             {
