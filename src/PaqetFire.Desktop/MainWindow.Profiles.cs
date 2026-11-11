@@ -468,7 +468,8 @@ public sealed partial class MainWindow
         if (ProfileEntries.Count == catalog.Profiles.Count &&
             ProfileEntries.Zip(catalog.Profiles).All(pair =>
                 pair.First.Id == pair.Second.Id && pair.First.Name == pair.Second.Name &&
-                pair.First.IsActive == pair.Second.IsActive && pair.First.IsDefault == pair.Second.IsDefault))
+                pair.First.IsActive == pair.Second.IsActive && pair.First.IsDefault == pair.Second.IsDefault &&
+                pair.First.DisplayName == ProfileDisplayName.Format(pair.Second.Name, pair.Second.IsDefault, pair.Second.HasTransportKey)))
         {
             return;
         }
@@ -483,7 +484,7 @@ public sealed partial class MainWindow
                 {
                     Id = profile.Id,
                     Name = profile.Name,
-                    DisplayName = profile.Name + (profile.IsDefault ? " · default" : string.Empty),
+                    DisplayName = ProfileDisplayName.Format(profile.Name, profile.IsDefault, profile.HasTransportKey),
                     IsActive = profile.IsActive,
                     IsDefault = profile.IsDefault,
                 });

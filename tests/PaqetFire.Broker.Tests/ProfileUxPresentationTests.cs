@@ -150,4 +150,13 @@ public sealed class ProfileUxPresentationTests
     [InlineData(double.PositiveInfinity)]
     public void WholeAndBlankNumbersNeedNoRounding(double typed) =>
         Assert.Null(AdvancedTransportText.WholeNumberFor(typed));
+
+    [Fact]
+    public void ProfilesWithoutATransportKeyAreMarked()
+    {
+        Assert.Equal("Office", ProfileDisplayName.Format("Office", isDefault: false, hasTransportKey: true));
+        Assert.Equal("Office · default", ProfileDisplayName.Format("Office", isDefault: true, hasTransportKey: true));
+        Assert.Equal("Travel · needs key", ProfileDisplayName.Format("Travel", isDefault: false, hasTransportKey: false));
+        Assert.Equal("Travel · default · needs key", ProfileDisplayName.Format("Travel", isDefault: true, hasTransportKey: false));
+    }
 }

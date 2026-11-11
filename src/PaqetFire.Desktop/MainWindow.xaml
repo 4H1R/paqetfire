@@ -443,7 +443,7 @@
                   <PasswordBox x:Name="TransportKeyBox" Grid.Column="1" Header="Transport key"
                                PlaceholderText="Enter the shared Paqet key" PasswordRevealMode="Peek" />
                 </Grid>
-                <TextBlock Text="The transport key is kept in memory for this session and is never written to desktop-settings.json."
+                <TextBlock Text="The transport key is stored encrypted (Windows DPAPI) by the PaqetFire service on this PC, never in desktop-settings.json. Leave it blank to keep the saved key."
                            FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
                 <Grid ColumnSpacing="12">
                   <Grid.ColumnDefinitions>
