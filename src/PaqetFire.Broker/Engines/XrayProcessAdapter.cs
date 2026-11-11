@@ -13,6 +13,8 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
     private static readonly TimeSpan StoppingTimeout = TimeSpan.FromSeconds(2);
     internal const string AssetLocationVariable = "XRAY_LOCATION_ASSET";
     private readonly XrayProcessOptions options;
+    private readonly LocalPortPlan? ports;
+    private System.Net.IPEndPoint? startedEndpoint;
     private readonly RoutingDataFileVerifier routingDataVerifier;
     private RoutingDataSet routingData = RoutingDataSet.Bundled;
     private byte[]? lastValidatedConfiguration;
@@ -26,11 +28,19 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
     private bool expectedExit;
     private bool disposed;
 
-    public XrayProcessAdapter(XrayProcessOptions options, RoutingDataFileVerifier? routingDataVerifier = null)
+    /// <param name="ports">The broker's port plan; each start waits for its Xray port. Without it, the options' endpoint.</param>
+    public XrayProcessAdapter(
+        XrayProcessOptions options,
+        RoutingDataFileVerifier? routingDataVerifier = null,
+        LocalPortPlan? ports = null)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         this.routingDataVerifier = routingDataVerifier ?? new RoutingDataFileVerifier();
+        this.ports = ports;
     }
+
+    /// <summary>The endpoint the next start listens on, matching the configuration written for it.</summary>
+    private System.Net.IPEndPoint PlannedEndpoint => ports?.XrayInboundEndpoint ?? options.InboundEndpoint;
 
     public EngineKind Kind => EngineKind.Xray;
 
@@ -82,11 +92,12 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
                     ChangedAt: changedAt));
             }
 
+            var endpoint = process is not null && startedEndpoint is not null ? startedEndpoint : PlannedEndpoint;
             return ValueTask.FromResult(new EngineStatus(
                 Kind,
                 state,
                 options.Version,
-                $"{options.InboundEndpoint.Address}:{options.InboundEndpoint.Port}",
+                $"{endpoint.Address}:{endpoint.Port}",
                 detail,
                 changedAt));
         }
@@ -108,10 +119,12 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
             }
 
             await using var executableLock = await ValidatePayloadAsync(cancellationToken).ConfigureAwait(false);
-            if (LoopbackListeners.IsListening(options.InboundEndpoint))
+            var endpoint = PlannedEndpoint;
+            if (LoopbackListeners.IsListening(endpoint))
             {
                 throw new InvalidOperationException(
-                    $"Xray's local SOCKS5 endpoint {options.InboundEndpoint} is already in use.");
+                    $"Xray's local SOCKS5 port {endpoint.Port} was taken by another program just before Xray " +
+                    "started. Connect again to move it to a free port.");
             }
 
             var data = RoutingData;
@@ -141,6 +154,7 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
             lock (stateLock)
             {
                 process = started;
+                startedEndpoint = endpoint;
                 expectedExit = false;
             }
 
@@ -151,7 +165,7 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
                 EngineProcessJob.Assign(started);
                 try
                 {
-                    await WaitUntilReadyAsync(started, TimeoutFor(data, options.ReadinessTimeout), cancellationToken)
+                    await WaitUntilReadyAsync(started, endpoint, TimeoutFor(data, options.ReadinessTimeout), cancellationToken)
                         .ConfigureAwait(false);
                 }
                 catch (TimeoutException exception) when (data.IsUpdated)
@@ -501,7 +515,11 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
         environment[AssetLocationVariable] = assetDirectory;
     }
 
-    private async Task WaitUntilReadyAsync(Process started, TimeSpan readinessTimeout, CancellationToken cancellationToken)
+    private async Task WaitUntilReadyAsync(
+        Process started,
+        System.Net.IPEndPoint endpoint,
+        TimeSpan readinessTimeout,
+        CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(readinessTimeout);
@@ -516,8 +534,8 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
 
                 // The listener table shows the socket as soon as Xray binds it; one connect
                 // then confirms that it accepts.
-                if (LoopbackListeners.IsListening(options.InboundEndpoint) &&
-                    await CanConnectAsync(timeout.Token).ConfigureAwait(false))
+                if (LoopbackListeners.IsListening(endpoint) &&
+                    await CanConnectAsync(endpoint, timeout.Token).ConfigureAwait(false))
                 {
                     return;
                 }
@@ -531,7 +549,7 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
         }
     }
 
-    private async Task<bool> CanConnectAsync(CancellationToken cancellationToken)
+    private static async Task<bool> CanConnectAsync(System.Net.IPEndPoint endpoint, CancellationToken cancellationToken)
     {
         try
         {
@@ -539,8 +557,8 @@ public sealed class XrayProcessAdapter : IEngineAdapter, IAsyncDisposable
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromMilliseconds(500));
             await client.ConnectAsync(
-                options.InboundEndpoint.Address,
-                options.InboundEndpoint.Port,
+                endpoint.Address,
+                endpoint.Port,
                 timeout.Token).ConfigureAwait(false);
             return true;
         }

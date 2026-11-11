@@ -469,11 +469,7 @@
                           DisplayMemberPath="DisplayName" SelectionChanged="NetworkInterfaceBox_SelectionChanged" />
                 <TextBlock Text="Only active interfaces with an IPv4 address and default gateway are listed."
                            FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
-                <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <TextBox x:Name="SocksEndpointBox" Header="Local SOCKS5 endpoint" Text="127.0.0.1:1080" IsReadOnly="True" />
-                  <TextBox x:Name="InterfaceNameBox" Grid.Column="1" Header="Detected adapter" PlaceholderText="Click Detect adapter details" IsReadOnly="True" />
-                </Grid>
+                <TextBox x:Name="InterfaceNameBox" Header="Detected adapter" PlaceholderText="Click Detect adapter details" IsReadOnly="True" />
                 <TextBox x:Name="InterfaceGuidBox" Header="Adapter GUID" PlaceholderText="Detected automatically" IsReadOnly="True" />
                 <Grid SizeChanged="FormGrid_SizeChanged" ColumnSpacing="14">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using PaqetFire.Broker.Engines;
 using PaqetFire.Core.Configuration;
 
 namespace PaqetFire.Broker.Diagnostics;
@@ -54,14 +55,14 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
     private readonly ConcurrentDictionary<string, HttpClient> adapterClients = new(StringComparer.OrdinalIgnoreCase);
     private long lastSuccessTimestamp;
 
-    public PaqetTunnelProbe(EngineSocksCredentials credentials)
+    /// <param name="ports">The broker's port plan; each request dials the engines' current ports.</param>
+    public PaqetTunnelProbe(EngineSocksCredentials credentials, LocalPortPlan? ports = null)
     {
+        ports ??= new LocalPortPlan();
+        var paqetCredentials = new NetworkCredential(credentials.Username, credentials.Password);
         client = new HttpClient(new SocketsHttpHandler
         {
-            Proxy = new WebProxy(new Uri($"socks5://127.0.0.1:{XrayJsonConfigurationWriter.PaqetPort}"))
-            {
-                Credentials = new NetworkCredential(credentials.Username, credentials.Password),
-            },
+            Proxy = new LoopbackSocksProxy(() => ports.Current.Paqet, paqetCredentials),
             UseProxy = true,
             ConnectTimeout = ProbeTimeout,
             PooledConnectionIdleTimeout = WarmConnectionLifetime + TimeSpan.FromSeconds(10),
@@ -75,10 +76,7 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
         // new stream must be negotiated through Paqet with the server.
         reachabilityClient = new HttpClient(new SocketsHttpHandler
         {
-            Proxy = new WebProxy(new Uri($"socks5://127.0.0.1:{XrayJsonConfigurationWriter.PaqetPort}"))
-            {
-                Credentials = new NetworkCredential(credentials.Username, credentials.Password),
-            },
+            Proxy = new LoopbackSocksProxy(() => ports.Current.Paqet, paqetCredentials),
             UseProxy = true,
             ConnectTimeout = ReachabilityTimeout,
             PooledConnectionLifetime = TimeSpan.Zero,
@@ -90,7 +88,7 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
         // The exit engine's loopback listener takes no credentials.
         exitClient = new HttpClient(new SocketsHttpHandler
         {
-            Proxy = new WebProxy(new Uri($"socks5://127.0.0.1:{PsiphonJsonConfigurationWriter.LocalSocksPort}")),
+            Proxy = new LoopbackSocksProxy(() => ports.Current.PsiphonSocks, credentials: null),
             UseProxy = true,
             ConnectTimeout = ProbeTimeout,
             PooledConnectionLifetime = TimeSpan.Zero,
@@ -246,4 +244,17 @@ public sealed class PaqetTunnelProbe : ITunnelProbe, IDisposable
     private static bool IsProbeFailure(Exception exception, CancellationToken callerToken) =>
         exception is IOException or SocketException or HttpRequestException or InvalidOperationException ||
         exception is OperationCanceledException && !callerToken.IsCancellationRequested;
+
+    /// <summary>
+    /// An engine's loopback SOCKS5 listener at whatever port it has now. Connections are
+    /// pooled per proxy address, so a moved port never reuses a connection to the old one.
+    /// </summary>
+    private sealed class LoopbackSocksProxy(Func<int> port, ICredentials? credentials) : IWebProxy
+    {
+        public ICredentials? Credentials { get; set; } = credentials;
+
+        public Uri GetProxy(Uri destination) => new($"socks5://127.0.0.1:{port()}");
+
+        public bool IsBypassed(Uri host) => false;
+    }
 }

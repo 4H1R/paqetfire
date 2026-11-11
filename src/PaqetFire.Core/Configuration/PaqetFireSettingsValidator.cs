@@ -109,10 +109,9 @@ public static class PaqetFireSettingsValidator
 
         if (settings.ShareWithLan)
         {
-            if (settings.LanSocksPort is < 1024 or > 65535 ||
-                IsReservedPort(settings.LanSocksPort))
+            if (settings.LanSocksPort is < 1024 or > 65535)
             {
-                errors.Add("The shared SOCKS5 port must be between 1024 and 65535 and cannot be 1080, 1081, or 1084.");
+                errors.Add("The shared SOCKS5 port must be between 1024 and 65535.");
             }
 
             if (string.IsNullOrWhiteSpace(settings.LanSocksUsername) ||
@@ -136,9 +135,8 @@ public static class PaqetFireSettingsValidator
             {
                 errors.Add("Hotspot sharing requires direct access for local network devices.");
             }
-            if (settings.HotspotSocksPort is < 1024 or > 65535 ||
-                IsReservedPort(settings.HotspotSocksPort))
-                errors.Add("The hotspot SOCKS port must be between 1024 and 65535 and cannot be 1080, 1081, or 1084.");
+            if (settings.HotspotSocksPort is < 1024 or > 65535)
+                errors.Add("The hotspot SOCKS port must be between 1024 and 65535.");
             if (settings.ShareWithLan && settings.HotspotSocksPort == settings.LanSocksPort)
                 errors.Add("The hotspot port must differ from the LAN share port.");
             if (string.IsNullOrWhiteSpace(settings.LanSocksUsername) ||
@@ -193,10 +191,6 @@ public static class PaqetFireSettingsValidator
             errors.Add("This OpenVPN configuration needs the OpenVPN password of your VPN account.");
         }
     }
-
-    private static bool IsReservedPort(int port) =>
-        port is XrayJsonConfigurationWriter.PaqetPort or XrayJsonConfigurationWriter.InboundPort or
-            PsiphonJsonConfigurationWriter.LocalSocksPort;
 
     private static void ValidateDirectRouteDestinations(
         IReadOnlyList<string>? entries,

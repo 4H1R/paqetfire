@@ -4,14 +4,20 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using PaqetFire.Broker.Engines;
 using PaqetFire.Broker.Network;
 using PaqetFire.Core.Configuration;
 
 namespace PaqetFire.Broker.Diagnostics;
 
-public sealed class SocketRouteProbe(EngineSocksCredentials credentials, IPEndPoint? xrayEndpoint = null) : IRouteProbe
+/// <param name="xrayEndpoint">A fixed Xray endpoint (tests); otherwise the port plan's current one.</param>
+public sealed class SocketRouteProbe(
+    EngineSocksCredentials credentials,
+    IPEndPoint? xrayEndpoint = null,
+    LocalPortPlan? ports = null) : IRouteProbe
 {
-    private readonly IPEndPoint routeEndpoint = xrayEndpoint ?? new(IPAddress.Loopback, XrayJsonConfigurationWriter.InboundPort);
+    private IPEndPoint RouteEndpoint => xrayEndpoint ?? ports?.XrayInboundEndpoint ??
+        new(IPAddress.Loopback, XrayJsonConfigurationWriter.InboundPort);
     private static readonly Uri Ipv4CheckUri = new("https://api4.ipify.org");
     private static readonly Uri Ipv6CheckUri = new("https://api6.ipify.org");
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(8);
@@ -28,7 +34,7 @@ public sealed class SocketRouteProbe(EngineSocksCredentials credentials, IPEndPo
         {
             using var deadline = CreateDeadline(cancellationToken);
             using var client = new TcpClient(AddressFamily.InterNetwork);
-            await client.ConnectAsync(routeEndpoint, deadline.Token).ConfigureAwait(false);
+            await client.ConnectAsync(RouteEndpoint, deadline.Token).ConfigureAwait(false);
             var stream = client.GetStream();
             await NegotiateAsync(stream, deadline.Token).ConfigureAwait(false);
             return Success("The local Xray SOCKS5 listener accepted a protocol handshake.", stopwatch);
@@ -52,7 +58,7 @@ public sealed class SocketRouteProbe(EngineSocksCredentials credentials, IPEndPo
         {
             using var deadline = CreateDeadline(cancellationToken);
             using var control = new TcpClient(AddressFamily.InterNetwork);
-            await control.ConnectAsync(routeEndpoint, deadline.Token).ConfigureAwait(false);
+            await control.ConnectAsync(RouteEndpoint, deadline.Token).ConfigureAwait(false);
             var stream = control.GetStream();
             await NegotiateAsync(stream, deadline.Token).ConfigureAwait(false);
             var relayEndpoint = await RequestUdpRelayAsync(stream, deadline.Token).ConfigureAwait(false);
@@ -141,7 +147,7 @@ public sealed class SocketRouteProbe(EngineSocksCredentials credentials, IPEndPo
     {
         using var deadline = CreateDeadline(cancellationToken);
         using var control = new TcpClient(AddressFamily.InterNetwork);
-        await control.ConnectAsync(routeEndpoint, deadline.Token).ConfigureAwait(false);
+        await control.ConnectAsync(RouteEndpoint, deadline.Token).ConfigureAwait(false);
         var stream = control.GetStream();
         await NegotiateAsync(stream, deadline.Token).ConfigureAwait(false);
         var relayEndpoint = await RequestUdpRelayAsync(stream, deadline.Token).ConfigureAwait(false);
@@ -175,7 +181,7 @@ public sealed class SocketRouteProbe(EngineSocksCredentials credentials, IPEndPo
             using var deadline = CreateDeadline(cancellationToken);
             using var handler = new SocketsHttpHandler
             {
-                Proxy = new WebProxy(new Uri($"socks5://{routeEndpoint.Address}:{routeEndpoint.Port}"))
+                Proxy = new WebProxy(new Uri($"socks5://{RouteEndpoint.Address}:{RouteEndpoint.Port}"))
                 {
                     Credentials = new NetworkCredential(credentials.Username, credentials.Password),
                 },

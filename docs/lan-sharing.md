@@ -10,7 +10,9 @@ Windows mobile hotspot.
 The broker detects the active adapter and binds Xray to that adapter's specific
 IPv4 address. It does not listen on `0.0.0.0`. The installer creates inbound TCP
 and UDP rules for Xray restricted to Windows Firewall's `localSubnet` scope.
-The local ProxiFyre listener remains separate on `127.0.0.1:1081`.
+The local ProxiFyre listener remains separate on loopback (`127.0.0.1:1081` by
+default). The share port may be any port from 1024 to 65535; the broker moves
+its own [local engine ports](architecture.md#local-engine-ports) out of the way.
 
 When sharing is enabled, another device uses:
 

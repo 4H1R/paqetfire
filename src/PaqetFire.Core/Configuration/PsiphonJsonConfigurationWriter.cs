@@ -9,6 +9,7 @@ namespace PaqetFire.Core.Configuration;
 /// </summary>
 public sealed class PsiphonJsonConfigurationWriter
 {
+    // The default; the broker moves it when another program holds it (see LocalEnginePorts).
     public const int LocalSocksPort = 1084;
 
     // The public network parameters shared by community Psiphon clients such as warp-plus.

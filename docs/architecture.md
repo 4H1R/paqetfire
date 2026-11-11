@@ -80,6 +80,35 @@ or stopped if the route is released without the kill switch. They are neverthele
 components: users install, configure, update, repair, and uninstall PaqetFire
 only.
 
+## Local engine ports
+
+The engines reach one another over loopback SOCKS5 listeners that only this
+computer can reach, each protected by the engine credentials:
+
+| Listener | Default port |
+| --- | --- |
+| Paqet SOCKS5 (Xray and the exit engines dial it) | 1080 |
+| Xray SOCKS5 (ProxiFyre sends captured traffic to it) | 1081 |
+| Xray statistics API | 10085 |
+| Psiphon exit SOCKS5 | 1084 |
+
+Users never configure these. Before a connect that starts every engine, the
+broker checks each port: the listener table for TCP and UDP, then a bind, which
+also catches ranges Windows reserves for Hyper-V, WSL, or Docker. A port stays
+where it is while it is free or held by its own running engine. A port that
+another program holds, or that a LAN or hotspot share uses, moves to its
+default if that is free, or else to a random free port from 20000 to 44999.
+That range is below the Windows dynamic range, so the port is not also handed
+out as some connection's source port. The chosen ports are saved in
+`broker-state.json` and reused after a broker restart, because a ProxiFyre kept
+for the kill switch still sends to the same Xray port. When a port moves while
+engines run, the broker restarts them, ProxiFyre included. Diagnostics list the
+ports in use.
+
+The only ports other devices use are the LAN share and hotspot share ports,
+which are set under Sharing. A share port another program already holds stops
+the connect with a message that names the port.
+
 ## Installation and prerequisites
 
 Setup is a single x64 MSI. It installs the desktop app, the broker service, and

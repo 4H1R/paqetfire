@@ -50,7 +50,9 @@ public sealed class PaqetFireRuntime(
     RoutingDataService? routingData = null,
     PsiphonProcessAdapter? psiphonAdapter = null,
     OpenVpnProcessAdapter? openVpnAdapter = null,
-    ExitEngineInstaller? exitEngines = null) : IPaqetFireRuntime
+    ExitEngineInstaller? exitEngines = null,
+    LocalPortPlan? localPorts = null,
+    Func<IPAddress, int, bool>? portIsFree = null) : IPaqetFireRuntime
 {
     private const int RecentLogBudgetBytes = 24 * 1024;
     private static readonly TimeSpan SystemResolverTimeout = TimeSpan.FromMilliseconds(1500);
@@ -65,6 +67,9 @@ public sealed class PaqetFireRuntime(
     private readonly RouteRecoveryPolicy recovery = new(RecoveryOptions);
     private readonly PsiphonJsonConfigurationWriter psiphonWriter = new();
     private readonly OpenVpnConfigurationWriter openVpnWriter = new();
+    private readonly LocalPortPlan ports = localPorts ?? new LocalPortPlan();
+    private readonly Func<IPAddress, int, bool> isPortFree = portIsFree ?? LocalPortAllocator.IsFree;
+    private IReadOnlyList<SocksShareListener> writtenShareListeners = [];
     private readonly Lock stateSync = new();
     private readonly SemaphoreSlim stateWriteGate = new(1, 1);
     private readonly Lock operationSync = new();
@@ -88,6 +93,11 @@ public sealed class PaqetFireRuntime(
     {
         brokerState = stateStore.Load();
         desiredConnected = brokerState.DesiredConnected;
+        if (brokerState.LocalPorts is { IsValid: true } savedPorts)
+        {
+            // A ProxiFyre kept for the kill switch still sends to the Xray port saved here.
+            ports.Use(savedPorts);
+        }
 
         // Paqet, Xray, and the exit engines are bound to the broker's kill-on-close job, so
         // they rarely survive it. ProxiFyre is not: it may still be blocking routed
@@ -153,7 +163,7 @@ public sealed class PaqetFireRuntime(
             // configuration so it carries the engine credentials Xray will expect.
             await configurationStore.WriteAsync(
                     paths.ProxiFyreConfigurationPath,
-                    CreateProxiFyreConfiguration(Normalize(settings)),
+                    CreateProxiFyreConfiguration(Normalize(settings), ports.Current),
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -271,8 +281,9 @@ public sealed class PaqetFireRuntime(
                     // Persisting is not cancelled by a Disconnect; only the activation is.
                     if (applyEngineConfiguration)
                     {
+                        var plannedPorts = await PlanLocalPortsAsync(savedSettings, cancellationToken).ConfigureAwait(false);
                         configuration = await BuildEngineConfigurationsAsync(
-                                savedSettings, requireHotspot: true, ServerResolution.Fresh, null, cancellationToken)
+                                savedSettings, plannedPorts, requireHotspot: true, ServerResolution.Fresh, null, cancellationToken)
                             .ConfigureAwait(false);
                         await WriteEngineConfigurationsAsync(configuration, cancellationToken).ConfigureAwait(false);
                     }
@@ -614,8 +625,9 @@ public sealed class PaqetFireRuntime(
                         connectionController,
                         async () =>
                         {
+                            var plannedPorts = await PlanLocalPortsAsync(selected, cancellationToken).ConfigureAwait(false);
                             configuration = await BuildEngineConfigurationsAsync(
-                                    selected, requireHotspot: true, ServerResolution.Fresh, null, cancellationToken)
+                                    selected, plannedPorts, requireHotspot: true, ServerResolution.Fresh, null, cancellationToken)
                                 .ConfigureAwait(false);
                             await WriteEngineConfigurationsAsync(configuration, cancellationToken).ConfigureAwait(false);
                             await profileCatalogStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
@@ -992,7 +1004,8 @@ public sealed class PaqetFireRuntime(
                         .. OpenVpnConfiguration.Parse(settings?.OpenVpn?.Configuration).Remotes.Select(remote => remote.Host),
                     ],
                     notes,
-                    routingData?.Status),
+                    routingData?.Status,
+                    ports.Current),
                 DateTimeOffset.UtcNow);
         }
         finally
@@ -1043,8 +1056,15 @@ public sealed class PaqetFireRuntime(
             }
 
             latestVerification = null;
+            var plannedPorts = await PlanLocalPortsAsync(settings, cancellationToken).ConfigureAwait(false);
+            // Engines read their ports only when they start, and the connect below starts only
+            // the stopped ones; ProxiFyre also keeps running for the kill switch. When a port
+            // moved, everything still running restarts with the new configuration.
+            var portsMoved = plannedPorts != ports.Current &&
+                             status.Engines.Any(engine => engine.State is EngineState.Running or EngineState.Starting);
             var configuration = await BuildEngineConfigurationsAsync(
                     settings,
+                    plannedPorts,
                     requireHotspot: explicitRequest,
                     ServerResolution.Fresh,
                     null,
@@ -1053,7 +1073,16 @@ public sealed class PaqetFireRuntime(
             await WriteEngineConfigurationsAsync(configuration, cancellationToken).ConfigureAwait(false);
             backgroundNotice = configuration.Notice;
 
-            if (status.State == ConnectionState.Connected)
+            if (portsMoved)
+            {
+                logger.LogInformation("Restarting the running engines for their new local ports: {Ports}.", plannedPorts);
+                await connectionController.DisconnectAsync(cancellationToken).ConfigureAwait(false);
+                if (settings.KillSwitchEnabled)
+                {
+                    await connectionController.GuardAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+            else if (status.State == ConnectionState.Connected)
             {
                 // Running with other settings: every engine must restart to read the new files.
                 if (settings.KillSwitchEnabled)
@@ -1154,8 +1183,10 @@ public sealed class PaqetFireRuntime(
         // Keep the running session's IPv6 DNS choice and routing data so a capability
         // learned or a data update installed meanwhile does not force an Xray restart;
         // they apply from the next connect.
+        // The running engines keep their ports: ProxiFyre is not restarted here.
         var configuration = await BuildEngineConfigurationsAsync(
                 settings,
+                ports.Current,
                 requireHotspot: false,
                 ServerResolution.Cached,
                 activeRoute?.ResolveIpv6,
@@ -1169,6 +1200,7 @@ public sealed class PaqetFireRuntime(
             // Xray restarts anyway, so it may as well load the newest verified data.
             configuration = await BuildEngineConfigurationsAsync(
                     settings,
+                    ports.Current,
                     requireHotspot: false,
                     ServerResolution.Cached,
                     activeRoute.ResolveIpv6,
@@ -1238,8 +1270,18 @@ public sealed class PaqetFireRuntime(
         }
 
         logger.LogWarning(cause, "Xray could not start with the downloaded routing data; retrying with the bundled data.");
+        // The retry follows straight after the rollback stopped the engines, and a stopped
+        // engine's port can stay held for a moment, so the ports are chosen again. Xray's
+        // stays put while ProxiFyre runs for the kill switch: capture is not restarted here.
+        var status = await connectionController.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        var retryPorts = await PlanLocalPortsAsync(
+                settings,
+                cancellationToken,
+                keepCapturePort: status.ProxiFyre.State is EngineState.Running or EngineState.Starting)
+            .ConfigureAwait(false);
         var bundled = await BuildEngineConfigurationsAsync(
                 Normalize(settings),
+                retryPorts,
                 requireHotspot: explicitRequest,
                 ServerResolution.Cached,
                 configuration.ResolveIpv6,
@@ -1559,6 +1601,7 @@ public sealed class PaqetFireRuntime(
 
     private async ValueTask<EngineConfigurationSet> BuildEngineConfigurationsAsync(
         PaqetFireSettings settings,
+        LocalEnginePorts localPorts,
         bool requireHotspot,
         ServerResolution serverResolution,
         bool? resolveIpv6Override,
@@ -1571,7 +1614,7 @@ public sealed class PaqetFireRuntime(
             : await ResolveServerEndpointAsync(settings.ServerEndpoint, network, cancellationToken).ConfigureAwait(false);
         var paqetProfile = new PaqetProfile(
             serverEndpoint,
-            "127.0.0.1:1080",
+            $"127.0.0.1:{localPorts.Paqet}",
             network.InterfaceName,
             network.InterfaceGuid,
             network.LocalIpv4Address,
@@ -1608,6 +1651,19 @@ public sealed class PaqetFireRuntime(
             }
         }
 
+        List<SocksShareListener> shareListeners = [];
+        if (settings.ShareWithLan)
+        {
+            shareListeners.Add(new SocksShareListener("LAN share", network.LocalIpv4Address, settings.LanSocksPort));
+        }
+
+        if (hotspotShare is not null)
+        {
+            shareListeners.Add(new SocksShareListener("hotspot share", hotspotShare.ListenAddress, hotspotShare.Port));
+        }
+
+        await EnsureShareListenersAvailableAsync(shareListeners, cancellationToken).ConfigureAwait(false);
+
         var resolveIpv6 = resolveIpv6Override ?? (settings.RouteIpv6 && Ipv6SupportFor(settings.ServerEndpoint) != false);
         if (settings.RouteIpv6 && !resolveIpv6)
         {
@@ -1624,12 +1680,12 @@ public sealed class PaqetFireRuntime(
         var paqetText = paqetWriter.Write(paqetProfile, settings.TransportKey);
         var psiphonText = settings.ExitProxy == ExitProxyKind.Psiphon
             ? psiphonWriter.Write(new PsiphonClientProfile(
-                PsiphonJsonConfigurationWriter.LocalSocksPort,
-                XrayJsonConfigurationWriter.PaqetPort,
+                localPorts.PsiphonSocks,
+                localPorts.Paqet,
                 engineCredentials,
                 settings.Psiphon?.EgressRegion ?? string.Empty))
             : null;
-        var openVpn = settings.ExitProxy == ExitProxyKind.OpenVpn ? CreateOpenVpnFiles(settings.OpenVpn ?? new()) : null;
+        var openVpn = settings.ExitProxy == ExitProxyKind.OpenVpn ? CreateOpenVpnFiles(settings.OpenVpn ?? new(), localPorts.Paqet) : null;
         var xrayText = xrayWriter.Write(new XrayRoutingPolicy(
             settings.RegionalPreset,
             settings.DomainStrategy,
@@ -1654,11 +1710,12 @@ public sealed class PaqetFireRuntime(
                 UseFakeDns: settings.FakeDns),
             engineCredentials,
             blockMalware,
-            ExitProxyOutbound.For(settings.ExitProxy)));
+            ExitProxyOutbound.For(settings.ExitProxy, localPorts.PsiphonSocks),
+            localPorts));
         return new EngineConfigurationSet(
             paqetText,
             xrayText,
-            CreateProxiFyreConfiguration(settings),
+            CreateProxiFyreConfiguration(settings, localPorts),
             network.InterfaceName,
             resolveIpv6,
             NetworkFingerprint.From(network, hotspotAddress),
@@ -1668,6 +1725,8 @@ public sealed class PaqetFireRuntime(
         {
             PsiphonText = psiphonText,
             OpenVpn = openVpn,
+            Ports = localPorts,
+            ShareListeners = shareListeners,
         };
     }
 
@@ -1675,12 +1734,127 @@ public sealed class PaqetFireRuntime(
     /// The OpenVPN configuration and the two credential files it reads: Paqet's loopback
     /// SOCKS5 login, and the VPN account when the configuration asks for one.
     /// </summary>
-    private OpenVpnFiles CreateOpenVpnFiles(OpenVpnExitOptions options)
+    /// <summary>
+    /// Chooses the engines' loopback ports for a start of every engine. Each keeps its port
+    /// while the port is free or held by that engine's own running process, and moves when a
+    /// LAN or hotspot share uses it or another program holds it.
+    /// </summary>
+    /// <param name="keepCapturePort">Keep Xray's port because a running ProxiFyre sends to it.</param>
+    private async ValueTask<LocalEnginePorts> PlanLocalPortsAsync(
+        PaqetFireSettings settings,
+        CancellationToken cancellationToken,
+        bool keepCapturePort = false)
+    {
+        var current = ports.Current;
+        HashSet<LocalPortRole> running = [];
+        if (IsActive(await paqetAdapter.GetStatusAsync(cancellationToken).ConfigureAwait(false)))
+        {
+            running.Add(LocalPortRole.Paqet);
+        }
+
+        if (IsActive(await xrayAdapter.GetStatusAsync(cancellationToken).ConfigureAwait(false)))
+        {
+            running.Add(LocalPortRole.XrayInbound);
+            running.Add(LocalPortRole.XrayStats);
+        }
+
+        if (psiphonAdapter is not null &&
+            IsActive(await psiphonAdapter.GetStatusAsync(cancellationToken).ConfigureAwait(false)))
+        {
+            running.Add(LocalPortRole.PsiphonSocks);
+        }
+
+        var owned = LocalPortAllocator.Roles(current).Where(entry => running.Contains(entry.Role)).ToHashSet();
+        List<int> reserved = [];
+        if (settings.ShareWithLan)
+        {
+            reserved.Add(settings.LanSocksPort);
+        }
+
+        if (settings.ShareViaHotspot)
+        {
+            reserved.Add(settings.HotspotSocksPort);
+        }
+
+        var planned = LocalPortAllocator.Plan(
+            current,
+            reserved,
+            (role, port) => owned.Contains((role, port)) || isPortFree(IPAddress.Loopback, port),
+            keepCapturePort ? new HashSet<LocalPortRole> { LocalPortRole.XrayInbound } : null);
+        foreach (var ((role, before), (_, after)) in LocalPortAllocator.Roles(current).Zip(LocalPortAllocator.Roles(planned)))
+        {
+            if (before != after)
+            {
+                logger.LogWarning(
+                    "Moved {Listener} from port {OldPort} to {NewPort}: another program or a share uses port {OldPort}.",
+                    LocalPortAllocator.Describe(role),
+                    before,
+                    after,
+                    before);
+            }
+        }
+
+        return planned;
+
+        static bool IsActive(EngineStatus status) => status.State is EngineState.Running or EngineState.Starting;
+    }
+
+    /// <summary>
+    /// Fails with a plain explanation when another program already holds a LAN or hotspot
+    /// share port; Xray would otherwise stop at startup with only a bind error in its log.
+    /// </summary>
+    private async ValueTask EnsureShareListenersAvailableAsync(
+        IReadOnlyList<SocksShareListener> listeners,
+        CancellationToken cancellationToken)
+    {
+        if (listeners.Count == 0)
+        {
+            return;
+        }
+
+        var xrayRunning = (await xrayAdapter.GetStatusAsync(cancellationToken).ConfigureAwait(false)).State is
+            EngineState.Running or EngineState.Starting;
+        foreach (var listener in listeners)
+        {
+            // A running Xray holds the listeners it was started with.
+            if (xrayRunning && writtenShareListeners.Contains(listener))
+            {
+                continue;
+            }
+
+            if (IPAddress.TryParse(listener.Address, out var address) && !isPortFree(address, listener.Port))
+            {
+                throw new InvalidOperationException(
+                    $"Port {listener.Port} for the {listener.Name} is already used by another program on this computer. " +
+                    "Choose another port under Sharing, or close the program that uses it.");
+            }
+        }
+    }
+
+    /// <summary>Applies the ports a written configuration uses and keeps them for the next broker start.</summary>
+    private async ValueTask RememberLocalPortsAsync(EngineConfigurationSet configuration)
+    {
+        ports.Use(configuration.Ports);
+        writtenShareListeners = configuration.ShareListeners;
+        lock (stateSync)
+        {
+            if (brokerState.LocalPorts == configuration.Ports)
+            {
+                return;
+            }
+
+            brokerState = brokerState with { LocalPorts = configuration.Ports };
+        }
+
+        await SaveStateAsync().ConfigureAwait(false);
+    }
+
+    private OpenVpnFiles CreateOpenVpnFiles(OpenVpnExitOptions options, int paqetPort)
     {
         var configuration = OpenVpnConfiguration.Parse(options.Configuration);
         var text = openVpnWriter.Write(new OpenVpnClientProfile(
             configuration,
-            XrayJsonConfigurationWriter.PaqetPort,
+            paqetPort,
             paths.OpenVpnSocksCredentialsPath,
             configuration.RequiresCredentials ? paths.OpenVpnUserCredentialsPath : null));
         return new OpenVpnFiles(
@@ -1763,6 +1937,8 @@ public sealed class PaqetFireRuntime(
         {
             exit.UseExit(exit.Kind == configuration.ExitEngine);
         }
+
+        await RememberLocalPortsAsync(configuration).ConfigureAwait(false);
     }
 
     private IEnumerable<ExitEngineProcessAdapter> ExitAdapters =>
@@ -1915,11 +2091,11 @@ public sealed class PaqetFireRuntime(
         return true;
     }
 
-    private string CreateProxiFyreConfiguration(PaqetFireSettings settings)
+    private string CreateProxiFyreConfiguration(PaqetFireSettings settings, LocalEnginePorts localPorts)
     {
         var policy = new RoutingPolicy(
             settings.RoutingMode,
-            $"127.0.0.1:{XrayJsonConfigurationWriter.InboundPort}",
+            $"127.0.0.1:{localPorts.XrayInbound}",
             settings.SelectedApplications,
             settings.UserExclusions,
             BypassLan: settings.BypassLan,
@@ -2215,6 +2391,11 @@ public sealed class PaqetFireRuntime(
 
         public OpenVpnFiles? OpenVpn { get; init; }
 
+        public required LocalEnginePorts Ports { get; init; }
+
+        /// <summary>The LAN and hotspot share listeners Xray opens with this configuration.</summary>
+        public IReadOnlyList<SocksShareListener> ShareListeners { get; init; } = [];
+
         public EngineKind? ExitEngine => PsiphonText is not null ? EngineKind.Psiphon
             : OpenVpn is not null ? EngineKind.OpenVpn
             : null;
@@ -2222,6 +2403,9 @@ public sealed class PaqetFireRuntime(
 
     /// <param name="UserCredentials">The VPN account file; null when the server asks for none.</param>
     private sealed record OpenVpnFiles(string ConfigurationText, string SocksCredentials, string? UserCredentials);
+
+    /// <summary>A LAN or hotspot share listener Xray opens for other devices.</summary>
+    private sealed record SocksShareListener(string Name, string Address, int Port);
 }
 
 /// <summary>The network details the engines are configured from; any change may need a restart.</summary>

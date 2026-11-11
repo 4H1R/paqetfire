@@ -371,7 +371,7 @@ public sealed class ConfigurationTests
             ServerEndpoint = "example.com:8443",
             TransportKey = "secret",
             ShareWithLan = true,
-            LanSocksPort = 1081,
+            LanSocksPort = 80,
             LanSocksUsername = string.Empty,
             LanSocksPassword = "short",
         };

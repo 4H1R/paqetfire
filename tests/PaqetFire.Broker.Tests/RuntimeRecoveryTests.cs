@@ -24,6 +24,66 @@ namespace PaqetFire.Broker.Tests;
 public sealed class RuntimeRecoveryTests
 {
     [Fact]
+    public async Task APortAnotherProgramHoldsMovesAndIsRemembered()
+    {
+        var state = new InMemoryBrokerStateStore();
+        await using var fixture = await RuntimeFixture.StartAsync(
+            state: state,
+            portIsFree: (_, port) => port != XrayJsonConfigurationWriter.PaqetPort);
+
+        await fixture.Runtime.ConnectAsync(CancellationToken.None);
+
+        var ports = fixture.Xray.Last!.Ports!;
+        Assert.NotEqual(XrayJsonConfigurationWriter.PaqetPort, ports.Paqet);
+        Assert.Equal(XrayJsonConfigurationWriter.InboundPort, ports.XrayInbound);
+        Assert.Equal(ports, state.Load().LocalPorts);
+        Assert.Contains($"127.0.0.1:{ports.XrayInbound}", fixture.Configurations.Files[fixture.Paths.ProxiFyreConfigurationPath],
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SavedPortsSurviveABrokerRestart()
+    {
+        var saved = new LocalEnginePorts(31080, 31081, 31085, 31084);
+        var state = new InMemoryBrokerStateStore();
+        await state.SaveAsync(new BrokerRuntimeState { LocalPorts = saved }, CancellationToken.None);
+        await using var fixture = await RuntimeFixture.StartAsync(state: state);
+
+        await fixture.Runtime.ConnectAsync(CancellationToken.None);
+
+        // The defaults are free again, but the engines keep the ports a kept ProxiFyre may use.
+        Assert.Equal(saved, fixture.Xray.Last!.Ports);
+    }
+
+    [Fact]
+    public async Task AShareOnAnEnginePortMovesTheEngine()
+    {
+        await using var fixture = await RuntimeFixture.StartAsync(settings => settings with
+        {
+            ShareWithLan = true,
+            LanSocksPort = XrayJsonConfigurationWriter.PaqetPort,
+        });
+
+        await fixture.Runtime.ConnectAsync(CancellationToken.None);
+
+        Assert.Equal(XrayJsonConfigurationWriter.PaqetPort, fixture.Xray.Last!.LanShare!.Port);
+        Assert.NotEqual(XrayJsonConfigurationWriter.PaqetPort, fixture.Xray.Last.Ports!.Paqet);
+    }
+
+    [Fact]
+    public async Task ATakenSharePortIsReportedBeforeXrayStarts()
+    {
+        const int sharePort = 1082;
+        await using var fixture = await RuntimeFixture.StartAsync(
+            settings => settings with { ShareWithLan = true, LanSocksPort = sharePort },
+            portIsFree: (address, port) => !(port == sharePort && !IPAddress.IsLoopback(address)));
+
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => fixture.Runtime.ConnectAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains($"Port {sharePort} for the LAN share", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task APsiphonProfileWritesItsExitAndLocksItOutOfCapture()
     {
         var psiphon = new PsiphonProcessAdapter(new PsiphonProcessOptions
@@ -311,9 +371,10 @@ internal sealed class RuntimeFixture : IAsyncDisposable
         IIpv6CapabilityProbe? ipv6Probe = null,
         RoutingDataService? routingData = null,
         PsiphonProcessAdapter? psiphon = null,
-        OpenVpnProcessAdapter? openVpn = null)
+        OpenVpnProcessAdapter? openVpn = null,
+        Func<IPAddress, int, bool>? portIsFree = null)
     {
-        var fixture = new RuntimeFixture(configure, state, catalog, ipv6Probe, routingData, psiphon, openVpn);
+        var fixture = new RuntimeFixture(configure, state, catalog, ipv6Probe, routingData, psiphon, openVpn, portIsFree);
         await fixture.Runtime.InitializeAsync(CancellationToken.None);
         return fixture;
     }
@@ -325,7 +386,8 @@ internal sealed class RuntimeFixture : IAsyncDisposable
         IIpv6CapabilityProbe? ipv6Probe = null,
         RoutingDataService? routingData = null,
         PsiphonProcessAdapter? psiphon = null,
-        OpenVpnProcessAdapter? openVpn = null)
+        OpenVpnProcessAdapter? openVpn = null,
+        Func<IPAddress, int, bool>? portIsFree = null)
     {
         root = Path.Combine(Path.GetTempPath(), "PaqetFire-runtime-tests", Guid.NewGuid().ToString("N"));
         var payload = Path.Combine(root, "payload");
@@ -383,7 +445,9 @@ internal sealed class RuntimeFixture : IAsyncDisposable
             Clock,
             routingData,
             psiphon,
-            openVpn);
+            openVpn,
+            // The machine running the tests may hold the default ports itself.
+            portIsFree: portIsFree ?? (static (_, _) => true));
     }
 
     public XrayProcessAdapter XrayAdapter => xray;

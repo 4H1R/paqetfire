@@ -79,10 +79,16 @@ builder.Services.AddSingleton<IFirewallRuleStore, WindowsFirewallRuleStore>();
 builder.Services.AddSingleton<EngineFirewallRules>();
 builder.Services.AddSingleton<NetworkEnvironmentDetector>();
 builder.Services.AddSingleton<HotspotNetworkDetector>();
-builder.Services.AddSingleton<IRouteProbe, SocketRouteProbe>();
+// The engines' loopback ports; the runtime restores the saved ones before any engine starts.
+builder.Services.AddSingleton(_ => new LocalPortPlan());
+builder.Services.AddSingleton<IRouteProbe>(services => new SocketRouteProbe(
+    services.GetRequiredService<EngineSocksCredentials>(),
+    ports: services.GetRequiredService<LocalPortPlan>()));
 builder.Services.AddSingleton<IConnectionVerifier, ConnectionVerifier>();
-builder.Services.AddSingleton<IXrayTrafficStats, XrayStatsClient>();
-builder.Services.AddSingleton<ITunnelProbe, PaqetTunnelProbe>();
+builder.Services.AddSingleton<IXrayTrafficStats>(services => new XrayStatsClient(services.GetRequiredService<LocalPortPlan>()));
+builder.Services.AddSingleton<ITunnelProbe>(services => new PaqetTunnelProbe(
+    services.GetRequiredService<EngineSocksCredentials>(),
+    services.GetRequiredService<LocalPortPlan>()));
 builder.Services.AddSingleton<IIpv6CapabilityProbe, Ipv6CapabilityProbe>();
 builder.Services.AddSingleton<TunnelActivity>();
 // Reads the GeoIP data Xray loads: the downloaded routing data has every country, while
@@ -124,7 +130,7 @@ builder.Services.AddSingleton(services =>
 });
 builder.Services.AddSingleton(services =>
 {
-    var adapter = new PaqetProcessAdapter(BundledEngineOptions.CreatePaqet(paths));
+    var adapter = new PaqetProcessAdapter(BundledEngineOptions.CreatePaqet(paths), services.GetRequiredService<LocalPortPlan>());
     adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
     return adapter;
 });
@@ -133,7 +139,8 @@ builder.Services.AddSingleton(services =>
 {
     var adapter = new XrayProcessAdapter(
         BundledEngineOptions.CreateXray(paths),
-        services.GetRequiredService<RoutingDataFileVerifier>());
+        services.GetRequiredService<RoutingDataFileVerifier>(),
+        services.GetRequiredService<LocalPortPlan>());
     adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
     // Xray's counters die with its process; record them before every stop.
     adapter.Stopping = cancellationToken => services.GetRequiredService<DataUsageRecorder>().CheckpointAsync(cancellationToken);
@@ -167,7 +174,7 @@ builder.Services.AddSingleton(services =>
 });
 builder.Services.AddSingleton(services =>
 {
-    var adapter = new PsiphonProcessAdapter(ExitEngineOptions.CreatePsiphon(paths));
+    var adapter = new PsiphonProcessAdapter(ExitEngineOptions.CreatePsiphon(paths), services.GetRequiredService<LocalPortPlan>());
     adapter.UnexpectedExit += (_, _) => services.GetRequiredService<BrokerSignal>().Notify();
     return adapter;
 });

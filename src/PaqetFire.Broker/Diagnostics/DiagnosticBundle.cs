@@ -25,7 +25,8 @@ public sealed record DiagnosticBundleInput(
     IReadOnlyList<string> RecentLogs,
     IReadOnlyList<string?> Secrets,
     IReadOnlyList<string>? Notes = null,
-    RoutingDataStatus? RoutingData = null);
+    RoutingDataStatus? RoutingData = null,
+    LocalEnginePorts? LocalPorts = null);
 
 public sealed record DiagnosticNetwork(
     string InterfaceName,
@@ -107,7 +108,7 @@ public static class DiagnosticBundle
             }
         }
 
-        AppendListeners(text, input.Settings);
+        AppendListeners(text, input.Settings, input.LocalPorts ?? LocalEnginePorts.Default);
 
         Section(text, "Profile");
         if (input.Settings is { } settings)
@@ -170,16 +171,21 @@ public static class DiagnosticBundle
         text.AppendLine(CultureInfo.InvariantCulture, $"Advanced: {settings.Advanced}");
     }
 
-    private static void AppendListeners(StringBuilder text, PaqetFireSettings? settings)
+    private static void AppendListeners(StringBuilder text, PaqetFireSettings? settings, LocalEnginePorts localPorts)
     {
         Section(text, "Local listeners");
+        if (localPorts != LocalEnginePorts.Default)
+        {
+            text.AppendLine("Engine ports moved from their defaults because other programs held them.");
+        }
+
         var ports = new List<(string Name, int Port)>
         {
-            ("Paqet SOCKS5", XrayJsonConfigurationWriter.PaqetPort),
-            ("Xray SOCKS5", XrayJsonConfigurationWriter.InboundPort),
-            ("Xray statistics", XrayJsonConfigurationWriter.StatsApiPort),
+            ("Paqet SOCKS5", localPorts.Paqet),
+            ("Xray SOCKS5", localPorts.XrayInbound),
+            ("Xray statistics", localPorts.XrayStats),
         };
-        if (settings?.ExitProxy == ExitProxyKind.Psiphon) ports.Add(("Psiphon SOCKS5", PsiphonJsonConfigurationWriter.LocalSocksPort));
+        if (settings?.ExitProxy == ExitProxyKind.Psiphon) ports.Add(("Psiphon SOCKS5", localPorts.PsiphonSocks));
         if (settings?.ShareWithLan == true) ports.Add(("LAN share", settings.LanSocksPort));
         if (settings?.ShareViaHotspot == true) ports.Add(("Hotspot share", settings.HotspotSocksPort));
         if (settings?.ExitProxy == ExitProxyKind.OpenVpn)

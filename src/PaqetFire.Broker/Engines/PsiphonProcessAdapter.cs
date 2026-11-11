@@ -15,13 +15,18 @@ namespace PaqetFire.Broker.Engines;
 public sealed partial class PsiphonProcessAdapter : ExitEngineProcessAdapter
 {
     private readonly PsiphonProcessOptions options;
+    private readonly LocalPortPlan? ports;
     private PsiphonSession session = PsiphonSession.None;
 
-    public PsiphonProcessAdapter(PsiphonProcessOptions options)
+    /// <param name="ports">The broker's port plan, which the written configuration follows. Without it, the options' endpoint.</param>
+    public PsiphonProcessAdapter(PsiphonProcessOptions options, LocalPortPlan? ports = null)
         : base((options ?? throw new ArgumentNullException(nameof(options))).ReadinessTimeout)
     {
         this.options = options;
+        this.ports = ports;
     }
+
+    private System.Net.IPEndPoint SocksEndpoint => ports?.PsiphonEndpoint ?? options.SocksEndpoint;
 
     public override EngineKind Kind => EngineKind.Psiphon;
 
@@ -41,7 +46,7 @@ public sealed partial class PsiphonProcessAdapter : ExitEngineProcessAdapter
 
     protected override string? Version => options.Version;
 
-    protected override string? Endpoint => $"{options.SocksEndpoint.Address}:{options.SocksEndpoint.Port}";
+    protected override string? Endpoint => $"{SocksEndpoint.Address}:{SocksEndpoint.Port}";
 
     /// <summary>
     /// Applies one console-client notice, a JSON object such as
@@ -85,7 +90,7 @@ public sealed partial class PsiphonProcessAdapter : ExitEngineProcessAdapter
                     SetProblem(message);
                     break;
                 case "SocksProxyPortInUse":
-                    SetProblem($"Its local SOCKS5 port {options.SocksEndpoint.Port} is in use.");
+                    SetProblem($"Its local SOCKS5 port {SocksEndpoint.Port} is in use.");
                     break;
             }
         }
@@ -153,9 +158,11 @@ public sealed partial class PsiphonProcessAdapter : ExitEngineProcessAdapter
             .ConfigureAwait(false);
         try
         {
-            if (LoopbackListeners.IsListening(options.SocksEndpoint))
+            if (LoopbackListeners.IsListening(SocksEndpoint))
             {
-                throw new InvalidOperationException($"Psiphon's local SOCKS5 endpoint {options.SocksEndpoint} is already in use.");
+                throw new InvalidOperationException(
+                    $"Psiphon's local SOCKS5 port {SocksEndpoint.Port} was taken by another program just before Psiphon " +
+                    "started. Connect again to move it to a free port.");
             }
 
             if (options.DataDirectoryPolicy is { } policy)
@@ -194,7 +201,7 @@ public sealed partial class PsiphonProcessAdapter : ExitEngineProcessAdapter
         return startInfo;
     }
 
-    protected override bool IsReady() => LoopbackListeners.IsListening(options.SocksEndpoint);
+    protected override bool IsReady() => LoopbackListeners.IsListening(SocksEndpoint);
 
     protected override string DescribeRunning() => session switch
     {

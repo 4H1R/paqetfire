@@ -199,7 +199,8 @@ public sealed record XrayRoutingPolicy(
     XrayDnsPolicy? Dns = null,
     EngineSocksCredentials? EngineCredentials = null,
     bool BlockMalware = false,
-    ExitProxyOutbound? Exit = null);
+    ExitProxyOutbound? Exit = null,
+    LocalEnginePorts? Ports = null);
 
 /// <param name="DomesticServers">IPv4 resolvers of the active network, used directly for local and direct-routed domains.</param>
 public sealed record XrayDnsPolicy(

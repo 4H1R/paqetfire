@@ -17,6 +17,9 @@ hotspot clients                ------------> Xray SOCKS5 <hotspot IPv4>:10808  (
              the "PaqetFire Exit" adapter, which OpenVPN reaches through Paqet
 ```
 
+Loopback ports are the defaults; the broker moves any that another program holds
+(see [Local engine ports](architecture.md#local-engine-ports)).
+
 See [Exit proxy](exit-proxy.md).
 
 All inbounds sniff HTTP, TLS, and QUIC hostnames and share the same routing

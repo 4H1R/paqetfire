@@ -121,14 +121,36 @@ public sealed class ExitProxyTests
         Assert.Empty(PaqetFireSettingsValidator.Validate(ValidSettings() with { Psiphon = new PsiphonExitOptions("bad") }));
 
     [Fact]
-    public void SharesCannotTakeThePsiphonPort() =>
-        Assert.Contains(PaqetFireSettingsValidator.Validate(ValidSettings() with
+    public void ASharePortMayBeADefaultEnginePort() =>
+        // The broker moves its own engines off the share port instead.
+        Assert.Empty(PaqetFireSettingsValidator.Validate(ValidSettings() with
             {
                 ShareWithLan = true,
                 LanSocksPort = PsiphonJsonConfigurationWriter.LocalSocksPort,
                 LanSocksPassword = "password123",
-            }),
-            error => error.Contains("shared SOCKS5 port", StringComparison.Ordinal));
+            }));
+
+    [Fact]
+    public void XrayUsesTheGivenEnginePortsAndRefusesASharePortOnOne()
+    {
+        var ports = new LocalEnginePorts(31080, 31081, 31085, 31084);
+        var share = new LanSocksShare("192.168.1.20", XrayJsonConfigurationWriter.PaqetPort, "user", "password123");
+
+        using var document = JsonDocument.Parse(new XrayJsonConfigurationWriter().Write(
+            Policy(new SocksExitOutbound(ports.PsiphonSocks)) with { Ports = ports, LanShare = share }));
+
+        var root = document.RootElement;
+        Assert.Equal("127.0.0.1:31085", root.GetProperty("api").GetProperty("listen").GetString());
+        var inbounds = root.GetProperty("inbounds").EnumerateArray().ToArray();
+        Assert.Equal(31081, inbounds.Single(inbound => inbound.GetProperty("tag").GetString() == "proxifyre-in").GetProperty("port").GetInt32());
+        Assert.Equal(1080, inbounds.Single(inbound => inbound.GetProperty("tag").GetString() == "lan-share-in").GetProperty("port").GetInt32());
+        var paqet = root.GetProperty("outbounds").EnumerateArray()
+            .Single(outbound => outbound.GetProperty("tag").GetString() == XrayJsonConfigurationWriter.PaqetOutboundTag);
+        Assert.Equal(31080, paqet.GetProperty("settings").GetProperty("servers")[0].GetProperty("port").GetInt32());
+
+        Assert.Throws<ConfigurationValidationException>(() => new XrayJsonConfigurationWriter().Write(
+            Policy(exit: null) with { Ports = ports, LanShare = share with { Port = ports.XrayInbound } }));
+    }
 
     [Fact]
     public async Task ConnectStartsTheExitAfterPaqetAndBeforeCapture()

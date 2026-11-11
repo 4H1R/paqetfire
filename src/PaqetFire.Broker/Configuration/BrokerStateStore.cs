@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using PaqetFire.Core.Configuration;
 
 namespace PaqetFire.Broker.Configuration;
 
@@ -19,6 +20,12 @@ public sealed record BrokerRuntimeState
     /// <summary>Server endpoint to whether its Paqet server reached an IPv6 destination.</summary>
     public IReadOnlyDictionary<string, bool> Ipv6Support { get; init; } =
         new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The engines' loopback ports, kept so a restarted broker reuses them: a ProxiFyre left
+    /// running for the kill switch still sends captured traffic to the same Xray port.
+    /// </summary>
+    public LocalEnginePorts? LocalPorts { get; init; }
 }
 
 public interface IBrokerStateStore
@@ -86,6 +93,7 @@ public sealed class BrokerStateStore(string path, ProtectedDirectory? directory 
                             stored.ResolvedServers ?? [], StringComparer.OrdinalIgnoreCase),
                         Ipv6Support = new Dictionary<string, bool>(
                             stored.Ipv6Support ?? [], StringComparer.OrdinalIgnoreCase),
+                        LocalPorts = stored.LocalPorts is { IsValid: true } ports ? ports : null,
                     };
             }
             finally
@@ -108,7 +116,8 @@ public sealed class BrokerStateStore(string path, ProtectedDirectory? directory 
             state.DesiredConnected,
             state.DesiredProfileId,
             new Dictionary<string, string>(state.ResolvedServers),
-            new Dictionary<string, bool>(state.Ipv6Support)), JsonOptions);
+            new Dictionary<string, bool>(state.Ipv6Support),
+            state.LocalPorts), JsonOptions);
         byte[] protectedState;
         try
         {
@@ -153,5 +162,6 @@ public sealed class BrokerStateStore(string path, ProtectedDirectory? directory 
         bool DesiredConnected,
         Guid? DesiredProfileId,
         Dictionary<string, string>? ResolvedServers,
-        Dictionary<string, bool>? Ipv6Support);
+        Dictionary<string, bool>? Ipv6Support,
+        LocalEnginePorts? LocalPorts = null);
 }

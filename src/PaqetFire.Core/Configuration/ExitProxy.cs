@@ -72,9 +72,10 @@ public abstract record ExitProxyOutbound
     public abstract bool CarriesUdp { get; }
 
     /// <summary>The outbound each exit engine serves.</summary>
-    public static ExitProxyOutbound? For(ExitProxyKind kind) => kind switch
+    /// <param name="psiphonPort">Psiphon's loopback SOCKS5 port; the default when omitted.</param>
+    public static ExitProxyOutbound? For(ExitProxyKind kind, int? psiphonPort = null) => kind switch
     {
-        ExitProxyKind.Psiphon => new SocksExitOutbound(PsiphonJsonConfigurationWriter.LocalSocksPort),
+        ExitProxyKind.Psiphon => new SocksExitOutbound(psiphonPort ?? PsiphonJsonConfigurationWriter.LocalSocksPort),
         ExitProxyKind.OpenVpn => new InterfaceExitOutbound(OpenVpnConfigurationWriter.AdapterName),
         _ => null,
     };

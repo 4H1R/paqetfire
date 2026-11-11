@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Text;
+using PaqetFire.Broker.Engines;
 using PaqetFire.Core.Configuration;
 
 namespace PaqetFire.Broker.Diagnostics;
@@ -31,9 +32,12 @@ public sealed class XrayStatsClient : IXrayTrafficStats, IDisposable
     ];
 
     private readonly HttpClient client;
+    private readonly LocalPortPlan ports;
 
-    public XrayStatsClient()
+    /// <param name="ports">The broker's port plan; each query dials Xray's current statistics port.</param>
+    public XrayStatsClient(LocalPortPlan? ports = null)
     {
+        this.ports = ports ?? new LocalPortPlan();
         client = new HttpClient(new SocketsHttpHandler
         {
             UseProxy = false,
@@ -41,7 +45,6 @@ public sealed class XrayStatsClient : IXrayTrafficStats, IDisposable
             PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
         })
         {
-            BaseAddress = new Uri($"http://127.0.0.1:{XrayJsonConfigurationWriter.StatsApiPort}"),
             Timeout = RequestTimeout,
         };
     }
@@ -50,7 +53,9 @@ public sealed class XrayStatsClient : IXrayTrafficStats, IDisposable
     {
         // gRPC needs HTTP/2 prior knowledge over cleartext; a manually created request
         // does not inherit the client's default version.
-        using var request = new HttpRequestMessage(HttpMethod.Post, QueryStatsPath)
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            new Uri($"http://127.0.0.1:{ports.Current.XrayStats}{QueryStatsPath}"))
         {
             Version = HttpVersion.Version20,
             VersionPolicy = HttpVersionPolicy.RequestVersionExact,

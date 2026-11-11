@@ -413,7 +413,6 @@ public sealed partial class MainWindow
     /// <summary>Applies saved desktop preferences: app-behavior switches and the cached form.</summary>
     private void ApplyPreferences(DesktopPreferences source)
     {
-        SocksEndpointBox.Text = source.LocalSocksEndpoint;
         PopulateForm(ConnectionFormState.FromPreferences(source));
         ApplyAppSettings(source);
         _ = RefreshCurrentNetworkAsync();
@@ -447,7 +446,6 @@ public sealed partial class MainWindow
     {
         var state = ReadForm();
         state.ApplyTo(preferences);
-        preferences.LocalSocksEndpoint = SocksEndpointBox.Text.Trim();
         preferences.LanSocksPort = state.LanSocksPort == 0 ? 1082 : state.LanSocksPort;
         CaptureAppSettings();
     }

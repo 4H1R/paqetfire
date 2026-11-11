@@ -5,6 +5,7 @@ namespace PaqetFire.Core.Configuration;
 
 public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
 {
+    // The default loopback ports; the broker moves any that another program holds (see LocalEnginePorts).
     public const int InboundPort = 1081;
     public const int PaqetPort = 1080;
     public const int StatsApiPort = 10085;
@@ -36,7 +37,14 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             throw new ConfigurationValidationException(["The Xray domain strategy is invalid."]);
         }
 
-        if (policy.Exit is SocksExitOutbound { Port: < 1024 or > 65535 or PaqetPort or InboundPort or StatsApiPort })
+        var ports = policy.Ports ?? LocalEnginePorts.Default;
+        if (!ports.IsValid)
+        {
+            throw new ConfigurationValidationException(["The local engine ports are invalid."]);
+        }
+
+        if (policy.Exit is SocksExitOutbound { Port: var exitPort } &&
+            (exitPort is < 1024 or > 65535 || exitPort == ports.Paqet || exitPort == ports.XrayInbound || exitPort == ports.XrayStats))
         {
             throw new ConfigurationValidationException(["The exit proxy port is invalid."]);
         }
@@ -97,7 +105,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             // connection card. HandlerService is deliberately not enabled.
             writer.WriteStartObject("api");
             writer.WriteString("tag", "api");
-            writer.WriteString("listen", $"127.0.0.1:{StatsApiPort}");
+            writer.WriteString("listen", $"127.0.0.1:{ports.XrayStats}");
             writer.WriteStartArray("services");
             writer.WriteStringValue("StatsService");
             writer.WriteEndArray();
@@ -115,7 +123,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             writer.WriteStartObject();
             writer.WriteString("tag", "proxifyre-in");
             writer.WriteString("listen", "127.0.0.1");
-            writer.WriteNumber("port", InboundPort);
+            writer.WriteNumber("port", ports.XrayInbound);
             writer.WriteString("protocol", "socks");
             writer.WriteStartObject("settings");
             if (policy.EngineCredentials is { } engineCredentials)
@@ -148,7 +156,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
 
             if (policy.LanShare is { } lanShare)
             {
-                ValidateLanShare(lanShare);
+                ValidateLanShare(lanShare, ports);
                 writer.WriteStartObject();
                 writer.WriteString("tag", "lan-share-in");
                 writer.WriteString("listen", lanShare.ListenAddress);
@@ -174,7 +182,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
 
             if (policy.HotspotShare is { } hotspotShare)
             {
-                ValidateLanShare(hotspotShare);
+                ValidateLanShare(hotspotShare, ports);
                 writer.WriteStartObject();
                 writer.WriteString("tag", "hotspot-share-in");
                 writer.WriteString("listen", hotspotShare.ListenAddress);
@@ -200,7 +208,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             writer.WriteEndArray();
 
             writer.WriteStartArray("outbounds");
-            WritePaqetOutbound(writer, policy.EngineCredentials);
+            WritePaqetOutbound(writer, policy.EngineCredentials, ports.Paqet);
             if (policy.Exit is { } exit)
             {
                 WriteExitOutbound(writer, exit);
@@ -343,7 +351,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
         return destinations;
     }
 
-    private static void ValidateLanShare(LanSocksShare share)
+    private static void ValidateLanShare(LanSocksShare share, LocalEnginePorts ports)
     {
         if (!System.Net.IPAddress.TryParse(share.ListenAddress, out var address) ||
             address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork ||
@@ -354,9 +362,14 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
             throw new ConfigurationValidationException(["The shared SOCKS5 listener requires a specific private LAN IPv4 address."]);
         }
 
-        if (share.Port is < 1024 or > 65535 || share.Port is PaqetPort or InboundPort or PsiphonJsonConfigurationWriter.LocalSocksPort)
+        if (share.Port is < 1024 or > 65535)
         {
             throw new ConfigurationValidationException(["The shared SOCKS5 port is invalid."]);
+        }
+
+        if (ports.Uses(share.Port))
+        {
+            throw new ConfigurationValidationException([$"The shared SOCKS5 port {share.Port} is used by PaqetFire's own engines."]);
         }
 
         if (string.IsNullOrWhiteSpace(share.Username) || string.IsNullOrEmpty(share.Password))
@@ -594,7 +607,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
         writer.WriteEndArray();
     }
 
-    private static void WritePaqetOutbound(Utf8JsonWriter writer, EngineSocksCredentials? credentials)
+    private static void WritePaqetOutbound(Utf8JsonWriter writer, EngineSocksCredentials? credentials, int port)
     {
         writer.WriteStartObject();
         writer.WriteString("tag", "paqet");
@@ -603,7 +616,7 @@ public sealed class XrayJsonConfigurationWriter : IXrayConfigurationWriter
         writer.WriteStartArray("servers");
         writer.WriteStartObject();
         writer.WriteString("address", "127.0.0.1");
-        writer.WriteNumber("port", PaqetPort);
+        writer.WriteNumber("port", port);
         if (credentials is not null)
         {
             writer.WriteStartArray("users");

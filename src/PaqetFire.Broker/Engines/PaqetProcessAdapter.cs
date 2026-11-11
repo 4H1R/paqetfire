@@ -14,6 +14,8 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly Queue<PaqetProcessLogEntry> _logs = new();
     private readonly ValidatedOptions _options;
+    private readonly LocalPortPlan? _ports;
+    private IPEndPoint? _startedEndpoint;
     private Process? _process;
     private Task _standardOutputPump = Task.CompletedTask;
     private Task _standardErrorPump = Task.CompletedTask;
@@ -23,11 +25,16 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
     private bool _expectedExit;
     private bool _disposed;
 
-    public PaqetProcessAdapter(PaqetProcessOptions options)
+    /// <param name="ports">The broker's port plan; each start listens on its Paqet port. Without it, the options' endpoint.</param>
+    public PaqetProcessAdapter(PaqetProcessOptions options, LocalPortPlan? ports = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = ValidateOptions(options);
+        _ports = ports;
     }
+
+    /// <summary>The endpoint the next start listens on; a running process keeps the one it started with.</summary>
+    private IPEndPoint PlannedEndpoint => _ports?.PaqetEndpoint ?? _options.SocksEndpoint;
 
     public EngineKind Kind => EngineKind.Paqet;
 
@@ -46,7 +53,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 Kind,
                 _state,
                 _options.Version,
-                FormatEndpoint(_options.SocksEndpoint),
+                FormatEndpoint(_process is not null && _startedEndpoint is not null ? _startedEndpoint : PlannedEndpoint),
                 _detail,
                 _changedAt));
         }
@@ -69,15 +76,16 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
             }
 
             FileStream? executableLock;
+            var endpoint = PlannedEndpoint;
             try
             {
                 executableLock = await ValidateFilesAtStartAsync(cancellationToken).ConfigureAwait(false);
-                if (LoopbackListeners.IsListening(_options.SocksEndpoint))
+                if (LoopbackListeners.IsListening(endpoint))
                 {
                     executableLock?.Dispose();
                     throw new InvalidOperationException(
-                        $"The configured Paqet SOCKS5 endpoint {FormatEndpoint(_options.SocksEndpoint)} " +
-                        "is already in use. Stop the other listener or choose another port.");
+                        $"Paqet's local SOCKS5 port {endpoint.Port} was taken by another program just before " +
+                        "Paqet started. Connect again to move it to a free port.");
                 }
             }
             catch (OperationCanceledException)
@@ -112,6 +120,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 lock (_stateLock)
                 {
                     _process = process;
+                    _startedEndpoint = endpoint;
                     _expectedExit = false;
                 }
 
@@ -122,7 +131,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 _standardOutputPump = PumpLogAsync(process.StandardOutput, isError: false);
                 _standardErrorPump = PumpLogAsync(process.StandardError, isError: true);
 
-                await WaitForSocksReadinessAsync(process, cancellationToken).ConfigureAwait(false);
+                await WaitForSocksReadinessAsync(process, endpoint, cancellationToken).ConfigureAwait(false);
                 SetState(EngineState.Running, "Paqet is accepting SOCKS5 connections.");
             }
             catch (Exception error)
@@ -306,6 +315,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
 
     private async Task WaitForSocksReadinessAsync(
         Process process,
+        IPEndPoint endpoint,
         CancellationToken cancellationToken)
     {
         using var readinessTimeout = new CancellationTokenSource(_options.ReadinessTimeout);
@@ -322,11 +332,11 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
             }
 
             // Only greet once the listener exists; until then the cheap table poll runs.
-            var listening = LoopbackListeners.IsListening(_options.SocksEndpoint);
+            var listening = LoopbackListeners.IsListening(endpoint);
             try
             {
                 if (listening &&
-                    await ProbeSocks5Async(_options.SocksEndpoint, readinessCancellation.Token)
+                    await ProbeSocks5Async(endpoint, readinessCancellation.Token)
                         .ConfigureAwait(false))
                 {
                     return;
@@ -336,7 +346,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 readinessTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException(
-                    $"Paqet did not expose a SOCKS5 listener at {FormatEndpoint(_options.SocksEndpoint)} " +
+                    $"Paqet did not expose a SOCKS5 listener at {FormatEndpoint(endpoint)} " +
                     $"within {_options.ReadinessTimeout}.");
             }
             catch (OperationCanceledException) when (!readinessCancellation.IsCancellationRequested)
@@ -363,7 +373,7 @@ public sealed class PaqetProcessAdapter : IEngineAdapter, IAsyncDisposable
                 readinessTimeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException(
-                    $"Paqet did not expose a SOCKS5 listener at {FormatEndpoint(_options.SocksEndpoint)} " +
+                    $"Paqet did not expose a SOCKS5 listener at {FormatEndpoint(endpoint)} " +
                     $"within {_options.ReadinessTimeout}.");
             }
         }

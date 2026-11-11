@@ -11,8 +11,6 @@ public sealed class DesktopPreferences
 
     public string ServerEndpoint { get; set; } = string.Empty;
 
-    public string LocalSocksEndpoint { get; set; } = "127.0.0.1:1080";
-
     public Guid? NetworkInterfaceGuid { get; set; }
 
     public string LocalTcpFlags { get; set; } = "PA";
