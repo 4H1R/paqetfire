@@ -1097,16 +1097,16 @@
                 <StackPanel Spacing="5"><TextBlock Text="Broker service" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.BrokerStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
               </Border>
               <Border Grid.Column="1" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                <StackPanel Spacing="5"><TextBlock Text="Paqet" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.PaqetStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel Spacing="5"><TextBlock Text="Paqet" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.PaqetStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/><TextBlock Text="Server connection" FontSize="12" Opacity="0.55"/></StackPanel>
               </Border>
               <Border Grid.Column="2" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                <StackPanel Spacing="5"><TextBlock Text="Xray" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.XrayStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel Spacing="5"><TextBlock Text="Xray" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.XrayStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/><TextBlock Text="Destination rules" FontSize="12" Opacity="0.55"/></StackPanel>
               </Border>
               <Border Grid.Column="3" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="5"><TextBlock Text="Exit proxy" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.ExitStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold"/></StackPanel>
               </Border>
               <Border Grid.Column="4" Padding="18" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                <StackPanel Spacing="5"><TextBlock Text="ProxiFyre" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.RoutingStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
+                <StackPanel Spacing="5"><TextBlock Text="ProxiFyre" Opacity="0.65"/><TextBlock Text="{x:Bind ViewModel.RoutingStatusText, Mode=OneWay}" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="App capture" FontSize="12" Opacity="0.55"/></StackPanel>
               </Border>
             </Grid>
 
@@ -1118,9 +1118,14 @@
                   <TextBlock x:Name="VerificationSummaryText"
                              Text="Connect, then verify the local proxy route over TCP, routed UDP/DNS, IPv4, and IPv6."
                              Opacity="0.68" TextWrapping="Wrap" />
-                  <TextBlock Text="Only when you click Verify route, public-address checks contact api4.ipify.org and api6.ipify.org through Xray; returned addresses remain local. UDP/DNS sends a query for example.com through Xray's UDP relay; with encrypted DNS, Xray answers it over DNS-over-HTTPS through Paqet. The DNS leak check looks up whoami.akamai.net through the route and directly, then compares which resolver answered. This does not prove that every application is captured or detect WebRTC leaks."
+                  <TextBlock Text="Verify route sends a few test requests through your route to check that traffic and name lookups really go through it."
                              FontSize="12" Opacity="0.58" TextWrapping="Wrap" />
                 </StackPanel>
+                <Expander Header="What does Verify route check?" IsExpanded="False"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <TextBlock Text="Only when you click Verify route, public-address checks contact api4.ipify.org and api6.ipify.org through Xray; returned addresses remain local. UDP/DNS sends a query for example.com through Xray's UDP relay; with encrypted DNS, Xray answers it over DNS-over-HTTPS through Paqet. The DNS leak check looks up whoami.akamai.net through the route and directly, then compares which resolver answered. This does not prove that every application is captured or detect WebRTC leaks."
+                             FontSize="12" Opacity="0.72" TextWrapping="Wrap" />
+                </Expander>
                 <InfoBar x:Name="VerificationInfoBar" IsOpen="False" IsClosable="True" />
                 <TextBlock Text="Problems are listed first. Each result is labelled Failed, Warning, Passed, Note, or Skipped." FontSize="12" Opacity="0.58" TextWrapping="Wrap" />
                 <ListView ItemsSource="{x:Bind VerificationEntries}" SelectionMode="None" MaxHeight="420">
