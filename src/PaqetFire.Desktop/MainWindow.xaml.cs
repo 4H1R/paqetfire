@@ -670,10 +670,18 @@ public sealed partial class MainWindow : Window
     public Style? PrimaryActionStyle(PrimaryConnectionAction action) =>
         ButtonStyle(accent: action != PrimaryConnectionAction.Disconnect);
 
-    private static Style? ButtonStyle(bool accent) =>
-        Application.Current.Resources.TryGetValue(accent ? "AccentButtonStyle" : "DefaultButtonStyle", out var style)
-            ? style as Style
-            : null;
+    // The indexer searches the merged control resources, where both built-in styles live.
+    private static Style? ButtonStyle(bool accent)
+    {
+        try
+        {
+            return Application.Current.Resources[accent ? "AccentButtonStyle" : "DefaultButtonStyle"] as Style;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
 
     private async void SaveAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
