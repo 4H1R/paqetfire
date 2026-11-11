@@ -211,8 +211,8 @@ public sealed partial class MainWindow
     }
 
     // Saving while connected restarts the route, so the Routing page says so on its button.
-    private string RoutingSaveButtonText(bool connected) =>
-        connected ? "Save and reconnect" : "Save routing policy";
+    private string RoutingSaveButtonText(BrokerConnectionState state) =>
+        ProfileSwitch.RestartsRoute(state) ? "Save and reconnect" : "Save routing policy";
 
     private Visibility RoutingSaveAndConnectVisibility(bool connected) =>
         connected ? Visibility.Collapsed : Visibility.Visible;
@@ -312,7 +312,8 @@ public sealed partial class MainWindow
     private void UpdateConnectionSaveActions()
     {
         if (SaveProfileButton is null || SaveAndConnectButton is null) return;
-        var connected = ViewModel.IsConnected;
+        // Saving restarts the route in every live state, not only a fully connected one.
+        var connected = ProfileSwitch.RestartsRoute(ViewModel.ConnectionState);
         SaveProfileButton.Content = connected ? "Save and reconnect" : "Save profile";
         SaveAndConnectButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
     }

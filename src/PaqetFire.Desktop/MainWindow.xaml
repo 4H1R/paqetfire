@@ -980,7 +980,7 @@
             <StackPanel Spacing="10" Margin="0,8,0,0">
               <TextBlock x:Name="RoutingPendingText" Text="No pending changes." FontWeight="SemiBold" TextWrapping="Wrap" />
               <StackPanel x:Name="RoutingSaveActions" Orientation="Horizontal" Spacing="10">
-                <Button Content="{x:Bind RoutingSaveButtonText(ViewModel.IsConnected), Mode=OneWay}"
+                <Button Content="{x:Bind RoutingSaveButtonText(ViewModel.ConnectionState), Mode=OneWay}"
                         Style="{StaticResource AccentButtonStyle}" Click="SaveRoutingButton_Click"
                         ToolTipService.ToolTip="Save (Ctrl+S)" />
                 <Button Content="Save and connect" IsEnabled="{x:Bind ViewModel.CanSaveAndConnect, Mode=OneWay}"
