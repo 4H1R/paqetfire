@@ -1312,87 +1312,96 @@
             <StackPanel Spacing="6">
               <TextBlock Text="SETTINGS" FontSize="12" FontWeight="SemiBold"
                          Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
-              <TextBlock Text="App behavior" FontSize="32" FontWeight="SemiBold" />
-              <TextBlock Text="Control what PaqetFire does at sign-in, launch, and in the background."
+              <TextBlock Text="Settings" FontSize="32" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1" />
+              <TextBlock Text="Startup, notifications, network rules, updates, and reset. Changes on this page apply immediately."
                          FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
             </StackPanel>
             <InfoBar x:Name="SettingsInfoBar" IsOpen="False" IsClosable="True" HorizontalAlignment="Stretch" />
+
+            <TextBlock Text="General" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="18">
-                <TextBlock Text="Changes on this page apply immediately." FontSize="12" Opacity="0.62" />
-                <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows"
-                              OnContent="Starts hidden in the notification area" OffContent="Disabled"
-                              Toggled="AppSettingToggle_Toggled" />
-                <ToggleSwitch x:Name="ConnectOnLaunchSwitch" Header="Connect when PaqetFire opens"
-                              OnContent="Enabled" OffContent="Disabled" Toggled="AppSettingToggle_Toggled" />
-                <ToggleSwitch x:Name="CloseToTraySwitch" Header="Close to notification area"
-                              OnContent="Closing hides PaqetFire" OffContent="Closing exits PaqetFire" IsOn="True"
-                              Toggled="AppSettingToggle_Toggled" />
-                <ToggleSwitch x:Name="ShowNotificationsSwitch" Header="Notify about route changes while hidden"
-                              OnContent="Route dropped, kill switch blocking, reconnecting, recovered" OffContent="Disabled" IsOn="True"
-                              Toggled="AppSettingToggle_Toggled" />
-                <ToggleSwitch x:Name="CheckForUpdatesSwitch" Header="Check for updates automatically"
-                              OnContent="Enabled" OffContent="Disabled" IsOn="True" Toggled="AppSettingToggle_Toggled" />
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="PaqetFire starts hidden in the notification area when you sign in."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="ConnectOnLaunchSwitch" Header="Connect when PaqetFire opens"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="Starts the route with the active profile as soon as PaqetFire opens."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="CloseToTraySwitch" Header="Close to notification area" IsOn="True"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="When on, closing the window keeps PaqetFire running next to the clock. When off, closing exits PaqetFire."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="ShowNotificationsSwitch" Header="Notify about route changes while hidden" IsOn="True"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="Tells you when the route drops, the kill switch starts blocking, PaqetFire reconnects, or the route recovers."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
               </StackPanel>
             </Border>
+
+            <TextBlock Text="Network" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="14">
-                <TextBlock Text="Network-aware connection" FontSize="18" FontWeight="SemiBold" />
-                <ToggleSwitch x:Name="NetworkAutomationSwitch"
-                              Header="Automatically connect on unknown and untrusted networks"
-                              OnContent="Enabled" OffContent="Disabled" Toggled="AppSettingToggle_Toggled" />
-                <ToggleSwitch x:Name="ConnectOnTrustedNetworksSwitch"
-                              Header="Also connect on trusted networks"
-                              OnContent="Route required" OffContent="May stay direct" Toggled="AppSettingToggle_Toggled" />
+                <TextBlock Text="Network-aware connection" FontSize="18" FontWeight="SemiBold"
+                           AutomationProperties.HeadingLevel="Level3" />
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="NetworkAutomationSwitch"
+                                Header="Automatically connect on unknown and untrusted networks"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="PaqetFire connects by itself when you join a network you have not marked as trusted."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="ConnectOnTrustedNetworksSwitch"
+                                Header="Also connect on trusted networks"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="When off, traffic on trusted networks may go directly instead of through the route."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
                 <TextBlock x:Name="CurrentNetworkText" Text="Current network has not been detected yet."
                            Opacity="0.68" TextWrapping="Wrap" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <controls:WrapPanel HorizontalSpacing="8" VerticalSpacing="8">
                   <Button Content="Trust current network" Click="TrustCurrentNetworkButton_Click" />
                   <Button Content="Require route here" Click="RequireRouteCurrentNetworkButton_Click" />
                   <Button Content="Pause for 15 minutes" Click="PauseNetworkAutomationButton_Click" />
-                </StackPanel>
-                <TextBlock Text="Network changes and resume events use a short settle delay and bounded reconnect backoff. Captive portals pause automatic connection; an active kill switch remains fail-closed until you change it deliberately."
+                </controls:WrapPanel>
+                <TextBlock Text="After a network change or waking from sleep, PaqetFire waits a moment for the network to settle, then tries to connect, waiting longer between each retry. On networks with a sign-in page, such as hotel Wi-Fi, automatic connection waits until you have signed in. If the kill switch is on, routed apps stay blocked until you reconnect or turn the kill switch off."
                            FontSize="12" Opacity="0.62" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
+
+            <TextBlock Text="Updates &amp; data" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="12">
-                <TextBlock Text="Routing data" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="GeoIP and GeoSite rules are downloaded from the Iran-v2ray-rules project on GitHub, verified, and used from the next connection."
-                           Opacity="0.68" TextWrapping="Wrap" />
-                <TextBlock x:Name="RoutingDataSourceText" Text="Waiting for the broker…" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock x:Name="RoutingDataCheckedText" Opacity="0.72" TextWrapping="Wrap" />
-                <InfoBar x:Name="RoutingDataInfoBar" IsOpen="False" IsClosable="True" />
-                <ProgressBar x:Name="RoutingDataProgressBar" IsIndeterminate="True" Visibility="Collapsed"
-                             AutomationProperties.Name="Updating routing data" />
-                <ToggleSwitch x:Name="RoutingDataAutomaticSwitch" Header="Update automatically" IsOn="True"
-                              OnContent="Checks for a new release once a day" OffContent="Disabled"
-                              Toggled="RoutingDataAutomaticSwitch_Toggled" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button x:Name="RoutingDataUpdateButton" Content="Update now" Style="{StaticResource AccentButtonStyle}"
-                          Click="RoutingDataUpdateButton_Click" />
-                  <Button x:Name="RoutingDataBundledButton" Content="Use bundled data" Click="RoutingDataBundledButton_Click"
-                          ToolTipService.ToolTip="Remove the downloaded rules, return to the data shipped with Xray, and stop automatic updates" />
-                </StackPanel>
-              </StackPanel>
-            </Border>
-            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-              <StackPanel Spacing="12">
-                <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="App updates" FontSize="18" FontWeight="SemiBold"
+                           AutomationProperties.HeadingLevel="Level3" />
                 <TextBlock x:Name="AboutVersionText" Text="PaqetFire" FontWeight="SemiBold" />
-                <TextBlock Text="A single Windows control surface for Paqet, Xray, and ProxiFyre. Core engines and their licenses are included with the installer."
-                           Opacity="0.68" TextWrapping="Wrap" />
-                <TextBlock Text="Routing always excludes Paqet, Xray, ProxiFyre, the broker, and packet-capture services to avoid a proxy loop."
-                           Opacity="0.68" TextWrapping="Wrap" />
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="CheckForUpdatesSwitch" Header="Check for updates automatically" IsOn="True"
+                                Toggled="AppSettingToggle_Toggled" />
+                  <TextBlock Text="Checks GitHub Releases once a day and tells you when a newer version is ready."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
                 <InfoBar x:Name="UpdateInfoBar" IsOpen="False" IsClosable="True" />
                 <TextBlock x:Name="UpdateStatusText" Text="Check GitHub Releases for a newer verified build."
                            Opacity="0.72" TextWrapping="Wrap" />
                 <ProgressBar x:Name="UpdateProgressBar" Visibility="Collapsed" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <controls:WrapPanel HorizontalSpacing="8" VerticalSpacing="8">
                   <Button x:Name="CheckForUpdatesButton" Content="Check for updates" Click="CheckForUpdatesButton_Click" />
                   <Button x:Name="InstallUpdateButton" Content="Download and install" Visibility="Collapsed"
                           Style="{StaticResource AccentButtonStyle}" Click="InstallUpdateButton_Click" />
@@ -1400,15 +1409,70 @@
                           Click="CancelUpdateButton_Click" />
                   <Button x:Name="ViewReleaseButton" Content="View release notes" Visibility="Collapsed"
                           Click="ViewReleaseButton_Click" />
-                </StackPanel>
+                </controls:WrapPanel>
               </StackPanel>
             </Border>
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="12">
+                <TextBlock Text="Routing data" FontSize="18" FontWeight="SemiBold"
+                           AutomationProperties.HeadingLevel="Level3" />
+                <TextBlock Text="GeoIP and GeoSite rules are downloaded from the Iran-v2ray-rules project on GitHub, verified, and used from the next connection."
+                           Opacity="0.68" TextWrapping="Wrap" />
+                <TextBlock x:Name="RoutingDataSourceText" Text="Waiting for the broker…" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="RoutingDataCheckedText" Opacity="0.72" TextWrapping="Wrap" />
+                <InfoBar x:Name="RoutingDataInfoBar" IsOpen="False" IsClosable="True" />
+                <ProgressBar x:Name="RoutingDataProgressBar" IsIndeterminate="True" Visibility="Collapsed"
+                             AutomationProperties.Name="Updating routing data" />
+                <StackPanel Spacing="2">
+                  <ToggleSwitch x:Name="RoutingDataAutomaticSwitch" Header="Update automatically" IsOn="True"
+                                Toggled="RoutingDataAutomaticSwitch_Toggled" />
+                  <TextBlock Text="Checks for a new release of the rules once a day."
+                             FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+                </StackPanel>
+                <controls:WrapPanel HorizontalSpacing="8" VerticalSpacing="8">
+                  <Button x:Name="RoutingDataUpdateButton" Content="Update now" Style="{StaticResource AccentButtonStyle}"
+                          Click="RoutingDataUpdateButton_Click" />
+                  <Button x:Name="RoutingDataBundledButton" Content="Use bundled data" Click="RoutingDataBundledButton_Click"
+                          ToolTipService.ToolTip="Remove the downloaded rules, return to the data shipped with Xray, and stop automatic updates" />
+                </controls:WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="Reset" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
             <Border Padding="24" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
               <StackPanel Spacing="12">
-                <TextBlock Text="Factory reset" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Factory reset" FontSize="18" FontWeight="SemiBold"
+                           AutomationProperties.HeadingLevel="Level3" />
                 <TextBlock Text="Remove all profiles, encryption keys, SOCKS credentials, routing changes, and app preferences, then return to the installation defaults."
                            TextWrapping="Wrap" Opacity="0.72" />
-                <Button x:Name="FactoryResetButton" Content="Reset app to defaults" Click="FactoryResetButton_Click" HorizontalAlignment="Left" />
+                <!-- Destructive: critical red in every state, with the text colour Windows pairs with filled controls. -->
+                <Button x:Name="FactoryResetButton" Content="Reset app to defaults" Click="FactoryResetButton_Click" HorizontalAlignment="Left">
+                  <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackground" Color="{ThemeResource SystemFillColorCritical}" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource SystemFillColorCritical}" Opacity="0.9" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource SystemFillColorCritical}" Opacity="0.8" />
+                    <SolidColorBrush x:Key="ButtonBorderBrush" Color="{ThemeResource SystemFillColorCritical}" />
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{ThemeResource SystemFillColorCritical}" />
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{ThemeResource SystemFillColorCritical}" />
+                    <SolidColorBrush x:Key="ButtonForeground" Color="{ThemeResource TextOnAccentFillColorPrimary}" />
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{ThemeResource TextOnAccentFillColorPrimary}" />
+                    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{ThemeResource TextOnAccentFillColorSecondary}" />
+                  </Button.Resources>
+                </Button>
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="About" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,-8"
+                       AutomationProperties.HeadingLevel="Level2" />
+            <Border Padding="24" CornerRadius="20" HorizontalAlignment="Stretch"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+              <StackPanel Spacing="12">
+                <TextBlock Text="A single Windows control surface for Paqet, Xray, and ProxiFyre. Core engines and their licenses are included with the installer."
+                           Opacity="0.68" TextWrapping="Wrap" />
+                <TextBlock Text="Routing always excludes Paqet, Xray, ProxiFyre, the broker, and packet-capture services to avoid a proxy loop."
+                           Opacity="0.68" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
           </StackPanel>
