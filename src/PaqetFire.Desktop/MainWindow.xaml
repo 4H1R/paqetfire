@@ -84,7 +84,7 @@
             <Border x:Name="SetupChecklistCard" Grid.Row="2" Margin="0,0,0,18" Padding="22" CornerRadius="20"
                     HorizontalAlignment="Stretch" Visibility="Collapsed"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{StaticResource PaqetFireAccentBrush}" BorderThickness="1">
+                    BorderBrush="{ThemeResource PaqetFireAccentBrush}" BorderThickness="1">
               <StackPanel Spacing="12">
                 <TextBlock Text="Get started" FontSize="18" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2" />
                 <ItemsControl ItemsSource="{x:Bind ChecklistEntries}" IsTabStop="False">
@@ -130,7 +130,7 @@
                 <StackPanel Spacing="13">
                   <StackPanel Orientation="Horizontal" Spacing="9" Visibility="{x:Bind ViewModel.HasStateLabel, Mode=OneWay}">
                     <Ellipse x:Name="ConnectionStateIndicator" Width="9" Height="9"
-                             Fill="{StaticResource PaqetFireNeutralBrush}" VerticalAlignment="Center" />
+                             Fill="{ThemeResource PaqetFireNeutralBrush}" VerticalAlignment="Center" />
                     <TextBlock Text="{x:Bind ViewModel.StateLabel, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" />
                   </StackPanel>
                   <TextBlock x:Name="StatusTextBlock" Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap"
@@ -206,7 +206,7 @@
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                         VerticalAlignment="Center">
                   <FontIcon x:Name="ConnectionStateIcon" Glyph="&#xE774;" FontSize="42"
-                            Foreground="{StaticResource PaqetFireNeutralBrush}"
+                            Foreground="{ThemeResource PaqetFireNeutralBrush}"
                             AutomationProperties.AccessibilityView="Raw" />
                 </Border>
               </Grid>
@@ -216,7 +216,7 @@
                     HorizontalAlignment="Stretch"
                     Visibility="{x:Bind ViewModel.IsConnected, Mode=OneWay}"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{StaticResource PaqetFireSuccessBrush}" BorderThickness="1">
+                    BorderBrush="{ThemeResource PaqetFireSuccessBrush}" BorderThickness="1">
               <Grid x:Name="LiveSessionGrid" ColumnSpacing="24">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
@@ -241,9 +241,9 @@
                       <TextBlock Text="Exit IP" FontSize="12" Opacity="0.65" VerticalAlignment="Center" />
                       <Border Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
                               Visibility="{x:Bind ViewModel.Live.HasCountryCode, Mode=OneWay}"
-                              Background="{StaticResource PaqetFireSuccessBrush}">
+                              Background="{ThemeResource PaqetFireSuccessBrush}">
                         <TextBlock Text="{x:Bind ViewModel.Live.CountryCode, Mode=OneWay}" FontSize="11" FontWeight="Bold"
-                                   Foreground="Black" AutomationProperties.Name="{x:Bind ViewModel.Live.CountryAccessibleName, Mode=OneWay}" />
+                                   Foreground="{ThemeResource PaqetFireOnSuccessBrush}" AutomationProperties.Name="{x:Bind ViewModel.Live.CountryAccessibleName, Mode=OneWay}" />
                       </Border>
                       <TextBlock Text="{x:Bind ViewModel.Live.PublicAddressText, Mode=OneWay}" FontSize="15" FontWeight="SemiBold"
                                  FontFamily="Cascadia Mono, Consolas" VerticalAlignment="Center" IsTextSelectionEnabled="True" />
@@ -285,7 +285,7 @@
                       </Grid.ColumnDefinitions>
                       <StackPanel Orientation="Horizontal" Spacing="12">
                         <Border Width="34" Height="34" CornerRadius="17" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
-                          <FontIcon Glyph="&#xE74B;" FontSize="14" Foreground="{StaticResource PaqetFireSuccessBrush}"
+                          <FontIcon Glyph="&#xE74B;" FontSize="14" Foreground="{ThemeResource PaqetFireSuccessBrush}"
                                     AutomationProperties.AccessibilityView="Raw" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
@@ -299,7 +299,7 @@
                       <Rectangle Grid.Column="1" Width="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12">
                         <Border Width="34" Height="34" CornerRadius="17" Background="{ThemeResource SubtleFillColorTertiaryBrush}">
-                          <FontIcon Glyph="&#xE74A;" FontSize="14" Foreground="{StaticResource PaqetFireSuccessBrush}"
+                          <FontIcon Glyph="&#xE74A;" FontSize="14" Foreground="{ThemeResource PaqetFireSuccessBrush}"
                                     AutomationProperties.AccessibilityView="Raw" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
@@ -339,7 +339,7 @@
                           <DataTemplate x:DataType="vm:PingBar">
                             <Rectangle Width="7" Height="{x:Bind Height}" RadiusX="3.5" RadiusY="3.5"
                                        VerticalAlignment="Center" Opacity="{x:Bind Opacity}"
-                                       Fill="{StaticResource PaqetFireSuccessBrush}" />
+                                       Fill="{ThemeResource PaqetFireSuccessBrush}" />
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
@@ -361,7 +361,7 @@
               <Border Padding="22" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="10">
                   <StackPanel Orientation="Horizontal" Spacing="10">
-                    <FontIcon Glyph="&#xE968;" Foreground="{StaticResource PaqetFireAccentBrush}" />
+                    <FontIcon Glyph="&#xE968;" Foreground="{ThemeResource PaqetFireAccentBrush}" />
                     <TextBlock Text="Paqet engine" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2" />
                   </StackPanel>
                   <TextBlock Text="{x:Bind ViewModel.PaqetStatusText, Mode=OneWay}" FontSize="22" FontWeight="SemiBold" />
@@ -372,7 +372,7 @@
               <Border Grid.Column="1" Padding="22" CornerRadius="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <StackPanel Spacing="10">
                   <StackPanel Orientation="Horizontal" Spacing="10">
-                    <FontIcon Glyph="&#xE8A7;" Foreground="{StaticResource PaqetFireAccentBrush}" />
+                    <FontIcon Glyph="&#xE8A7;" Foreground="{ThemeResource PaqetFireAccentBrush}" />
                     <TextBlock Text="Application routing" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2" />
                   </StackPanel>
                   <TextBlock Text="{x:Bind ViewModel.ApplicationRoutingStatusText, Mode=OneWay}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -1311,7 +1311,7 @@
           <StackPanel MaxWidth="820" Padding="36,28,36,48" HorizontalAlignment="Stretch" Spacing="20">
             <StackPanel Spacing="6">
               <TextBlock Text="SETTINGS" FontSize="12" FontWeight="SemiBold"
-                         Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
+                         Foreground="{ThemeResource PaqetFireAccentBrush}" CharacterSpacing="110" />
               <TextBlock Text="Settings" FontSize="32" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1" />
               <TextBlock Text="Startup, notifications, network rules, updates, and reset. Changes on this page apply immediately."
                          FontSize="15" Opacity="0.72" TextWrapping="Wrap" />

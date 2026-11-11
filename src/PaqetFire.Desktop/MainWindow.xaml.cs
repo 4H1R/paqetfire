@@ -37,6 +37,7 @@ public sealed partial class MainWindow : Window
     private readonly SemaphoreSlim appSettingsLock = new(1, 1);
     private readonly ServerReachabilityProbe serverReachabilityProbe = new();
     private readonly Windows.UI.ViewManagement.UISettings uiSettings = new();
+    private readonly Windows.UI.ViewManagement.AccessibilitySettings accessibilitySettings = new();
     private bool updatingNetworkInterfaceSelection;
     private bool initialized;
     private bool brokerSettingsApplied;
@@ -116,6 +117,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         InitializeAdvancedOptions();
         InitializeExitProxyOptions();
+        RootGrid.ActualThemeChanged += (_, _) => UpdateConnectionVisuals();
         var versionText = GitHubUpdateService.FormatVersion(CurrentVersion);
         VersionBadgeText.Text = $"v{versionText}";
         AboutVersionText.Text = $"PaqetFire {versionText}";
@@ -1523,7 +1525,27 @@ public sealed partial class MainWindow : Window
             LatencyQuality.Poor or LatencyQuality.Unreachable => "PaqetFireErrorBrush",
             _ => "PaqetFireNeutralBrush",
         };
-        return (Brush)Application.Current.Resources[resourceKey];
+        return ThemeBrush(resourceKey);
+    }
+
+    /// <summary>
+    /// A PaqetFire brush for the theme the window shows. Brushes set from code do not follow
+    /// {ThemeResource}, and an Application lookup ignores the element's theme, so pick the
+    /// theme dictionary here and repaint when the theme changes.
+    /// </summary>
+    private SolidColorBrush ThemeBrush(string resourceKey)
+    {
+        var theme = accessibilitySettings.HighContrast ? "HighContrast"
+            : RootGrid?.ActualTheme == ElementTheme.Light ? "Light"
+            : "Default";
+        if (Application.Current.Resources.ThemeDictionaries.TryGetValue(theme, out var dictionary) &&
+            dictionary is ResourceDictionary themed &&
+            themed.TryGetValue(resourceKey, out var value) && value is SolidColorBrush brush)
+        {
+            return brush;
+        }
+
+        return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 138, 143, 152));
     }
 
     private void UpdateConnectionVisuals()
@@ -1542,8 +1564,7 @@ public sealed partial class MainWindow : Window
             BrokerConnectionState.Faulted => "PaqetFireErrorBrush",
             _ => "PaqetFireNeutralBrush",
         };
-        var brush = Application.Current.Resources[resourceKey] as SolidColorBrush
-            ?? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 138, 143, 152));
+        var brush = ThemeBrush(resourceKey);
         ConnectionStateIndicator.Fill = brush;
         ConnectionStateIcon.Foreground = brush;
         ConnectionStateIconSurface.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(

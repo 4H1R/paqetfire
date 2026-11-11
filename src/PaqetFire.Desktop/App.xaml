@@ -7,11 +7,35 @@
       <ResourceDictionary.MergedDictionaries>
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
       </ResourceDictionary.MergedDictionaries>
-      <SolidColorBrush x:Key="PaqetFireAccentBrush" Color="#FF6B42" />
-      <SolidColorBrush x:Key="PaqetFireSuccessBrush" Color="#2FCB8C" />
-      <SolidColorBrush x:Key="PaqetFireWarningBrush" Color="#F5A524" />
-      <SolidColorBrush x:Key="PaqetFireErrorBrush" Color="#E5484D" />
-      <SolidColorBrush x:Key="PaqetFireNeutralBrush" Color="#8A8F98" />
+      <!-- Use these with {ThemeResource}. Light shades keep text at 4.5:1 or better on light cards;
+           high contrast maps to the system colours the user chose. -->
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+          <SolidColorBrush x:Key="PaqetFireAccentBrush" Color="#FF6B42" />
+          <SolidColorBrush x:Key="PaqetFireSuccessBrush" Color="#2FCB8C" />
+          <SolidColorBrush x:Key="PaqetFireWarningBrush" Color="#F5A524" />
+          <SolidColorBrush x:Key="PaqetFireErrorBrush" Color="#E5484D" />
+          <SolidColorBrush x:Key="PaqetFireNeutralBrush" Color="#8A8F98" />
+          <!-- Text on a PaqetFireSuccessBrush fill, such as the exit country badge. -->
+          <SolidColorBrush x:Key="PaqetFireOnSuccessBrush" Color="#000000" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="PaqetFireAccentBrush" Color="#B93A0E" />
+          <SolidColorBrush x:Key="PaqetFireSuccessBrush" Color="#0E7A4F" />
+          <SolidColorBrush x:Key="PaqetFireWarningBrush" Color="#8A5300" />
+          <SolidColorBrush x:Key="PaqetFireErrorBrush" Color="#C42B1C" />
+          <SolidColorBrush x:Key="PaqetFireNeutralBrush" Color="#5F646C" />
+          <SolidColorBrush x:Key="PaqetFireOnSuccessBrush" Color="#FFFFFF" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+          <SolidColorBrush x:Key="PaqetFireAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+          <SolidColorBrush x:Key="PaqetFireSuccessBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+          <SolidColorBrush x:Key="PaqetFireWarningBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+          <SolidColorBrush x:Key="PaqetFireErrorBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+          <SolidColorBrush x:Key="PaqetFireNeutralBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+          <SolidColorBrush x:Key="PaqetFireOnSuccessBrush" Color="{ThemeResource SystemColorWindowColor}" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>
   </Application.Resources>
 </Application>
