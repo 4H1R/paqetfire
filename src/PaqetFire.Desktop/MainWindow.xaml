@@ -409,7 +409,7 @@
           <StackPanel MaxWidth="900" Padding="36,28,36,48" HorizontalAlignment="Stretch" Spacing="20">
             <StackPanel Spacing="6">
               <TextBlock Text="PAQET CONNECTION" FontSize="12" FontWeight="SemiBold"
-                         Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
+                         Foreground="{ThemeResource PaqetFireAccentBrush}" CharacterSpacing="110" />
               <TextBlock Text="Connection profile" FontSize="32" FontWeight="SemiBold" />
               <TextBlock Text="Add the server details Paqet will use. Your active adapter is detected safely by the broker."
                          FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
@@ -533,7 +533,7 @@
           <StackPanel MaxWidth="900" Padding="36,28,36,48" HorizontalAlignment="Stretch" Spacing="20">
             <StackPanel Spacing="6">
               <TextBlock Text="PROXIFYRE ROUTING" FontSize="12" FontWeight="SemiBold"
-                         Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
+                         Foreground="{ThemeResource PaqetFireAccentBrush}" CharacterSpacing="110" />
               <TextBlock Text="Choose what uses the route" FontSize="32" FontWeight="SemiBold" />
               <TextBlock Text="Choose applications and destination regions. Engine exclusions are always locked."
                          FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
@@ -999,7 +999,7 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Spacing="6">
                 <TextBlock Text="DATA USAGE" FontSize="12" FontWeight="SemiBold"
-                           Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
+                           Foreground="{ThemeResource PaqetFireAccentBrush}" CharacterSpacing="110" />
                 <TextBlock Text="Traffic through Paqet" FontSize="32" FontWeight="SemiBold" />
                 <TextBlock Text="What applications and shared devices downloaded and uploaded through your Paqet server, including any exit proxy behind it. Traffic routed directly is not counted. Days are kept for 90 days."
                            FontSize="15" Opacity="0.72" TextWrapping="Wrap" />
@@ -1093,7 +1093,7 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Spacing="6">
                 <TextBlock Text="DIAGNOSTICS" FontSize="12" FontWeight="SemiBold"
-                           Foreground="{StaticResource PaqetFireAccentBrush}" CharacterSpacing="110" />
+                           Foreground="{ThemeResource PaqetFireAccentBrush}" CharacterSpacing="110" />
                 <TextBlock Text="Health and activity" FontSize="32" FontWeight="SemiBold" />
                 <TextBlock Text="Use this page to check the broker, engines, local endpoint, and recent actions."
                            FontSize="15" Opacity="0.72" TextWrapping="Wrap" />

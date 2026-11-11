@@ -82,6 +82,16 @@ public sealed partial class MainWindow
             StatusTone.Accent => "PaqetFireAccentBrush",
             _ => "TextFillColorSecondaryBrush",
         };
-        return (Brush)Application.Current.Resources[resourceKey];
+        // The indexer also searches theme dictionaries; fall back to a neutral brush rather than
+        // throw if a key is ever missing, because this runs while rendering list rows.
+        try
+        {
+            if (Application.Current.Resources[resourceKey] is Brush brush) return brush;
+        }
+        catch (Exception)
+        {
+        }
+
+        return new SolidColorBrush(Windows.UI.Color.FromArgb(255, 138, 143, 152));
     }
 }
