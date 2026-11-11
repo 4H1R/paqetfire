@@ -88,4 +88,29 @@ public sealed class ProfileUxPresentationTests
         Assert.DoesNotContain("reconnects", ProfileSwitch.DeleteMessage(false, true, next), StringComparison.Ordinal);
         Assert.DoesNotContain("reconnects", ProfileSwitch.DeleteMessage(true, false, next), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ImportListsShortFilesByNameAndCountsLongOnes()
+    {
+        Assert.Equal("The file contains 1 profile: Office.", ProfileImportText.Contents(["Office"]));
+        Assert.Equal("The file contains 2 profiles: Office, Travel.", ProfileImportText.Contents(["Office", "Travel"]));
+        var many = Enumerable.Range(1, ProfileImportText.NamedProfileLimit + 1).Select(index => $"Server {index}").ToList();
+        Assert.Equal($"The file contains {many.Count} profiles.", ProfileImportText.Contents(many));
+    }
+
+    [Fact]
+    public void ImportExplainsWhyReplacingIsUnavailableWhileConnected()
+    {
+        Assert.Contains("only while the route is disconnected", ProfileImportText.ChoiceMessage(["Office"], canReplace: false), StringComparison.Ordinal);
+        Assert.Contains("or replace every saved profile", ProfileImportText.ChoiceMessage(["Office"], canReplace: true), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReplacingIsConfirmedWithTheNumberOfProfilesItDeletes()
+    {
+        Assert.Equal("Replace all 4 existing profiles?", ProfileImportText.ReplaceTitle(4));
+        Assert.Contains("the 2 profiles in the file", ProfileImportText.ReplaceMessage(2, hasPendingChanges: false), StringComparison.Ordinal);
+        Assert.Contains("unsaved changes", ProfileImportText.ReplaceMessage(1, hasPendingChanges: true), StringComparison.Ordinal);
+        Assert.DoesNotContain("unsaved changes", ProfileImportText.ReplaceMessage(1, hasPendingChanges: false), StringComparison.Ordinal);
+    }
 }

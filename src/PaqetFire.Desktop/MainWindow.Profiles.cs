@@ -320,18 +320,59 @@ public sealed partial class MainWindow
     private async Task ImportProfilesAsync(string json)
     {
         if (Content?.XamlRoot is null) return;
+        IReadOnlyList<string> importedNames;
+        try
+        {
+            importedNames = ProfileCatalogJson.ReadImport(json).Profiles
+                .Select(profile => profile.Settings.ProfileName)
+                .ToList();
+        }
+        catch (Exception exception) when (exception is InvalidDataException or InvalidOperationException)
+        {
+            ShowInfo(ConnectionInfoBar, InfoBarSeverity.Error, "Profiles could not be imported",
+                "This is not a valid PaqetFire profile export. Choose an export (.json) made by PaqetFire.");
+            return;
+        }
+
+        // The broker replaces the catalog only while the route is disconnected.
+        var canReplace = ProfileCreation.BecomesActive(lastSnapshot);
         var choice = new ContentDialog
         {
             Title = "Import profiles",
-            Content = "Add the imported profiles beside your current ones, or replace every saved profile with the import. Replacing requires the route to be disconnected. Transport keys are restored from portable exports; older redacted exports need keys entered again. Your SOCKS username and password are kept either way.",
+            Content = new TextBlock
+            {
+                Text = ProfileImportText.ChoiceMessage(importedNames, canReplace),
+                TextWrapping = TextWrapping.Wrap,
+            },
             PrimaryButtonText = "Add to my profiles",
-            SecondaryButtonText = "Replace all profiles",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = Content.XamlRoot,
         };
+        if (canReplace)
+        {
+            choice.SecondaryButtonText = "Replace all profiles…";
+        }
+
         var result = await ShowDialogAsync(choice);
         if (result is null or ContentDialogResult.None) return;
+        if (result == ContentDialogResult.Secondary)
+        {
+            var confirm = new ContentDialog
+            {
+                Title = ProfileImportText.ReplaceTitle(ProfileEntries.Count),
+                Content = new TextBlock
+                {
+                    Text = ProfileImportText.ReplaceMessage(importedNames.Count, hasPendingConfigurationChanges),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                PrimaryButtonText = "Replace all",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot,
+            };
+            if (await ShowDialogAsync(confirm) != ContentDialogResult.Primary) return;
+        }
 
         var merge = result == ContentDialogResult.Primary;
         await RunProfileActionAsync(
